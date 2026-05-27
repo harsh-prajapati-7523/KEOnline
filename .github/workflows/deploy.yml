@@ -27,8 +27,8 @@ jobs:
 
       - name: Deploy dist files
         run: |
-          sudo rm -rf /var/www/frontend/*
-          sudo cp -r ~/apps/frontend/dist/* /var/www/frontend/
+          sudo visudo rm -rf /var/www/frontend/*
+          sudo visudo cp -r ~/apps/frontend/dist/* /var/www/frontend/
 
       - name: Restart nginx
-        run: sudo systemctl restart nginx
+        run: sudo visudo systemctl restart nginx

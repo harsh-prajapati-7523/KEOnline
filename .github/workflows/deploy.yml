@@ -12,23 +12,23 @@ jobs:
     steps:
       - name: Go to frontend repo
         run: |
-          cd ~/apps/frontend
+          cd ~/apps/KEOnline
           git pull
 
       - name: Install dependencies
         run: |
-          cd ~/apps/frontend
+          cd ~/apps/KEOnline
           npm install
 
       - name: Build frontend
         run: |
-          cd ~/apps/frontend
+          cd ~/apps/KEOnline
           npm run build
 
       - name: Deploy dist files
         run: |
-          sudo visudo rm -rf /var/www/frontend/*
-          sudo visudo cp -r ~/apps/frontend/dist/* /var/www/frontend/
+          sudo visudo rm -rf /var/www/KEOnline/*
+          sudo visudo cp -r ~/apps/KEOnline/dist/* /var/www/KEOnline/
 
       - name: Restart nginx
         run: sudo visudo systemctl restart nginx

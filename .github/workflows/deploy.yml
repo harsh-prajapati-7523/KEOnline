@@ -27,8 +27,8 @@ jobs:
 
       - name: Deploy dist files
         run: |
-          sudo visudo rm -rf /var/www/KEOnline/*
-          sudo visudo cp -r ~/apps/KEOnline/dist/* /var/www/KEOnline/
+          sudo rm -rf /var/www/KEOnline/*
+          sudo cp -r ~/apps/KEOnline/dist/* /var/www/KEOnline/
 
       - name: Restart nginx
-        run: sudo visudo systemctl restart nginx
+        run: sudo systemctl restart nginx

@@ -1,0 +1,34 @@
+name: Deploy KE Frontend
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Go to frontend repo
+        run: |
+          cd ~/apps/frontend
+          git pull
+
+      - name: Install dependencies
+        run: |
+          cd ~/apps/frontend
+          npm install
+
+      - name: Build frontend
+        run: |
+          cd ~/apps/frontend
+          npm run build
+
+      - name: Deploy dist files
+        run: |
+          sudo rm -rf /var/www/frontend/*
+          sudo cp -r ~/apps/frontend/dist/* /var/www/frontend/
+
+      - name: Restart nginx
+        run: sudo systemctl restart nginx

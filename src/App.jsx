@@ -7,7 +7,7 @@ import EmployeeLogin from "./pages/EmployeeLogin";
 function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const active = location.pathname === "/" ? "Home" : "RiseTicket";
+  const active = location.pathname;
 
   return (
     <nav className="bg-blue-950 text-white shadow-lg">
@@ -41,7 +41,7 @@ function Navbar() {
           >
             <Ticket size={18} /> Rise Ticket
           </button>
-          <button nClick={() => navigate("/employee-login")}
+          <button onClick={() => navigate("/employee-login")}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${
               active === "/employee-login"
                 ? "bg-yellow-400 text-black"

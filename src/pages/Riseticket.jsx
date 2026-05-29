@@ -128,6 +128,9 @@ export default function RiseTicket() {
 
                             <input
                                 type="tel"
+                                inputMode="numeric"
+                                pattern="[0-9]{10}"
+                                maxLength={10}
                                 name="mobileNo"
                                 placeholder="Enter mobile number"
                                 value={formData.mobileNo}

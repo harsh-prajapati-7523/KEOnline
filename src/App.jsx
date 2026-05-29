@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-ro
 import { Home, Ticket } from "lucide-react";
 import HomePage from "./pages/Home";
 import RiseTicket from "./pages/Riseticket";
+import EmployeeLogin from "./pages/EmployeeLogin";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -33,13 +34,21 @@ function Navbar() {
           >
             <Home size={18} /> Home
           </button>
-          <button
-            onClick={() => navigate("/ticket")}
+          <button onClick={() => navigate("/ticket")}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${
               active === "RiseTicket" ? "bg-yellow-400 text-black" : "bg-white/10 hover:bg-white/20"
             }`}
           >
             <Ticket size={18} /> Rise Ticket
+          </button>
+          <button nClick={() => navigate("/employee-login")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${
+              active === "/employee-login"
+                ? "bg-yellow-400 text-black"
+                : "bg-white/10 hover:bg-white/20"
+            }`}
+          >
+            Employee Login
           </button>
         </div>
       </div>
@@ -54,6 +63,7 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/ticket" element={<RiseTicket />} />
+        <Route path="/employee-login" element={<EmployeeLogin />} />
       </Routes>
     </BrowserRouter>
   );

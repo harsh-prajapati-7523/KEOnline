@@ -3,6 +3,7 @@ import { Home, Ticket } from "lucide-react";
 import HomePage from "./pages/Home";
 import RiseTicket from "./pages/Riseticket";
 import EmployeeLogin from "./pages/EmployeeLogin";
+import EmployeeDashboard from "./pages/EmployeeDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function Navbar() {
@@ -67,7 +68,7 @@ function App() {
         <Route path="/employee-login" element={<EmployeeLogin />} />
         <Route path="/employee/dashboard" element={
           <ProtectedRoute>
-            <EmployeeDashboard />
+            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
           </ProtectedRoute>
         }/>
       </Routes>

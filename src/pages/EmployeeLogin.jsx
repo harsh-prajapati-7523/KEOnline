@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { User, Lock, ShieldCheck } from "lucide-react";
+import BASE_URL from "../services/config";
 
 export default function EmployeeLogin() {
   const [employeeId, setEmployeeId] = useState("");

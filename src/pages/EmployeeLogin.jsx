@@ -5,16 +5,16 @@ export default function EmployeeLogin() {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleLogin = (e) => {
-    e.preventDefault();
-
-    // Temporary frontend-only login
-    if (employeeId === "admin" && password === "123456") {
-      alert("Login Successful");
-    } else {
-      alert("Invalid Credentials");
-    }
-  };
+const response = await fetch(`${BASE_URL}/api/auth/login`, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    employeeId,
+    password,
+  }),
+});
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-950 to-blue-800 flex items-center justify-center px-4">

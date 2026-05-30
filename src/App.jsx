@@ -3,6 +3,7 @@ import { Home, Ticket } from "lucide-react";
 import HomePage from "./pages/Home";
 import RiseTicket from "./pages/Riseticket";
 import EmployeeLogin from "./pages/EmployeeLogin";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -64,7 +65,13 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/ticket" element={<RiseTicket />} />
         <Route path="/employee-login" element={<EmployeeLogin />} />
+        <Route path="/employee/dashboard" element={
+          <ProtectedRoute>
+            <EmployeeDashboard />
+          </ProtectedRoute>
+        }/>
       </Routes>
+      
     </BrowserRouter>
   );
 }

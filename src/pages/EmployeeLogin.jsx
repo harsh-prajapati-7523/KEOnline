@@ -9,7 +9,7 @@ export default function EmployeeLogin() {
 const handleLogin = async (e) => {
   e.preventDefault();
 
-  const response = await fetch(`${BASE_URL}/api/auth/login`, {
+  const response = await fetch(`${BASE_URL}/auth/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

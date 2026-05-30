@@ -6,7 +6,7 @@ export default function App() {
   e.preventDefault();
 
   try {
-    const response = await fetch("http://localhost:8080/api/tickets", {
+    const response = await fetch(`${BASE_URL}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -34,7 +34,7 @@ export default function RiseTicket() {
     e.preventDefault();
 
     try {
-        const response = await fetch(`${BASE_URL}/api/tickets/create`, {
+        const response = await fetch(`${BASE_URL}/tickets/create`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

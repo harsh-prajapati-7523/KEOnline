@@ -15,7 +15,7 @@ const handleLogin = async (e) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      email,
+      employeeId,
       password,
     }),
   });

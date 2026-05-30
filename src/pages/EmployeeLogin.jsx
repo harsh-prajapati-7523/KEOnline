@@ -5,16 +5,23 @@ export default function EmployeeLogin() {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
 
-const response = await fetch(`${BASE_URL}/api/auth/login`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    employeeId,
-    password,
-  }),
-});
+const handleLogin = async (e) => {
+  e.preventDefault();
+
+  const response = await fetch(`${BASE_URL}/api/auth/login`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      email,
+      password,
+    }),
+  });
+
+  const data = await response.json();
+  console.log(data);
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-950 to-blue-800 flex items-center justify-center px-4">

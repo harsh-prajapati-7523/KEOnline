@@ -4,7 +4,7 @@ export default function ProtectedRoute({ children }) {
   const token = localStorage.getItem("token");
 
   if (!token) {
-    return <Navigate to="/employee-login" />;
+    return <Navigate to="/employee-login" replace />;
   }
 
   return children;

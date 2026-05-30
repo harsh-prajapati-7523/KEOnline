@@ -1,28 +1,51 @@
 import { useState } from "react";
 import { User, Lock, ShieldCheck } from "lucide-react";
-import BASE_URL from "../services/config";
+import { useNavigate } from "react-router-dom";
 
 export default function EmployeeLogin() {
+  const navigate = useNavigate();
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-const handleLogin = async (e) => {
-  e.preventDefault();
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setIsSubmitting(true);
 
-  const response = await fetch(`${BASE_URL}/auth/employeelogin`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      employeeId,
-      password,
-    }),
-  });
+    try {
+      const response = await fetch("/volt/auth/employeelogin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          employeeId,
+          password,
+        }),
+      });
 
-  const data = await response.json();
-  console.log(data);
-};
+      if (!response.ok) {
+        throw new Error("Invalid credentials");
+      }
+
+      const data = await response.json();
+
+      if (!data.token) {
+        throw new Error("Missing token");
+      }
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("employeeName", data.employeeName ?? "");
+      localStorage.setItem("role", data.role ?? "");
+      navigate("/employee-dashboard", { replace: true });
+    } catch {
+      setError("Unable to log in. Please check your employee ID and password.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-r from-blue-950 to-blue-800 flex items-center justify-center px-4">
@@ -87,11 +110,18 @@ const handleLogin = async (e) => {
 
           <button
             type="submit"
+            disabled={isSubmitting}
             className="w-full mt-6 bg-yellow-400 hover:bg-yellow-300 text-black py-3 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 transition"
           >
             <ShieldCheck size={22} />
-            Login
+            {isSubmitting ? "Logging in..." : "Login"}
           </button>
+
+          {error && (
+            <p className="mt-4 text-center text-sm font-semibold text-red-600">
+              {error}
+            </p>
+          )}
 
         </form>
 

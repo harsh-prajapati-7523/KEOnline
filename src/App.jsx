@@ -66,9 +66,9 @@ function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/ticket" element={<RiseTicket />} />
         <Route path="/employee-login" element={<EmployeeLogin />} />
-        <Route path="/employee/dashboard" element={
+        <Route path="/employee-dashboard" element={
           <ProtectedRoute>
-            <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+            <EmployeeDashboard />
           </ProtectedRoute>
         }/>
       </Routes>

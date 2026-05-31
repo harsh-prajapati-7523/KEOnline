@@ -217,8 +217,6 @@ function TicketCard({
           </button>
         )}
       </div>
-
-      </div>
     </article>
   );
 }

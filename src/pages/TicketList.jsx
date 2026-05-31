@@ -309,6 +309,80 @@ export default function TicketList() {
     await loadCharges(ticketId);
   };
 
+  const ticketAction = async (ticketId, method, path, body = null, successMessage = "Action completed successfully.") => {
+    const response = await fetch(`/volt/tickets/${ticketId}/${path}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${localStorage.getItem("token")}`,
+        "Content-Type": "application/json",
+      },
+      body: body ? JSON.stringify(body) : null,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      throw new Error(errorText || "Ticket action failed");
+    }
+
+    await loadTickets();
+    if (activeTicketId === ticketId) {
+      await loadCharges(ticketId);
+    }
+    setStatusMessage(successMessage);
+  };
+
+  const pickTicket = async (ticketId) => {
+    const key = `pick-${ticketId}`;
+    setProcessing(key, true);
+    setStatusMessage("");
+    try {
+      await ticketAction(ticketId, "POST", "pick", null, "Ticket picked successfully.");
+    } catch {
+      setStatusMessage("Unable to pick ticket. Please try again.");
+    } finally {
+      setProcessing(key, false);
+    }
+  };
+
+  const startWork = async (ticketId) => {
+    const key = `start-${ticketId}`;
+    setProcessing(key, true);
+    setStatusMessage("");
+    try {
+      await ticketAction(ticketId, "POST", "start-work", null, "Work started on ticket.");
+    } catch {
+      setStatusMessage("Unable to start work. Please try again.");
+    } finally {
+      setProcessing(key, false);
+    }
+  };
+
+  const completeTicket = async (ticketId) => {
+    const key = `complete-${ticketId}`;
+    setProcessing(key, true);
+    setStatusMessage("");
+    try {
+      await ticketAction(ticketId, "POST", "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.");
+    } catch {
+      setStatusMessage("Unable to complete ticket. Please try again.");
+    } finally {
+      setProcessing(key, false);
+    }
+  };
+
+  const cancelTicket = async (ticketId) => {
+    const key = `cancel-${ticketId}`;
+    setProcessing(key, true);
+    setStatusMessage("");
+    try {
+      await ticketAction(ticketId, "POST", "cancel", { cancellationReason: "Cancelled via ticket list." }, "Ticket cancelled successfully.");
+    } catch {
+      setStatusMessage("Unable to cancel ticket. Please try again.");
+    } finally {
+      setProcessing(key, false);
+    }
+  };
+
   const validateChargeInput = (description, amountValue) => {
     const errors = {};
     const trimmedDescription = description.trim();

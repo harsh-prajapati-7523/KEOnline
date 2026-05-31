@@ -8,8 +8,11 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
 }
 
-function TicketCard({ ticket, onPick, onStart, processingKeys }) {
+function TicketCard({ ticket, currentRole, currentEmployeeId, onPick, onStart, onComplete, onCancel, processingKeys }) {
   const pickedBy = ticket.pickedByEmployeeId ?? "Not picked";
+  const isCurrentOwner = currentEmployeeId && String(ticket.pickedByEmployeeId) === currentEmployeeId;
+  const canShowComplete = ticket.status === 'IN_PROGRESS' && (currentRole === 'SUPER_ADMIN' || currentRole === 'ADMIN' || isCurrentOwner);
+  const canShowCancel = ['SUPER_ADMIN', 'ADMIN'].includes(currentRole) && ['NEW', 'PICKED', 'IN_PROGRESS'].includes(ticket.status);
 
   return (
     <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
@@ -46,6 +49,36 @@ function TicketCard({ ticket, onPick, onStart, processingKeys }) {
           <dt className="font-bold text-gray-500">Picked By</dt>
           <dd className="mt-1 text-gray-800">{pickedBy}</dd>
         </div>
+
+        {ticket.status === 'COMPLETED' && (
+          <>
+            <div>
+              <dt className="font-bold text-gray-500">Completed By</dt>
+              <dd className="mt-1 text-gray-800">{ticket.completedByEmployeeId ?? 'Not available'}</dd>
+            </div>
+            <div>
+              <dt className="font-bold text-gray-500">Completed At</dt>
+              <dd className="mt-1 text-gray-800">{formatDate(ticket.completedAt)}</dd>
+            </div>
+          </>
+        )}
+
+        {ticket.status === 'CANCELLED' && (
+          <>
+            <div>
+              <dt className="font-bold text-gray-500">Cancelled By</dt>
+              <dd className="mt-1 text-gray-800">{ticket.cancelledByEmployeeId ?? 'Not available'}</dd>
+            </div>
+            <div>
+              <dt className="font-bold text-gray-500">Cancelled At</dt>
+              <dd className="mt-1 text-gray-800">{formatDate(ticket.cancelledAt)}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="font-bold text-gray-500">Cancellation Reason</dt>
+              <dd className="mt-1 text-gray-800">{ticket.cancellationReason ?? 'Not available'}</dd>
+            </div>
+          </>
+        )}
       </dl>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -83,7 +116,32 @@ function TicketCard({ ticket, onPick, onStart, processingKeys }) {
         )}
 
         {ticket.status === 'IN_PROGRESS' && (
-          <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-950">In Progress</span>
+          <>
+            {canShowComplete && (
+              <button
+                type="button"
+                onClick={() => onComplete(ticket.id)}
+                disabled={processingKeys[`complete-${ticket.id}`]}
+                className="rounded-2xl bg-green-600 px-4 py-2 font-semibold text-white disabled:opacity-60"
+              >
+                {processingKeys[`complete-${ticket.id}`] ? 'Completing…' : 'Complete Ticket'}
+              </button>
+            )}
+            {!canShowComplete && (
+              <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-950">In Progress</span>
+            )}
+          </>
+        )}
+
+        {canShowCancel && (
+          <button
+            type="button"
+            onClick={() => onCancel(ticket.id)}
+            disabled={processingKeys[`cancel-${ticket.id}`]}
+            className="rounded-2xl bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-60"
+          >
+            {processingKeys[`cancel-${ticket.id}`] ? 'Cancelling…' : 'Cancel Ticket'}
+          </button>
         )}
       </div>
     </article>
@@ -95,11 +153,15 @@ export default function TicketList() {
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
   const [processingKeys, setProcessingKeys] = useState({});
+  const currentRole = localStorage.getItem("role") ?? "";
+  const currentEmployeeId = localStorage.getItem("employeeId") ?? "";
 
   const loadTickets = async () => {
     setIsLoading(true);
     setError("");
+    setStatusMessage("");
     try {
       const response = await fetch("/volt/tickets", {
         headers: {
@@ -181,6 +243,94 @@ export default function TicketList() {
     }
   };
 
+  const completeTicket = async (ticketId) => {
+    setError("");
+    setStatusMessage("");
+    const completionRemark = window.prompt("Enter optional completion remark:", "");
+    if (completionRemark === null) {
+      return;
+    }
+
+    const key = `complete-${ticketId}`;
+    setProcessing(key, true);
+
+    try {
+      const res = await fetch(`/volt/tickets/${ticketId}/complete`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ completionRemark: completionRemark.trim() }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) throw new Error("Unauthorized");
+        if (res.status === 403) throw new Error("Forbidden");
+        if (res.status === 409) throw new Error("Ticket status changed");
+        throw new Error("Unable to complete ticket");
+      }
+
+      await loadTickets();
+      setStatusMessage("Ticket completed successfully.");
+    } catch (e) {
+      if (e.message === "Ticket status changed") {
+        setError("Ticket status changed. Please refresh and try again.");
+      } else {
+        setError("Unable to complete ticket. Please try again.");
+      }
+    } finally {
+      setProcessing(key, false);
+    }
+  };
+
+  const cancelTicket = async (ticketId) => {
+    setError("");
+    setStatusMessage("");
+    const reason = window.prompt("Enter cancellation reason (required):", "");
+    if (reason === null) {
+      return;
+    }
+
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) {
+      setError("Unable to cancel ticket. Please provide a valid reason and try again.");
+      return;
+    }
+
+    const key = `cancel-${ticketId}`;
+    setProcessing(key, true);
+
+    try {
+      const res = await fetch(`/volt/tickets/${ticketId}/cancel`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ cancellationReason: trimmedReason }),
+      });
+
+      if (!res.ok) {
+        if (res.status === 401) throw new Error("Unauthorized");
+        if (res.status === 403) throw new Error("Forbidden");
+        if (res.status === 409) throw new Error("Ticket status changed");
+        throw new Error("Unable to cancel ticket");
+      }
+
+      await loadTickets();
+      setStatusMessage("Ticket cancelled successfully.");
+    } catch (e) {
+      if (e.message === "Ticket status changed") {
+        setError("Ticket status changed. Please refresh and try again.");
+      } else {
+        setError("Unable to cancel ticket. Please provide a valid reason and try again.");
+      }
+    } finally {
+      setProcessing(key, false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
@@ -193,6 +343,10 @@ export default function TicketList() {
           <p className="mt-2 text-sm text-blue-100">Customer service ticket list.</p>
         </header>
 
+        {statusMessage && (
+          <p className="mt-4 rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">{statusMessage}</p>
+        )}
+
         <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2" aria-live="polite">
           {isLoading && <p className="text-sm font-semibold text-gray-600">Loading tickets...</p>}
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
@@ -201,8 +355,12 @@ export default function TicketList() {
             <TicketCard
               key={ticket.id ?? ticket.ticketNumber}
               ticket={ticket}
+              currentRole={currentRole}
+              currentEmployeeId={currentEmployeeId}
               onPick={pickTicket}
               onStart={startWork}
+              onComplete={completeTicket}
+              onCancel={cancelTicket}
               processingKeys={processingKeys}
             />
           ))}

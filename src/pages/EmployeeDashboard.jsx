@@ -5,7 +5,9 @@ import {
   ClipboardList,
   Clock,
   History,
+  ListChecks,
   LogOut,
+  PlusCircle,
   Wrench,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -59,6 +61,7 @@ export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const employeeName = localStorage.getItem("employeeName") ?? "";
   const role = localStorage.getItem("role") ?? "";
+  const canCreateTicket = role === "SUPER_ADMIN" || role === "ADMIN";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -104,6 +107,40 @@ export default function EmployeeDashboard() {
             {dashboardStats.map((stat) => (
               <StatCard key={stat.label} {...stat} />
             ))}
+          </div>
+        </section>
+
+        <section className="mt-8" aria-labelledby="ticket-actions">
+          <h2 id="ticket-actions" className="text-xl font-extrabold text-blue-950">
+            Ticket Actions
+          </h2>
+          <p className="mt-1 text-sm text-gray-500">
+            Create and review customer service tickets.
+          </p>
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {canCreateTicket && (
+              <button
+                type="button"
+                onClick={() => navigate("/tickets/new")}
+                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+              >
+                <div className="rounded-xl bg-yellow-100 p-2 text-yellow-800">
+                  <PlusCircle size={20} aria-hidden="true" />
+                </div>
+                <span className="font-semibold text-blue-950">Create Ticket</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate("/tickets")}
+              className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+            >
+              <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
+                <ListChecks size={20} aria-hidden="true" />
+              </div>
+              <span className="font-semibold text-blue-950">View Tickets</span>
+            </button>
           </div>
         </section>
 

@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { Home, Ticket } from "lucide-react";
+import { Home } from "lucide-react";
 import HomePage from "./pages/Home";
-import RiseTicket from "./pages/Riseticket";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
+import CreateTicket from "./pages/CreateTicket";
+import TicketList from "./pages/TicketList";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function Navbar() {
@@ -36,13 +37,6 @@ function Navbar() {
           >
             <Home size={18} /> Home
           </button>
-          <button onClick={() => navigate("/ticket")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${
-              active === "RiseTicket" ? "bg-yellow-400 text-black" : "bg-white/10 hover:bg-white/20"
-            }`}
-          >
-            <Ticket size={18} /> Rise Ticket
-          </button>
           <button onClick={() => navigate("/employee-login")}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${
               active === "/employee-login"
@@ -64,11 +58,20 @@ function App() {
       <Navbar />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/ticket" element={<RiseTicket />} />
         <Route path="/employee-login" element={<EmployeeLogin />} />
         <Route path="/employee-dashboard" element={
           <ProtectedRoute>
             <EmployeeDashboard />
+          </ProtectedRoute>
+        }/>
+        <Route path="/tickets/new" element={
+          <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
+            <CreateTicket />
+          </ProtectedRoute>
+        }/>
+        <Route path="/tickets" element={
+          <ProtectedRoute>
+            <TicketList />
           </ProtectedRoute>
         }/>
       </Routes>

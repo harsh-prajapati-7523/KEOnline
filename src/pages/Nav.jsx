@@ -39,17 +39,6 @@ const Nav = () => {
                             Home
                         </button>
 
-                        <button
-                            onClick={() => navigate("/ticket")}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${active === "RiseTicket"
-                                ? "bg-yellow-400 text-black"
-                                : "bg-white/10 hover:bg-white/20"
-                                }`}
-                        >
-                            <Ticket size={18} />
-                            Rise Ticket
-                        </button>
-
                     </div>
                 </div>
             </nav>

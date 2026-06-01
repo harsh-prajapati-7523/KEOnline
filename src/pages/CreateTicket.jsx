@@ -88,9 +88,7 @@ export default function CreateTicket() {
       if (!response.ok) throw new Error("Ticket creation failed");
 
       const ticket = await response.json();
-      const ticketNumber = ticket.ticketNumber ? ` ${ticket.ticketNumber}` : "";
-      setMessage(`Ticket${ticketNumber} created successfully.`);
-      setFormData(emptyForm);
+      navigate(`/tickets/${ticket.id}`);
     } catch {
       setMessage("Unable to create the ticket. Please try again.");
     } finally {

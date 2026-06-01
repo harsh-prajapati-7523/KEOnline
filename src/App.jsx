@@ -5,6 +5,7 @@ import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import CreateTicket from "./pages/CreateTicket";
 import TicketList from "./pages/TicketList";
+import TicketDetail from "./pages/TicketDetail";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function Navbar() {
@@ -72,6 +73,11 @@ function App() {
         <Route path="/tickets" element={
           <ProtectedRoute>
             <TicketList />
+          </ProtectedRoute>
+        }/>
+        <Route path="/tickets/:ticketId" element={
+          <ProtectedRoute>
+            <TicketDetail />
           </ProtectedRoute>
         }/>
       </Routes>

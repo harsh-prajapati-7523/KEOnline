@@ -3,32 +3,46 @@ name: Deploy KE Frontend
 on:
   push:
     branches:
+      - test
+      - main
+
+  pull_request:
+    branches:
+      - test
       - main
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: self-hosted
 
     steps:
-      - name: Go to frontend repo
-        run: |
-          cd ~/apps/KEOnline
-          git pull
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Install dependencies
-        run: |
-          cd ~/apps/KEOnline
-          npm install
+        run: npm ci
 
       - name: Build frontend
-        run: |
-          cd ~/apps/KEOnline
-          npm run build
+        run: npm run build
 
-      - name: Deploy dist files
+      - name: Deploy to TEST
+        if: github.event_name == 'push' && github.ref == 'refs/heads/test'
         run: |
-          sudo rm -rf /var/www/KEOnline/*
-          sudo cp -r ~/apps/KEOnline/dist/* /var/www/KEOnline/
+          sudo mkdir -p /var/www/keonline-test
+          sudo rm -rf /var/www/keonline-test/*
+          sudo cp -r dist/* /var/www/keonline-test/
+          sudo chown -R www-data:www-data /var/www/keonline-test
 
-      - name: Restart nginx
-        run: sudo systemctl restart nginx
+      - name: Deploy to PROD
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          sudo mkdir -p /var/www/keonline-prod
+          sudo rm -rf /var/www/keonline-prod/*
+          sudo cp -r dist/* /var/www/keonline-prod/
+          sudo chown -R www-data:www-data /var/www/keonline-prod
+
+      - name: Validate and reload nginx
+        if: github.event_name == 'push'
+        run: |
+          sudo nginx -t
+          sudo systemctl reload nginx

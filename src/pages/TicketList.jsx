@@ -16,6 +16,10 @@ function formatCurrency(value) {
   }).format(amount);
 }
 
+function formatLabel(value) {
+  return value ? value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
+}
+
 function TicketCard({ ticket, onViewDetails }) {
   return (
     <article className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
@@ -43,6 +47,14 @@ function TicketCard({ ticket, onViewDetails }) {
         <div>
           <dt className="font-bold text-gray-500">Total Charge</dt>
           <dd className="mt-1 text-gray-800">{formatCurrency(ticket.totalCharge ?? 0)}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-gray-500">Warranty</dt>
+          <dd className="mt-1 text-gray-800">{formatLabel(ticket.warrantyStatus)}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-gray-500">Mfg Status</dt>
+          <dd className="mt-1 text-gray-800">{formatLabel(ticket.manufacturerStatus)}</dd>
         </div>
       </dl>
 

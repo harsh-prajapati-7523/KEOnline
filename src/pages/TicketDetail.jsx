@@ -22,6 +22,23 @@ function formatCurrency(value) {
   }).format(amount);
 }
 
+function formatLabel(value) {
+  return value ? value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
+}
+
+const warrantyStatuses = ["NOT_CHECKED", "IN_WARRANTY", "OUT_OF_WARRANTY"];
+const manufacturerStatuses = ["NOT_REQUIRED", "RAISED", "IN_PROGRESS", "REPAIRED", "REPLACED", "WAITING_FOR_COMPANY_VISIT"];
+
+function createWarrantyForm(ticket = {}) {
+  return {
+    warrantyStatus: ticket.warrantyStatus ?? "",
+    manufacturerStatus: ticket.manufacturerStatus ?? "NOT_REQUIRED",
+    manufacturerComplaintNumber: ticket.manufacturerComplaintNumber ?? "",
+    manufacturerOrBrandName: ticket.manufacturerOrBrandName ?? "",
+    productSerialNumber: ticket.productSerialNumber ?? "",
+  };
+}
+
 function hasMaxTwoDecimals(value) {
   const match = String(value).match(/^(?:\d+)(?:\.(\d+))?$/);
   return match ? match[1] ? match[1].length <= 2 : true : false;
@@ -52,6 +69,10 @@ export default function TicketDetail() {
   const [chargeForm, setChargeForm] = useState({ description: "", amount: "" });
   const [chargeFormErrors, setChargeFormErrors] = useState({});
   const [chargeActionMessage, setChargeActionMessage] = useState("");
+  const [warrantyForm, setWarrantyForm] = useState(createWarrantyForm());
+  const [warrantyFormErrors, setWarrantyFormErrors] = useState({});
+  const [warrantyMessage, setWarrantyMessage] = useState("");
+  const [isUpdatingWarranty, setIsUpdatingWarranty] = useState(false);
   const currentRole = localStorage.getItem("role") ?? "";
   const currentEmployeeId = localStorage.getItem("employeeId") ?? "";
 
@@ -79,6 +100,7 @@ export default function TicketDetail() {
       }
 
       setTicket(selectedTicket);
+      setWarrantyForm(createWarrantyForm(selectedTicket));
     } catch {
       setTicket(null);
       setError("Unable to load ticket details. Please try again.");
@@ -145,7 +167,9 @@ export default function TicketDetail() {
     try {
       await ticketAction(path, body, successMessage);
     } catch {
-      setStatusMessage(errorMessage);
+      setStatusMessage(path === "complete" && ticket?.warrantyStatus === "NOT_CHECKED"
+        ? "Please confirm warranty status before completing this ticket."
+        : errorMessage);
     } finally {
       setProcessing(key, false);
     }
@@ -252,6 +276,70 @@ export default function TicketDetail() {
     setChargeActionMessage("");
   };
 
+  const handleWarrantyInput = (event) => {
+    const { name, value } = event.target;
+    setWarrantyForm((current) => ({ ...current, [name]: value }));
+    setWarrantyFormErrors((current) => ({ ...current, [name]: "" }));
+    setWarrantyMessage("");
+  };
+
+  const validateWarrantyForm = () => {
+    const errors = {};
+
+    if (!warrantyForm.warrantyStatus) errors.warrantyStatus = "Warranty status is required.";
+    if (!warrantyForm.manufacturerStatus) errors.manufacturerStatus = "Manufacturer status is required.";
+    if (warrantyForm.warrantyStatus === "IN_WARRANTY") {
+      if (!warrantyForm.manufacturerOrBrandName.trim()) {
+        errors.manufacturerOrBrandName = "Brand name is required for in-warranty tickets.";
+      }
+      if (!warrantyForm.productSerialNumber.trim()) {
+        errors.productSerialNumber = "Product serial number is required for in-warranty tickets.";
+      }
+    }
+
+    return errors;
+  };
+
+  const updateWarranty = async (event) => {
+    event.preventDefault();
+    const errors = validateWarrantyForm();
+    if (Object.keys(errors).length > 0) {
+      setWarrantyFormErrors(errors);
+      return;
+    }
+
+    setIsUpdatingWarranty(true);
+    setWarrantyFormErrors({});
+    setWarrantyMessage("");
+    try {
+      const response = await fetch(`/volt/tickets/${ticketId}/warranty`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          warrantyStatus: warrantyForm.warrantyStatus,
+          manufacturerStatus: warrantyForm.manufacturerStatus,
+          manufacturerComplaintNumber: warrantyForm.manufacturerComplaintNumber.trim(),
+          manufacturerOrBrandName: warrantyForm.manufacturerOrBrandName.trim(),
+          productSerialNumber: warrantyForm.productSerialNumber.trim(),
+        }),
+      });
+
+      if (!response.ok) throw new Error("Warranty update failed");
+
+      await loadTicket();
+      setWarrantyMessage("Warranty details updated successfully.");
+    } catch {
+      setWarrantyMessage(ticket?.status === "CANCELLED"
+        ? "Cancelled tickets cannot be updated."
+        : "Unable to update warranty details. Please try again.");
+    } finally {
+      setIsUpdatingWarranty(false);
+    }
+  };
+
   const isTicketOwner = ticket?.pickedByEmployeeId
     && currentEmployeeId
     && String(ticket.pickedByEmployeeId) === currentEmployeeId;
@@ -265,6 +353,11 @@ export default function TicketDetail() {
       ? ["PICKED", "IN_PROGRESS", "COMPLETED"].includes(ticket.status)
       : ["PICKED", "IN_PROGRESS"].includes(ticket.status) && isTicketOwner);
   const canDeleteCharge = ["SUPER_ADMIN", "ADMIN"].includes(currentRole);
+  const canUpdateWarranty = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE", "TECHNICIAN"].includes(currentRole)
+    && ticket?.status !== "CANCELLED";
+  const availableWarrantyStatuses = currentRole === "SUPER_ADMIN" || ticket?.warrantyStatus === "NOT_CHECKED"
+    ? warrantyStatuses
+    : warrantyStatuses.filter((status) => status === ticket?.warrantyStatus);
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
@@ -287,7 +380,7 @@ export default function TicketDetail() {
             </header>
 
             {statusMessage && (
-              <p className={`rounded-xl px-4 py-3 text-sm font-semibold ${statusMessage.startsWith("Unable") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+              <p className={`rounded-xl px-4 py-3 text-sm font-semibold ${statusMessage.startsWith("Unable") || statusMessage.startsWith("Please") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
                 {statusMessage}
               </p>
             )}
@@ -323,6 +416,70 @@ export default function TicketDetail() {
                 {ticket.status === "CANCELLED" && <InfoItem label="Cancelled At">{formatDate(ticket.cancelledAt)}</InfoItem>}
                 {ticket.status === "CANCELLED" && <InfoItem label="Cancellation Reason" className="sm:col-span-2">{ticket.cancellationReason}</InfoItem>}
               </dl>
+            </section>
+
+            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold text-blue-950">Warranty / Manufacturer</h2>
+              <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                <InfoItem label="Warranty Status">{formatLabel(ticket.warrantyStatus)}</InfoItem>
+                <InfoItem label="Manufacturer Status">{formatLabel(ticket.manufacturerStatus)}</InfoItem>
+                <InfoItem label="Manufacturer / Brand Name">{ticket.manufacturerOrBrandName}</InfoItem>
+                <InfoItem label="Manufacturer Complaint Number">{ticket.manufacturerComplaintNumber}</InfoItem>
+                <InfoItem label="Product Serial Number">{ticket.productSerialNumber}</InfoItem>
+                <InfoItem label="Last Updated By">{ticket.warrantyUpdatedByEmployeeId}</InfoItem>
+                <InfoItem label="Last Updated At">{formatDate(ticket.warrantyUpdatedAt)}</InfoItem>
+              </dl>
+
+              {ticket.status === "CANCELLED" && (
+                <p className="mt-4 rounded-xl bg-slate-100 px-4 py-3 text-sm font-semibold text-slate-700">
+                  Warranty details are read-only because this ticket is cancelled.
+                </p>
+              )}
+
+              {canUpdateWarranty && (
+                <form onSubmit={updateWarranty} className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <h3 className="text-sm font-bold text-slate-900">Update Warranty Details</h3>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Warranty Status
+                      <select name="warrantyStatus" value={warrantyForm.warrantyStatus} onChange={handleWarrantyInput} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
+                        <option value="">Select warranty status</option>
+                        {availableWarrantyStatuses.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                      </select>
+                      {warrantyFormErrors.warrantyStatus && <span className="mt-1 block text-xs text-red-600">{warrantyFormErrors.warrantyStatus}</span>}
+                    </label>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Manufacturer Status
+                      <select name="manufacturerStatus" value={warrantyForm.manufacturerStatus} onChange={handleWarrantyInput} className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
+                        {manufacturerStatuses.map((status) => <option key={status} value={status}>{formatLabel(status)}</option>)}
+                      </select>
+                      {warrantyFormErrors.manufacturerStatus && <span className="mt-1 block text-xs text-red-600">{warrantyFormErrors.manufacturerStatus}</span>}
+                    </label>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Manufacturer / Brand Name
+                      <input name="manufacturerOrBrandName" value={warrantyForm.manufacturerOrBrandName} onChange={handleWarrantyInput} maxLength={80} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-950" />
+                      {warrantyFormErrors.manufacturerOrBrandName && <span className="mt-1 block text-xs text-red-600">{warrantyFormErrors.manufacturerOrBrandName}</span>}
+                    </label>
+                    <label className="block text-sm font-semibold text-slate-700">
+                      Product Serial Number
+                      <input name="productSerialNumber" value={warrantyForm.productSerialNumber} onChange={handleWarrantyInput} maxLength={80} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-950" />
+                      {warrantyFormErrors.productSerialNumber && <span className="mt-1 block text-xs text-red-600">{warrantyFormErrors.productSerialNumber}</span>}
+                    </label>
+                    <label className="block text-sm font-semibold text-slate-700 sm:col-span-2">
+                      Manufacturer Complaint Number <span className="font-normal text-slate-500">(Optional)</span>
+                      <input name="manufacturerComplaintNumber" value={warrantyForm.manufacturerComplaintNumber} onChange={handleWarrantyInput} maxLength={80} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-950" />
+                    </label>
+                  </div>
+                  <button type="submit" disabled={isUpdatingWarranty} className="mt-4 rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">
+                    {isUpdatingWarranty ? "Updating..." : "Update Warranty Details"}
+                  </button>
+                  {warrantyMessage && (
+                    <p className={`mt-4 rounded-xl px-4 py-3 text-sm font-semibold ${warrantyMessage.startsWith("Warranty details updated") ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                      {warrantyMessage}
+                    </p>
+                  )}
+                </form>
+              )}
             </section>
 
             <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Calendar, Eye, MapPin, Phone, Plus } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import SuggestionInput from "../components/SuggestionInput";
@@ -76,6 +76,13 @@ export default function TicketDetail() {
   const [warrantyFormErrors, setWarrantyFormErrors] = useState({});
   const [warrantyMessage, setWarrantyMessage] = useState("");
   const [isUpdatingWarranty, setIsUpdatingWarranty] = useState(false);
+  const [showCustomerHistory, setShowCustomerHistory] = useState(false);
+  const [customerHistory, setCustomerHistory] = useState([]);
+  const [customerHistoryCount, setCustomerHistoryCount] = useState(0);
+  const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
+  const [customerHistoryError, setCustomerHistoryError] = useState("");
+  const [hasLoadedCustomerHistory, setHasLoadedCustomerHistory] = useState(false);
+  const customerHistoryTicketIdRef = useRef(ticketId);
   const currentRole = localStorage.getItem("role") ?? "";
   const currentEmployeeId = localStorage.getItem("employeeId") ?? "";
 
@@ -142,6 +149,61 @@ export default function TicketDetail() {
     loadTicket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
+
+  useEffect(() => {
+    customerHistoryTicketIdRef.current = ticketId;
+    setShowCustomerHistory(false);
+    setCustomerHistory([]);
+    setCustomerHistoryCount(0);
+    setCustomerHistoryLoading(false);
+    setCustomerHistoryError("");
+    setHasLoadedCustomerHistory(false);
+  }, [ticketId]);
+
+  const loadCustomerHistory = async () => {
+    const requestedTicketId = ticketId;
+    setCustomerHistoryLoading(true);
+    setCustomerHistoryError("");
+    try {
+      const response = await fetch(`/volt/tickets/${ticketId}/customer-history`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Unable to load customer history");
+
+      const data = await response.json();
+      if (String(customerHistoryTicketIdRef.current) !== String(requestedTicketId)) return;
+
+      const tickets = Array.isArray(data.tickets) ? data.tickets : [];
+      setCustomerHistory(tickets);
+      setCustomerHistoryCount(Number.isInteger(data.previousTicketCount) ? data.previousTicketCount : tickets.length);
+      setHasLoadedCustomerHistory(true);
+    } catch {
+      if (String(customerHistoryTicketIdRef.current) !== String(requestedTicketId)) return;
+
+      setCustomerHistory([]);
+      setCustomerHistoryCount(0);
+      setCustomerHistoryError("Unable to load customer history. Please try again.");
+    } finally {
+      if (String(customerHistoryTicketIdRef.current) === String(requestedTicketId)) {
+        setCustomerHistoryLoading(false);
+      }
+    }
+  };
+
+  const toggleCustomerHistory = async () => {
+    if (showCustomerHistory) {
+      setShowCustomerHistory(false);
+      return;
+    }
+
+    setShowCustomerHistory(true);
+    if (!hasLoadedCustomerHistory) {
+      await loadCustomerHistory();
+    }
+  };
 
   const setProcessing = (key, value) => {
     setProcessingKeys((current) => ({ ...current, [key]: value }));
@@ -413,6 +475,50 @@ export default function TicketDetail() {
                 <InfoItem label="Mobile Number"><span className="inline-flex items-center gap-2"><Phone size={15} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}</span></InfoItem>
                 <InfoItem label="Village / Area" className="sm:col-span-2"><span className="inline-flex items-center gap-2"><MapPin size={15} aria-hidden="true" /> {ticket.villageOrArea ?? "Not available"}</span></InfoItem>
               </dl>
+            </section>
+
+            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold text-blue-950">
+                  Customer History{hasLoadedCustomerHistory ? ` (${customerHistoryCount})` : ""}
+                </h2>
+                <button type="button" onClick={toggleCustomerHistory} className="rounded-2xl bg-blue-50 px-4 py-2 font-semibold text-blue-950 hover:bg-blue-100">
+                  <span className="inline-flex items-center gap-2"><Eye size={16} aria-hidden="true" /> {showCustomerHistory ? "Hide" : "View"}</span>
+                </button>
+              </div>
+
+              {showCustomerHistory && (
+                <div className="mt-4 space-y-3">
+                  {customerHistoryLoading && <p className="text-sm font-semibold text-gray-600">Loading customer history...</p>}
+                  {customerHistoryError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{customerHistoryError}</p>}
+                  {!customerHistoryLoading && !customerHistoryError && customerHistory.length === 0 && (
+                    <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">No previous tickets found.</p>
+                  )}
+                  {!customerHistoryLoading && !customerHistoryError && customerHistory.map((historyTicket) => (
+                    <article key={historyTicket.id ?? historyTicket.ticketNumber} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                          <h3 className="font-extrabold text-blue-950">{historyTicket.ticketNumber ?? "Not available"}</h3>
+                          <p className="mt-1 text-sm text-slate-700">{historyTicket.customerName ?? "Not available"}</p>
+                        </div>
+                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-950">{formatLabel(historyTicket.status)}</span>
+                      </div>
+                      <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                        <InfoItem label="Product">{historyTicket.productType}</InfoItem>
+                        <InfoItem label="Category">{formatLabel(historyTicket.category)}</InfoItem>
+                        <InfoItem label="Created">{formatDate(historyTicket.createdAt)}</InfoItem>
+                        <InfoItem label="Total Charge">{formatCurrency(historyTicket.totalCharge)}</InfoItem>
+                        <InfoItem label="Warranty">{formatLabel(historyTicket.warrantyStatus)}</InfoItem>
+                        <InfoItem label="Mfg Status">{formatLabel(historyTicket.manufacturerStatus)}</InfoItem>
+                        {historyTicket.manufacturerOrBrandName && <InfoItem label="Manufacturer / Brand">{historyTicket.manufacturerOrBrandName}</InfoItem>}
+                      </dl>
+                      <button type="button" onClick={() => navigate(`/tickets/${historyTicket.id}${location.search}`)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-950 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-900">
+                        <Eye size={15} aria-hidden="true" /> View Details
+                      </button>
+                    </article>
+                  ))}
+                </div>
+              )}
             </section>
 
             <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">

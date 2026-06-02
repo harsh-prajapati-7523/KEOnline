@@ -74,6 +74,10 @@ export default function TicketList() {
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [searchText, setSearchText] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
   useEffect(() => {
     const loadTickets = async () => {
@@ -100,6 +104,54 @@ export default function TicketList() {
     loadTickets();
   }, []);
 
+  useEffect(() => {
+    const trimmedSearchText = searchText.trim();
+    if (trimmedSearchText.length < 2) {
+      setSearchResults([]);
+      setIsSearching(false);
+      setSearchError("");
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setSearchResults([]);
+    setIsSearching(true);
+    setSearchError("");
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await fetch(`/volt/tickets/search?query=${encodeURIComponent(trimmedSearchText)}`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+          signal: controller.signal,
+        });
+
+        if (!response.ok) throw new Error("Ticket search failed");
+
+        const data = await response.json();
+        setSearchResults(Array.isArray(data) ? data : []);
+      } catch (searchRequestError) {
+        if (searchRequestError.name !== "AbortError") {
+          setSearchResults([]);
+          setSearchError("Unable to search tickets. Please try again.");
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsSearching(false);
+        }
+      }
+    }, 275);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [searchText]);
+
+  const isSearchActive = searchText.trim().length >= 2;
+  const displayedTickets = isSearchActive ? searchResults : tickets;
+
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl">
@@ -112,11 +164,37 @@ export default function TicketList() {
           <p className="mt-2 text-sm text-blue-100">Select a ticket to view details and available actions.</p>
         </header>
 
+        <section className="mt-6 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <label htmlFor="ticket-search" className="sr-only">Search tickets</label>
+            <input
+              id="ticket-search"
+              type="search"
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Search ticket, mobile, name, product, area"
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-950 focus:ring-2 focus:ring-blue-100"
+            />
+            {searchText && (
+              <button
+                type="button"
+                onClick={() => setSearchText("")}
+                className="rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </section>
+
         <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2" aria-live="polite">
-          {isLoading && <p className="text-sm font-semibold text-gray-600">Loading tickets...</p>}
-          {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
-          {!isLoading && !error && tickets.length === 0 && <p className="text-sm font-semibold text-gray-600">No tickets found.</p>}
-          {tickets.map((ticket) => (
+          {!isSearchActive && isLoading && <p className="text-sm font-semibold text-gray-600">Loading tickets...</p>}
+          {!isSearchActive && error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+          {!isSearchActive && !isLoading && !error && displayedTickets.length === 0 && <p className="text-sm font-semibold text-gray-600">No tickets found.</p>}
+          {isSearchActive && isSearching && <p className="text-sm font-semibold text-gray-600">Searching tickets...</p>}
+          {isSearchActive && searchError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{searchError}</p>}
+          {isSearchActive && !isSearching && !searchError && displayedTickets.length === 0 && <p className="text-sm font-semibold text-gray-600">No matching tickets found.</p>}
+          {!isSearching && !searchError && displayedTickets.map((ticket) => (
             <TicketCard
               key={ticket.id ?? ticket.ticketNumber}
               ticket={ticket}

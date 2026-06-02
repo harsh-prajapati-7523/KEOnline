@@ -3,6 +3,7 @@ import { Home } from "lucide-react";
 import HomePage from "./pages/Home";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
+import EmployeeManagement from "./pages/EmployeeManagement";
 import CreateTicket from "./pages/CreateTicket";
 import TicketList from "./pages/TicketList";
 import TicketDetail from "./pages/TicketDetail";
@@ -63,6 +64,11 @@ function App() {
         <Route path="/employee-dashboard" element={
           <ProtectedRoute>
             <EmployeeDashboard />
+          </ProtectedRoute>
+        }/>
+        <Route path="/admin/employees" element={
+          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+            <EmployeeManagement />
           </ProtectedRoute>
         }/>
         <Route path="/tickets/new" element={

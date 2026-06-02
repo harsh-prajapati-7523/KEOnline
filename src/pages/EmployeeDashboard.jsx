@@ -8,6 +8,7 @@ import {
   ListChecks,
   LogOut,
   PlusCircle,
+  Users,
   Wrench,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -62,6 +63,7 @@ export default function EmployeeDashboard() {
   const employeeName = localStorage.getItem("employeeName") ?? "";
   const role = localStorage.getItem("role") ?? "";
   const canCreateTicket = role === "SUPER_ADMIN" || role === "ADMIN";
+  const canManageEmployees = role === "SUPER_ADMIN";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -142,6 +144,18 @@ export default function EmployeeDashboard() {
               </div>
               <span className="font-semibold text-blue-950">View Tickets</span>
             </button>
+            {canManageEmployees && (
+              <button
+                type="button"
+                onClick={() => navigate("/admin/employees")}
+                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+              >
+                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
+                  <Users size={20} aria-hidden="true" />
+                </div>
+                <span className="font-semibold text-blue-950">Employee Management</span>
+              </button>
+            )}
           </div>
         </section>
 

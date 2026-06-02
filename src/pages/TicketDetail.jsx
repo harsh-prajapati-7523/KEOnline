@@ -62,6 +62,7 @@ export default function TicketDetail() {
   const [statusMessage, setStatusMessage] = useState("");
   const [processingKeys, setProcessingKeys] = useState({});
   const [showCharges, setShowCharges] = useState(false);
+  const [showAddChargeForm, setShowAddChargeForm] = useState(false);
   const [chargeItems, setChargeItems] = useState([]);
   const [chargeTotal, setChargeTotal] = useState("0.00");
   const [chargeLoading, setChargeLoading] = useState(false);
@@ -178,10 +179,14 @@ export default function TicketDetail() {
   const toggleCharges = async () => {
     if (showCharges) {
       setShowCharges(false);
+      setShowAddChargeForm(false);
+      setChargeForm({ description: "", amount: "" });
+      setChargeFormErrors({});
       return;
     }
 
     setShowCharges(true);
+    setShowAddChargeForm(false);
     setChargeForm({ description: "", amount: "" });
     await loadCharges();
   };
@@ -238,6 +243,7 @@ export default function TicketDetail() {
       await loadCharges();
       await loadTicket();
       setChargeForm({ description: "", amount: "" });
+      setShowAddChargeForm(false);
       setChargeActionMessage("Charge added successfully.");
     } catch {
       setChargeActionMessage("Unable to add charge. Please check description and amount.");
@@ -273,6 +279,19 @@ export default function TicketDetail() {
     const { name, value } = event.target;
     setChargeForm((current) => ({ ...current, [name]: value }));
     setChargeFormErrors((current) => ({ ...current, [name]: "" }));
+    setChargeActionMessage("");
+  };
+
+  const cancelAddCharge = () => {
+    setShowAddChargeForm(false);
+    setChargeForm({ description: "", amount: "" });
+    setChargeFormErrors({});
+    setChargeActionMessage("");
+  };
+
+  const openAddCharge = () => {
+    setShowAddChargeForm(true);
+    setChargeFormErrors({});
     setChargeActionMessage("");
   };
 
@@ -499,48 +518,55 @@ export default function TicketDetail() {
                   {chargeError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{chargeError}</p>}
                   {!chargeLoading && !chargeError && (
                     <>
+                      {canAddCharge && (
+                        showAddChargeForm ? (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                            <h3 className="text-sm font-bold text-slate-900">Add Charge</h3>
+                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                              <label className="block text-sm font-semibold text-slate-700">
+                                Description
+                                <input name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
+                                {chargeFormErrors.description && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.description}</span>}
+                              </label>
+                              <label className="block text-sm font-semibold text-slate-700">
+                                Amount
+                                <input name="amount" type="number" min="0.01" max="999999.99" step="0.01" value={chargeForm.amount} onChange={handleChargeInput} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
+                                {chargeFormErrors.amount && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.amount}</span>}
+                              </label>
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              <button type="button" onClick={addCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="rounded-xl bg-yellow-400 px-3 py-2 text-sm font-semibold text-black disabled:opacity-60">
+                                {processingKeys[`add-charge-${ticketId}`] ? "Saving..." : "Save"}
+                              </button>
+                              <button type="button" onClick={cancelAddCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-300 disabled:opacity-60">
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button type="button" onClick={openAddCharge} className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-3 py-2 text-sm font-semibold text-black hover:bg-yellow-300">
+                            <Plus size={16} aria-hidden="true" /> Add Charge
+                          </button>
+                        )
+                      )}
+
                       {chargeItems.length === 0 ? (
-                        <p className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">No charge items found.</p>
+                        <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">No charge items found.</p>
                       ) : (
-                        <div className="space-y-2">
+                        <div className="divide-y divide-slate-200 border-y border-slate-200">
                           {chargeItems.map((item) => (
-                            <div key={item.id} className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                              <span className="text-slate-800">{item.description}</span>
-                              <div className="flex items-center gap-3">
-                                <span className="font-semibold text-slate-900">{formatCurrency(item.amount)}</span>
-                                {canDeleteCharge && (
-                                  <button type="button" onClick={() => deleteCharge(item.id)} disabled={processingKeys[`delete-charge-${item.id}`]} className="rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60">
+                            <div key={item.id} className="py-2 sm:flex sm:items-center sm:justify-between sm:gap-4">
+                              <p className="min-w-0 break-words text-sm text-slate-800">{item.description}</p>
+                              <div className="mt-1 flex shrink-0 items-center justify-between gap-3 sm:mt-0">
+                                <span className="text-sm font-semibold text-slate-900">{formatCurrency(item.amount)}</span>
+                                {canDeleteCharge && ticket.status !== "CANCELLED" && (
+                                  <button type="button" onClick={() => deleteCharge(item.id)} disabled={processingKeys[`delete-charge-${item.id}`]} className="rounded-lg px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60">
                                     {processingKeys[`delete-charge-${item.id}`] ? "Deleting..." : "Delete"}
                                   </button>
                                 )}
                               </div>
                             </div>
                           ))}
-                        </div>
-                      )}
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-100 p-4 text-sm font-semibold text-slate-800">
-                        <div className="flex items-center justify-between"><span>Total Charge</span><span>{formatCurrency(chargeTotal)}</span></div>
-                      </div>
-
-                      {canAddCharge && (
-                        <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                          <h3 className="text-sm font-bold text-slate-900">Add Charge</h3>
-                          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                            <label className="block text-sm font-semibold text-slate-700">
-                              Description
-                              <input name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-950" />
-                              {chargeFormErrors.description && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.description}</span>}
-                            </label>
-                            <label className="block text-sm font-semibold text-slate-700">
-                              Amount
-                              <input name="amount" type="number" min="0.01" max="999999.99" step="0.01" value={chargeForm.amount} onChange={handleChargeInput} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-950" />
-                              {chargeFormErrors.amount && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.amount}</span>}
-                            </label>
-                          </div>
-                          <button type="button" onClick={addCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">
-                            <Plus size={16} aria-hidden="true" /> {processingKeys[`add-charge-${ticketId}`] ? "Adding..." : "Add Charge"}
-                          </button>
                         </div>
                       )}
                       {chargeActionMessage && <p className="rounded-xl bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-950">{chargeActionMessage}</p>}

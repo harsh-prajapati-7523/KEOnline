@@ -67,6 +67,7 @@ export default function EmployeeDashboard() {
     localStorage.removeItem("token");
     localStorage.removeItem("employeeName");
     localStorage.removeItem("role");
+    localStorage.removeItem("employeeId");
     navigate("/employee-login", { replace: true });
   };
 

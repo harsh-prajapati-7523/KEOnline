@@ -39,6 +39,7 @@ export default function EmployeeLogin() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("employeeName", data.employeeName ?? "");
       localStorage.setItem("role", data.role ?? "");
+      localStorage.setItem("employeeId", data.employeeId ?? "");
       navigate("/employee-dashboard", { replace: true });
     } catch {
       setError("Unable to log in. Please check your employee ID and password.");

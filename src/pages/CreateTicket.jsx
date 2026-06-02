@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, ListChecks, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import SuggestionInput from "../components/SuggestionInput";
 
 const emptyForm = {
   customerName: "",
@@ -145,12 +146,12 @@ export default function CreateTicket() {
 
             <label className="font-semibold text-gray-700">
               Village / Area <span className="text-sm font-normal text-gray-500">(Optional)</span>
-              <input name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+              <SuggestionInput endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
             </label>
 
             <label className="font-semibold text-gray-700">
               Product Type
-              <input name="productType" value={formData.productType} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+              <SuggestionInput endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
               <FieldError message={errors.productType} />
             </label>
 
@@ -182,7 +183,7 @@ export default function CreateTicket() {
 
             <label className="font-semibold text-gray-700">
               Manufacturer / Brand Name <span className="text-sm font-normal text-gray-500">(Required for in-warranty)</span>
-              <input name="manufacturerOrBrandName" value={formData.manufacturerOrBrandName} onChange={handleChange} maxLength={80} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+              <SuggestionInput endpoint="/volt/suggestions/manufacturers" name="manufacturerOrBrandName" value={formData.manufacturerOrBrandName} onChange={handleChange} maxLength={80} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
               <FieldError message={errors.manufacturerOrBrandName} />
             </label>
 

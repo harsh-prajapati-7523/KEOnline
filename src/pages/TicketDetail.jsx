@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Calendar, Eye, MapPin, Phone, Plus } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
+import SuggestionInput from "../components/SuggestionInput";
 
 function formatDate(value) {
   if (!value) return "Not available";
@@ -476,7 +477,7 @@ export default function TicketDetail() {
                     </label>
                     <label className="block text-sm font-semibold text-slate-700">
                       Manufacturer / Brand Name
-                      <input name="manufacturerOrBrandName" value={warrantyForm.manufacturerOrBrandName} onChange={handleWarrantyInput} maxLength={80} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-950" />
+                      <SuggestionInput endpoint="/volt/suggestions/manufacturers" name="manufacturerOrBrandName" value={warrantyForm.manufacturerOrBrandName} onChange={handleWarrantyInput} maxLength={80} className="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-950" />
                       {warrantyFormErrors.manufacturerOrBrandName && <span className="mt-1 block text-xs text-red-600">{warrantyFormErrors.manufacturerOrBrandName}</span>}
                     </label>
                     <label className="block text-sm font-semibold text-slate-700">
@@ -525,7 +526,7 @@ export default function TicketDetail() {
                             <div className="mt-3 grid gap-3 sm:grid-cols-2">
                               <label className="block text-sm font-semibold text-slate-700">
                                 Description
-                                <input name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
+                                <SuggestionInput endpoint="/volt/suggestions/charge-descriptions" name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
                                 {chargeFormErrors.description && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.description}</span>}
                               </label>
                               <label className="block text-sm font-semibold text-slate-700">

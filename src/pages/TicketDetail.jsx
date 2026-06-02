@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, Calendar, Eye, MapPin, Phone, Plus } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import SuggestionInput from "../components/SuggestionInput";
 
 function formatDate(value) {
@@ -56,6 +56,7 @@ function InfoItem({ label, children, className = "" }) {
 
 export default function TicketDetail() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { ticketId } = useParams();
   const [ticket, setTicket] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -382,7 +383,7 @@ export default function TicketDetail() {
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl">
-        <button type="button" onClick={() => navigate("/tickets")} className="flex items-center gap-2 font-semibold text-blue-950">
+        <button type="button" onClick={() => navigate(`/tickets${location.search}`)} className="flex items-center gap-2 font-semibold text-blue-950">
           <ArrowLeft size={18} aria-hidden="true" /> Back to Tickets
         </button>
 

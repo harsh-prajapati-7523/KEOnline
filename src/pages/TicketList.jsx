@@ -1,6 +1,48 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, Eye, Phone } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Eye, Filter, Phone } from "lucide-react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+
+const emptyFilters = {
+  status: "",
+  category: "",
+  warrantyStatus: "",
+  manufacturerStatus: "",
+  createdFrom: "",
+  createdTo: "",
+  mine: false,
+};
+
+const filterOptions = {
+  status: ["NEW", "PICKED", "IN_PROGRESS", "COMPLETED", "CANCELLED"],
+  category: ["INSTALLATION", "BATTERY_RECHARGE", "ELECTRICAL_REPAIR", "OTHER"],
+  warrantyStatus: ["NOT_CHECKED", "IN_WARRANTY", "OUT_OF_WARRANTY"],
+  manufacturerStatus: ["NOT_REQUIRED", "RAISED", "IN_PROGRESS", "REPAIRED", "REPLACED", "WAITING_FOR_COMPANY_VISIT"],
+};
+
+function filtersFromSearchParams(searchParams) {
+  return {
+    status: searchParams.get("status") ?? "",
+    category: searchParams.get("category") ?? "",
+    warrantyStatus: searchParams.get("warrantyStatus") ?? "",
+    manufacturerStatus: searchParams.get("manufacturerStatus") ?? "",
+    createdFrom: searchParams.get("createdFrom") ?? "",
+    createdTo: searchParams.get("createdTo") ?? "",
+    mine: searchParams.get("mine") === "true",
+  };
+}
+
+function countActiveFilters(filters) {
+  return Object.values(filters).filter(Boolean).length;
+}
+
+function createUrlSearchParams(searchText, filters) {
+  const params = new URLSearchParams();
+  if (searchText) params.set("search", searchText);
+  Object.entries(filters).forEach(([key, value]) => {
+    if (value) params.set(key, String(value));
+  });
+  return params;
+}
 
 function formatCurrency(value) {
   const amount = Number(value);
@@ -71,86 +113,98 @@ function TicketCard({ ticket, onViewDetails }) {
 
 export default function TicketList() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
-  const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [searchError, setSearchError] = useState("");
+  const [searchText, setSearchText] = useState(() => searchParams.get("search") ?? "");
+  const [appliedFilters, setAppliedFilters] = useState(() => filtersFromSearchParams(searchParams));
+  const [draftFilters, setDraftFilters] = useState(() => filtersFromSearchParams(searchParams));
+  const [showFilters, setShowFilters] = useState(false);
+  const trimmedSearchText = searchText.trim();
+  const activeFilterCount = countActiveFilters(appliedFilters);
+  const hasAppliedFilters = activeFilterCount > 0;
+  const isSearchActive = trimmedSearchText.length >= 2;
+  const requestParams = createUrlSearchParams(isSearchActive ? trimmedSearchText : "", appliedFilters);
+  const requestUrl = hasAppliedFilters || isSearchActive
+    ? `/volt/tickets/query?${requestParams.toString()}`
+    : "/volt/tickets";
 
   useEffect(() => {
-    const loadTickets = async () => {
-      setIsLoading(true);
-      setError("");
-      try {
-        const response = await fetch("/volt/tickets", {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-
-        if (!response.ok) throw new Error("Ticket list failed");
-
-        const data = await response.json();
-        setTickets(Array.isArray(data) ? data : []);
-      } catch {
-        setError("Unable to load tickets. Please try again.");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadTickets();
-  }, []);
-
-  useEffect(() => {
-    const trimmedSearchText = searchText.trim();
-    if (trimmedSearchText.length < 2) {
-      setSearchResults([]);
-      setIsSearching(false);
-      setSearchError("");
-      return undefined;
+    const nextSearchParams = createUrlSearchParams(searchText, appliedFilters);
+    if (nextSearchParams.toString() !== searchParams.toString()) {
+      setSearchParams(nextSearchParams, { replace: true });
     }
+  }, [appliedFilters, searchParams, searchText, setSearchParams]);
 
+  useEffect(() => {
     const controller = new AbortController();
-    setSearchResults([]);
-    setIsSearching(true);
-    setSearchError("");
+    setIsLoading(true);
+    setError("");
 
     const timeoutId = setTimeout(async () => {
       try {
-        const response = await fetch(`/volt/tickets/search?query=${encodeURIComponent(trimmedSearchText)}`, {
+        const response = await fetch(requestUrl, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
           signal: controller.signal,
         });
 
-        if (!response.ok) throw new Error("Ticket search failed");
+        if (!response.ok) throw new Error("Ticket request failed");
 
         const data = await response.json();
-        setSearchResults(Array.isArray(data) ? data : []);
-      } catch (searchRequestError) {
-        if (searchRequestError.name !== "AbortError") {
-          setSearchResults([]);
-          setSearchError("Unable to search tickets. Please try again.");
+        setTickets(Array.isArray(data) ? data : []);
+      } catch (requestError) {
+        if (requestError.name !== "AbortError") {
+          setTickets([]);
+          setError("Unable to load tickets. Please try again.");
         }
       } finally {
         if (!controller.signal.aborted) {
-          setIsSearching(false);
+          setIsLoading(false);
         }
       }
-    }, 275);
+    }, isSearchActive ? 275 : 0);
 
     return () => {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [searchText]);
+  }, [isSearchActive, requestUrl]);
 
-  const isSearchActive = searchText.trim().length >= 2;
-  const displayedTickets = isSearchActive ? searchResults : tickets;
+  const handleFilterInput = (event) => {
+    const { checked, name, type, value } = event.target;
+    setDraftFilters((current) => ({
+      ...current,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const toggleFilters = () => {
+    if (!showFilters) setDraftFilters(appliedFilters);
+    setShowFilters((current) => !current);
+  };
+
+  const applyFilters = () => {
+    setAppliedFilters({ ...draftFilters });
+    setShowFilters(false);
+  };
+
+  const clearFilters = () => {
+    setDraftFilters({ ...emptyFilters });
+    setAppliedFilters({ ...emptyFilters });
+  };
+
+  const loadingMessage = isSearchActive ? "Searching tickets..." : hasAppliedFilters ? "Applying filters..." : "Loading tickets...";
+  const emptyMessage = isSearchActive && hasAppliedFilters
+    ? "No tickets match your search and selected filters."
+    : hasAppliedFilters
+      ? "No tickets match the selected filters."
+      : isSearchActive
+        ? "No matching tickets found."
+        : "No tickets found.";
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
@@ -184,21 +238,81 @@ export default function TicketList() {
                 Clear
               </button>
             )}
+            <button
+              type="button"
+              onClick={toggleFilters}
+              aria-expanded={showFilters}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
+            >
+              <Filter size={16} aria-hidden="true" /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+            </button>
           </div>
+
+          {showFilters && (
+            <div className="mt-4 border-t border-blue-100 pt-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="text-sm font-semibold text-gray-700">
+                  Status
+                  <select name="status" value={draftFilters.status} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
+                    <option value="">All statuses</option>
+                    {filterOptions.status.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold text-gray-700">
+                  Category
+                  <select name="category" value={draftFilters.category} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
+                    <option value="">All categories</option>
+                    {filterOptions.category.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold text-gray-700">
+                  Warranty Status
+                  <select name="warrantyStatus" value={draftFilters.warrantyStatus} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
+                    <option value="">All warranty statuses</option>
+                    {filterOptions.warrantyStatus.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold text-gray-700">
+                  Manufacturer Status
+                  <select name="manufacturerStatus" value={draftFilters.manufacturerStatus} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
+                    <option value="">All manufacturer statuses</option>
+                    {filterOptions.manufacturerStatus.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm font-semibold text-gray-700">
+                  Created From
+                  <input name="createdFrom" type="date" value={draftFilters.createdFrom} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+                </label>
+                <label className="text-sm font-semibold text-gray-700">
+                  Created To
+                  <input name="createdTo" type="date" value={draftFilters.createdTo} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+                </label>
+                <label className="flex items-center gap-3 text-sm font-semibold text-gray-700 sm:col-span-2">
+                  <input name="mine" type="checkbox" checked={draftFilters.mine} onChange={handleFilterInput} className="h-4 w-4 rounded border-gray-300 text-blue-950 focus:ring-blue-950" />
+                  My Tickets
+                </label>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button type="button" onClick={applyFilters} className="rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900">
+                  Apply
+                </button>
+                <button type="button" onClick={clearFilters} className="rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50">
+                  Clear Filters
+                </button>
+              </div>
+            </div>
+          )}
         </section>
 
         <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2" aria-live="polite">
-          {!isSearchActive && isLoading && <p className="text-sm font-semibold text-gray-600">Loading tickets...</p>}
-          {!isSearchActive && error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
-          {!isSearchActive && !isLoading && !error && displayedTickets.length === 0 && <p className="text-sm font-semibold text-gray-600">No tickets found.</p>}
-          {isSearchActive && isSearching && <p className="text-sm font-semibold text-gray-600">Searching tickets...</p>}
-          {isSearchActive && searchError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{searchError}</p>}
-          {isSearchActive && !isSearching && !searchError && displayedTickets.length === 0 && <p className="text-sm font-semibold text-gray-600">No matching tickets found.</p>}
-          {!isSearching && !searchError && displayedTickets.map((ticket) => (
+          {isLoading && <p className="text-sm font-semibold text-gray-600">{loadingMessage}</p>}
+          {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+          {!isLoading && !error && tickets.length === 0 && <p className="text-sm font-semibold text-gray-600">{emptyMessage}</p>}
+          {!isLoading && !error && tickets.map((ticket) => (
             <TicketCard
               key={ticket.id ?? ticket.ticketNumber}
               ticket={ticket}
-              onViewDetails={(ticketId) => navigate(`/tickets/${ticketId}`)}
+              onViewDetails={(ticketId) => navigate(`/tickets/${ticketId}${location.search}`)}
             />
           ))}
         </section>

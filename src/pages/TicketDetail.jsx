@@ -82,6 +82,9 @@ export default function TicketDetail() {
   const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
   const [customerHistoryError, setCustomerHistoryError] = useState("");
   const [hasLoadedCustomerHistory, setHasLoadedCustomerHistory] = useState(false);
+  const [dynamicValues, setDynamicValues] = useState([]);
+  const [dynamicValuesLoading, setDynamicValuesLoading] = useState(false);
+  const [dynamicValuesError, setDynamicValuesError] = useState("");
   const customerHistoryTicketIdRef = useRef(ticketId);
   const currentRole = localStorage.getItem("role") ?? "";
   const currentEmployeeId = localStorage.getItem("employeeId") ?? "";
@@ -158,6 +161,46 @@ export default function TicketDetail() {
     setCustomerHistoryLoading(false);
     setCustomerHistoryError("");
     setHasLoadedCustomerHistory(false);
+  }, [ticketId]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    async function loadDynamicValues() {
+      setDynamicValues([]);
+      setDynamicValuesError("");
+      setDynamicValuesLoading(true);
+
+      try {
+        const response = await fetch(`/volt/tickets/${ticketId}/dynamic-values`, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+          },
+        });
+
+        if (!response.ok) throw new Error("Unable to load dynamic values");
+
+        const data = await response.json();
+        if (!isCurrent) return;
+        setDynamicValues(Array.isArray(data.dynamicValues) ? data.dynamicValues : []);
+      } catch {
+        if (!isCurrent) return;
+        setDynamicValues([]);
+        setDynamicValuesError("Unable to load additional details.");
+      } finally {
+        if (isCurrent) {
+          setDynamicValuesLoading(false);
+        }
+      }
+    }
+
+    if (ticketId) {
+      loadDynamicValues();
+    }
+
+    return () => {
+      isCurrent = false;
+    };
   }, [ticketId]);
 
   const loadCustomerHistory = async () => {
@@ -608,6 +651,25 @@ export default function TicketDetail() {
                 </form>
               )}
             </section>
+
+            {dynamicValues.length > 0 && (
+              <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+                <h2 className="text-lg font-bold text-blue-950">Additional Details</h2>
+                <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                  {dynamicValues.map((dynamicValue) => (
+                    <InfoItem key={dynamicValue.id ?? `${dynamicValue.fieldLabel}-${dynamicValue.displayValue}`} label={dynamicValue.fieldLabel || "Additional Detail"}>
+                      {dynamicValue.displayValue || "-"}
+                    </InfoItem>
+                  ))}
+                </dl>
+              </section>
+            )}
+
+            {!dynamicValuesLoading && dynamicValuesError && (
+              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                {dynamicValuesError}
+              </p>
+            )}
 
             <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">

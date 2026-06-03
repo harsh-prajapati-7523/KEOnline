@@ -43,6 +43,46 @@ function validate(formData) {
   return errors;
 }
 
+function isRenderableDynamicField(field) {
+  return field?.fieldType === "TEXT" || field?.fieldType === "NUMBER" || field?.fieldType === "TEXTAREA";
+}
+
+function validateDynamicFields(dynamicFields, dynamicValues) {
+  const errors = {};
+
+  dynamicFields.filter(isRenderableDynamicField).forEach((field) => {
+    const fieldId = String(field.categoryFieldConfigId);
+    const value = dynamicValues[fieldId] ?? "";
+    const trimmedValue = value.trim();
+
+    if (field.required && !trimmedValue) {
+      errors[fieldId] = `${field.displayName} is required.`;
+      return;
+    }
+
+    if (field.fieldType === "NUMBER" && trimmedValue && Number.isNaN(Number(trimmedValue))) {
+      errors[fieldId] = `${field.displayName} must be a valid number.`;
+    }
+  });
+
+  return errors;
+}
+
+function buildDynamicValuesPayload(dynamicFields, dynamicValues) {
+  return dynamicFields
+    .filter(isRenderableDynamicField)
+    .map((field) => {
+      const value = (dynamicValues[String(field.categoryFieldConfigId)] ?? "").trim();
+      if (!value) return null;
+      return {
+        categoryFieldConfigId: field.categoryFieldConfigId,
+        fieldDefinitionId: field.fieldDefinitionId,
+        value,
+      };
+    })
+    .filter(Boolean);
+}
+
 function FieldError({ message }) {
   return message ? <p className="mt-1 text-sm font-semibold text-red-600">{message}</p> : null;
 }
@@ -51,6 +91,15 @@ function authHeaders() {
   return {
     Authorization: `Bearer ${localStorage.getItem("token")}`,
   };
+}
+
+async function readErrorMessage(response, fallback) {
+  try {
+    const data = await response.json();
+    return typeof data.message === "string" && data.message.trim() ? data.message.trim() : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function formatCategoryLabel(category) {
@@ -68,6 +117,11 @@ export default function CreateTicket() {
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [dynamicFields, setDynamicFields] = useState([]);
+  const [dynamicValues, setDynamicValues] = useState({});
+  const [dynamicErrors, setDynamicErrors] = useState({});
+  const [isLoadingDynamicFields, setIsLoadingDynamicFields] = useState(false);
+  const [dynamicConfigError, setDynamicConfigError] = useState("");
 
   const loadCategories = useCallback(async () => {
     setIsLoadingCategories(true);
@@ -89,6 +143,44 @@ export default function CreateTicket() {
     loadCategories();
   }, [loadCategories]);
 
+  useEffect(() => {
+    const categoryId = formData.categoryId;
+    setDynamicFields([]);
+    setDynamicValues({});
+    setDynamicErrors({});
+    setDynamicConfigError("");
+
+    if (!categoryId) {
+      setIsLoadingDynamicFields(false);
+      return;
+    }
+
+    let isCurrent = true;
+
+    async function loadDynamicFields() {
+      setIsLoadingDynamicFields(true);
+      try {
+        const response = await fetch(`/volt/ticket-categories/${categoryId}/form-fields`, { headers: authHeaders() });
+        if (!response.ok) throw new Error("Dynamic form config request failed");
+        const data = await response.json();
+        if (!isCurrent) return;
+        setDynamicFields(Array.isArray(data.fields) ? data.fields.filter(isRenderableDynamicField) : []);
+      } catch {
+        if (!isCurrent) return;
+        setDynamicFields([]);
+        setDynamicConfigError("Unable to load category fields. Please try again.");
+      } finally {
+        if (isCurrent) setIsLoadingDynamicFields(false);
+      }
+    }
+
+    loadDynamicFields();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [formData.categoryId]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     const nextValue = name === "mobileNumber" ? value.replace(/\D/g, "").slice(0, 10) : value;
@@ -97,21 +189,37 @@ export default function CreateTicket() {
     setMessage("");
   };
 
+  const handleDynamicChange = (event) => {
+    const { name, value } = event.target;
+    setDynamicValues((current) => ({ ...current, [name]: value }));
+    setDynamicErrors((current) => ({ ...current, [name]: "" }));
+    setMessage("");
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     const validationErrors = validate(formData);
+    const dynamicValidationErrors = validateDynamicFields(dynamicFields, dynamicValues);
 
-    if (Object.keys(validationErrors).length > 0) {
+    if (Object.keys(validationErrors).length > 0 || Object.keys(dynamicValidationErrors).length > 0) {
       setErrors(validationErrors);
+      setDynamicErrors(dynamicValidationErrors);
       setMessage("");
+      return;
+    }
+
+    if (dynamicConfigError) {
+      setMessage("Unable to load category fields. Please try again.");
       return;
     }
 
     setIsSubmitting(true);
     setErrors({});
+    setDynamicErrors({});
     setMessage("");
 
     try {
+      const dynamicValuesPayload = buildDynamicValuesPayload(dynamicFields, dynamicValues);
       const response = await fetch("/volt/tickets", {
         method: "POST",
         headers: {
@@ -129,15 +237,18 @@ export default function CreateTicket() {
           manufacturerComplaintNumber: formData.manufacturerComplaintNumber.trim(),
           manufacturerOrBrandName: formData.manufacturerOrBrandName.trim(),
           productSerialNumber: formData.productSerialNumber.trim(),
+          dynamicValues: dynamicValuesPayload,
         }),
       });
 
-      if (!response.ok) throw new Error("Ticket creation failed");
+      if (!response.ok) {
+        throw new Error(await readErrorMessage(response, "Unable to create the ticket. Please try again."));
+      }
 
       const ticket = await response.json();
       navigate(`/tickets/${ticket.id}`);
-    } catch {
-      setMessage("Unable to create the ticket. Please try again.");
+    } catch (error) {
+      setMessage(error.message || "Unable to create the ticket. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -232,13 +343,60 @@ export default function CreateTicket() {
               <input name="manufacturerComplaintNumber" value={formData.manufacturerComplaintNumber} onChange={handleChange} maxLength={80} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
             </label>
 
+            {formData.categoryId && (
+              <div className="sm:col-span-2">
+                {isLoadingDynamicFields && (
+                  <p className="text-sm font-semibold text-gray-600">Loading category fields...</p>
+                )}
+                {dynamicConfigError && (
+                  <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{dynamicConfigError}</p>
+                )}
+                {!isLoadingDynamicFields && !dynamicConfigError && dynamicFields.length === 0 && (
+                  <p className="rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">No additional fields for this category.</p>
+                )}
+              </div>
+            )}
+
+            {!isLoadingDynamicFields && !dynamicConfigError && dynamicFields.map((field) => {
+              const fieldId = String(field.categoryFieldConfigId);
+              const commonClassName = "mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950";
+
+              if (field.fieldType === "TEXTAREA") {
+                return (
+                  <label key={fieldId} className="font-semibold text-gray-700 sm:col-span-2">
+                    {field.displayName} {field.required && <span className="text-red-600">*</span>}
+                    <textarea name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={`${commonClassName} resize-y`} />
+                    {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
+                    <FieldError message={dynamicErrors[fieldId]} />
+                  </label>
+                );
+              }
+
+              return (
+                <label key={fieldId} className="font-semibold text-gray-700">
+                  {field.displayName} {field.required && <span className="text-red-600">*</span>}
+                  <input
+                    name={fieldId}
+                    type={field.fieldType === "NUMBER" ? "number" : "text"}
+                    value={dynamicValues[fieldId] ?? ""}
+                    onChange={handleDynamicChange}
+                    maxLength={field.fieldType === "TEXT" ? 255 : undefined}
+                    step={field.fieldType === "NUMBER" ? "0.01" : undefined}
+                    className={commonClassName}
+                  />
+                  {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
+                  <FieldError message={dynamicErrors[fieldId]} />
+                </label>
+              );
+            })}
+
             {message && (
-              <p className={`sm:col-span-2 rounded-xl px-4 py-3 text-sm font-semibold ${message.startsWith("Unable") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+              <p className="sm:col-span-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
                 {message}
               </p>
             )}
 
-            <button type="submit" disabled={isSubmitting || isLoadingCategories || categories.length === 0} className="flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black transition hover:bg-yellow-300 disabled:opacity-60 sm:col-span-2">
+            <button type="submit" disabled={isSubmitting || isLoadingCategories || isLoadingDynamicFields || categories.length === 0} className="flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black transition hover:bg-yellow-300 disabled:opacity-60 sm:col-span-2">
               <Send size={18} aria-hidden="true" />
               {isSubmitting ? "Creating Ticket..." : "Create Ticket"}
             </button>

@@ -6,6 +6,7 @@ import {
   ClipboardList,
   Clock,
   KeyRound,
+  GitBranch,
   ListPlus,
   History,
   ListChecks,
@@ -76,12 +77,13 @@ export default function EmployeeDashboard() {
   const canManageEmployees = hasAnyAccess(["VIEW_EMPLOYEE_MANAGEMENT", "MANAGE_EMPLOYEES"]);
   const canManageRoles = hasAnyAccess(["VIEW_ROLE_MANAGEMENT", "MANAGE_ROLES"]);
   const canManageRoleAccess = role === "SUPER_ADMIN";
+  const canManageWorkflow = role === "SUPER_ADMIN";
   const canManageTicketCategories = hasAnyAccess(["VIEW_TICKET_CATEGORY_MANAGEMENT", "MANAGE_TICKET_CATEGORIES"]);
   const canManageTicketFields = hasAnyAccess(["VIEW_TICKET_FIELD_MANAGEMENT", "MANAGE_TICKET_FIELDS"]);
   const canManageCategoryFieldConfiguration = hasAnyAccess(["VIEW_CATEGORY_FIELD_CONFIGURATION", "MANAGE_CATEGORY_FIELD_CONFIGS"]);
   const canManageDropdownSources = hasAnyAccess(["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]);
   const hasDashboardActions = canCreateTicket || canViewTickets || canManageEmployees || canManageRoles || canManageRoleAccess
-    || canManageTicketCategories || canManageTicketFields || canManageCategoryFieldConfiguration || canManageDropdownSources;
+    || canManageWorkflow || canManageTicketCategories || canManageTicketFields || canManageCategoryFieldConfiguration || canManageDropdownSources;
 
   useEffect(() => {
     let isCurrent = true;
@@ -221,6 +223,18 @@ export default function EmployeeDashboard() {
                   <KeyRound size={20} aria-hidden="true" />
                 </div>
                 <span className="font-semibold text-blue-950">Role Access Management</span>
+              </button>
+            )}
+            {canManageWorkflow && (
+              <button
+                type="button"
+                onClick={() => navigate("/admin/workflow")}
+                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+              >
+                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
+                  <GitBranch size={20} aria-hidden="true" />
+                </div>
+                <span className="font-semibold text-blue-950">Workflow Management</span>
               </button>
             )}
             {canManageTicketCategories && (

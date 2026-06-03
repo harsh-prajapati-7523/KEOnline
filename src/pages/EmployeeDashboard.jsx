@@ -68,6 +68,7 @@ export default function EmployeeDashboard() {
   const canManageEmployees = role === "SUPER_ADMIN";
   const canManageRoles = role === "SUPER_ADMIN";
   const canManageTicketCategories = role === "SUPER_ADMIN";
+  const canManageTicketFields = role === "SUPER_ADMIN";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -182,6 +183,18 @@ export default function EmployeeDashboard() {
                   <Tags size={20} aria-hidden="true" />
                 </div>
                 <span className="font-semibold text-blue-950">Ticket Categories</span>
+              </button>
+            )}
+            {canManageTicketFields && (
+              <button
+                type="button"
+                onClick={() => navigate("/admin/ticket-fields")}
+                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+              >
+                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
+                  <ClipboardList size={20} aria-hidden="true" />
+                </div>
+                <span className="font-semibold text-blue-950">Ticket Fields</span>
               </button>
             )}
           </div>

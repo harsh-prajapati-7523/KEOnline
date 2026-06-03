@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, ListChecks, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SuggestionInput from "../components/SuggestionInput";
@@ -8,20 +8,13 @@ const emptyForm = {
   mobileNumber: "",
   villageOrArea: "",
   productType: "",
-  category: "",
+  categoryId: "",
   complaintDescription: "",
   warrantyStatus: "",
   manufacturerComplaintNumber: "",
   manufacturerOrBrandName: "",
   productSerialNumber: "",
 };
-
-const categories = [
-  "INSTALLATION",
-  "BATTERY_RECHARGE",
-  "ELECTRICAL_REPAIR",
-  "OTHER",
-];
 
 function validate(formData) {
   const errors = {};
@@ -33,7 +26,7 @@ function validate(formData) {
     errors.mobileNumber = "Mobile number must contain exactly 10 digits.";
   }
   if (!formData.productType.trim()) errors.productType = "Product type is required.";
-  if (!formData.category) errors.category = "Category is required.";
+  if (!formData.categoryId) errors.categoryId = "Ticket category is required.";
   if (!formData.complaintDescription.trim()) {
     errors.complaintDescription = "Complaint description is required.";
   }
@@ -54,12 +47,47 @@ function FieldError({ message }) {
   return message ? <p className="mt-1 text-sm font-semibold text-red-600">{message}</p> : null;
 }
 
+function authHeaders() {
+  return {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  };
+}
+
+function formatCategoryLabel(category) {
+  if (!category) return "Not available";
+  const categoryKey = category.categoryKey ?? "";
+  return category.displayName ? `${category.displayName} (${categoryKey})` : categoryKey || "Not available";
+}
+
 export default function CreateTicket() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState(emptyForm);
+  const [categories, setCategories] = useState([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [categoryError, setCategoryError] = useState("");
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const loadCategories = useCallback(async () => {
+    setIsLoadingCategories(true);
+    setCategoryError("");
+    try {
+      const response = await fetch("/volt/ticket-categories", { headers: authHeaders() });
+      if (!response.ok) throw new Error("Category request failed");
+      const data = await response.json();
+      setCategories(Array.isArray(data) ? data.filter((category) => category.active) : []);
+    } catch {
+      setCategories([]);
+      setCategoryError("Unable to load ticket categories. Please try again.");
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -91,11 +119,13 @@ export default function CreateTicket() {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
         body: JSON.stringify({
-          ...formData,
           customerName: formData.customerName.trim(),
+          mobileNumber: formData.mobileNumber,
           villageOrArea: formData.villageOrArea.trim(),
           productType: formData.productType.trim(),
+          categoryId: Number(formData.categoryId),
           complaintDescription: formData.complaintDescription.trim(),
+          warrantyStatus: formData.warrantyStatus,
           manufacturerComplaintNumber: formData.manufacturerComplaintNumber.trim(),
           manufacturerOrBrandName: formData.manufacturerOrBrandName.trim(),
           productSerialNumber: formData.productSerialNumber.trim(),
@@ -156,12 +186,16 @@ export default function CreateTicket() {
             </label>
 
             <label className="font-semibold text-gray-700 sm:col-span-2">
-              Category
-              <select name="category" value={formData.category} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
-                <option value="">Select category</option>
-                {categories.map((category) => <option key={category}>{category}</option>)}
+              Ticket Category
+              <select name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950 disabled:opacity-60">
+                <option value="">{isLoadingCategories ? "Loading ticket categories..." : "Select ticket category"}</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{formatCategoryLabel(category)}</option>)}
               </select>
-              <FieldError message={errors.category} />
+              <FieldError message={errors.categoryId} />
+              {categoryError && <p className="mt-1 text-sm font-semibold text-red-600">{categoryError}</p>}
+              {!isLoadingCategories && !categoryError && categories.length === 0 && (
+                <p className="mt-1 text-sm font-semibold text-yellow-700">No active ticket categories are available.</p>
+              )}
             </label>
 
             <label className="font-semibold text-gray-700 sm:col-span-2">
@@ -204,7 +238,7 @@ export default function CreateTicket() {
               </p>
             )}
 
-            <button type="submit" disabled={isSubmitting} className="flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black transition hover:bg-yellow-300 disabled:opacity-60 sm:col-span-2">
+            <button type="submit" disabled={isSubmitting || isLoadingCategories || categories.length === 0} className="flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black transition hover:bg-yellow-300 disabled:opacity-60 sm:col-span-2">
               <Send size={18} aria-hidden="true" />
               {isSubmitting ? "Creating Ticket..." : "Create Ticket"}
             </button>

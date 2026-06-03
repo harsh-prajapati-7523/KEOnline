@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Eye, Filter, Phone } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
@@ -14,7 +14,6 @@ const emptyFilters = {
 
 const filterOptions = {
   status: ["NEW", "PICKED", "IN_PROGRESS", "COMPLETED", "CANCELLED"],
-  category: ["INSTALLATION", "BATTERY_RECHARGE", "ELECTRICAL_REPAIR", "OTHER"],
   warrantyStatus: ["NOT_CHECKED", "IN_WARRANTY", "OUT_OF_WARRANTY"],
   manufacturerStatus: ["NOT_REQUIRED", "RAISED", "IN_PROGRESS", "REPAIRED", "REPLACED", "WAITING_FOR_COMPANY_VISIT"],
 };
@@ -60,6 +59,15 @@ function formatCurrency(value) {
 
 function formatLabel(value) {
   return value ? value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
+}
+
+function formatCategoryOption(category) {
+  if (!category?.categoryKey) return "Not available";
+  return category.displayName ? `${category.displayName} (${category.categoryKey})` : category.categoryKey;
+}
+
+function formatLegacyCategory(value) {
+  return value ? `${formatLabel(value)} (${value})` : "Not available";
 }
 
 function TicketCard({ ticket, onViewDetails }) {
@@ -122,6 +130,9 @@ export default function TicketList() {
   const [appliedFilters, setAppliedFilters] = useState(() => filtersFromSearchParams(searchParams));
   const [draftFilters, setDraftFilters] = useState(() => filtersFromSearchParams(searchParams));
   const [showFilters, setShowFilters] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [categoryError, setCategoryError] = useState("");
   const trimmedSearchText = searchText.trim();
   const activeFilterCount = countActiveFilters(appliedFilters);
   const hasAppliedFilters = activeFilterCount > 0;
@@ -130,6 +141,31 @@ export default function TicketList() {
   const requestUrl = hasAppliedFilters || isSearchActive
     ? `/volt/tickets/query?${requestParams.toString()}`
     : "/volt/tickets";
+  const selectedCategory = draftFilters.category;
+  const selectedCategoryInOptions = !selectedCategory || categories.some((category) => category.categoryKey === selectedCategory);
+
+  const loadCategories = useCallback(async () => {
+    setIsLoadingCategories(true);
+    setCategoryError("");
+
+    try {
+      const response = await fetch("/volt/ticket-categories", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Category request failed");
+
+      const data = await response.json();
+      setCategories(Array.isArray(data) ? data.filter((category) => category.active) : []);
+    } catch {
+      setCategories([]);
+      setCategoryError("Unable to load categories.");
+    } finally {
+      setIsLoadingCategories(false);
+    }
+  }, []);
 
   useEffect(() => {
     const nextSearchParams = createUrlSearchParams(searchText, appliedFilters);
@@ -137,6 +173,10 @@ export default function TicketList() {
       setSearchParams(nextSearchParams, { replace: true });
     }
   }, [appliedFilters, searchParams, searchText, setSearchParams]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -262,8 +302,18 @@ export default function TicketList() {
                   Category
                   <select name="category" value={draftFilters.category} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
                     <option value="">All categories</option>
-                    {filterOptions.category.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+                    {!selectedCategoryInOptions && <option value={selectedCategory}>{formatLegacyCategory(selectedCategory)}</option>}
+                    {categories.map((category) => (
+                      <option key={category.id ?? category.categoryKey} value={category.categoryKey}>
+                        {formatCategoryOption(category)}
+                      </option>
+                    ))}
                   </select>
+                  {isLoadingCategories && <p className="mt-1 text-xs font-semibold text-gray-500">Loading categories...</p>}
+                  {categoryError && <p className="mt-1 text-xs font-semibold text-red-600">{categoryError}</p>}
+                  {!isLoadingCategories && !categoryError && categories.length === 0 && (
+                    <p className="mt-1 text-xs font-semibold text-yellow-700">No active categories available.</p>
+                  )}
                 </label>
                 <label className="text-sm font-semibold text-gray-700">
                   Warranty Status

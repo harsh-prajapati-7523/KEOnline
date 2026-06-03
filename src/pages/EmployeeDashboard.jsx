@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
+  KeyRound,
   ListPlus,
   History,
   ListChecks,
@@ -69,6 +70,7 @@ export default function EmployeeDashboard() {
   const canCreateTicket = role === "SUPER_ADMIN" || role === "ADMIN";
   const canManageEmployees = role === "SUPER_ADMIN";
   const canManageRoles = role === "SUPER_ADMIN";
+  const canManageRoleAccess = role === "SUPER_ADMIN";
   const canManageTicketCategories = role === "SUPER_ADMIN";
   const canManageTicketFields = role === "SUPER_ADMIN";
   const canManageCategoryFieldConfiguration = role === "SUPER_ADMIN";
@@ -175,6 +177,18 @@ export default function EmployeeDashboard() {
                   <ShieldCheck size={20} aria-hidden="true" />
                 </div>
                 <span className="font-semibold text-blue-950">Role Management</span>
+              </button>
+            )}
+            {canManageRoleAccess && (
+              <button
+                type="button"
+                onClick={() => navigate("/admin/role-access")}
+                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+              >
+                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
+                  <KeyRound size={20} aria-hidden="true" />
+                </div>
+                <span className="font-semibold text-blue-950">Role Access Management</span>
               </button>
             )}
             {canManageTicketCategories && (

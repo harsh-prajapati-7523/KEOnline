@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   ClipboardList,
   Clock,
+  ListPlus,
   History,
   ListChecks,
   LogOut,
@@ -71,6 +72,7 @@ export default function EmployeeDashboard() {
   const canManageTicketCategories = role === "SUPER_ADMIN";
   const canManageTicketFields = role === "SUPER_ADMIN";
   const canManageCategoryFieldConfiguration = role === "SUPER_ADMIN";
+  const canManageDropdownSources = role === "SUPER_ADMIN";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -209,6 +211,18 @@ export default function EmployeeDashboard() {
                   <Settings2 size={20} aria-hidden="true" />
                 </div>
                 <span className="font-semibold text-blue-950">Category Field Configuration</span>
+              </button>
+            )}
+            {canManageDropdownSources && (
+              <button
+                type="button"
+                onClick={() => navigate("/admin/dropdown-sources")}
+                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+              >
+                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
+                  <ListPlus size={20} aria-hidden="true" />
+                </div>
+                <span className="font-semibold text-blue-950">Dropdown Sources</span>
               </button>
             )}
           </div>

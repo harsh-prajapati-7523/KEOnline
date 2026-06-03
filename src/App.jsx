@@ -6,6 +6,7 @@ import EmployeeDashboard from "./pages/EmployeeDashboard";
 import EmployeeManagement from "./pages/EmployeeManagement";
 import RoleManagement from "./pages/RoleManagement";
 import TicketCategoryManagement from "./pages/TicketCategoryManagement";
+import TicketCategoryFieldManagement from "./pages/TicketCategoryFieldManagement";
 import TicketFieldManagement from "./pages/TicketFieldManagement";
 import CreateTicket from "./pages/CreateTicket";
 import TicketList from "./pages/TicketList";
@@ -87,6 +88,11 @@ function App() {
         <Route path="/admin/ticket-fields" element={
           <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
             <TicketFieldManagement />
+          </ProtectedRoute>
+        }/>
+        <Route path="/admin/ticket-category-fields" element={
+          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+            <TicketCategoryFieldManagement />
           </ProtectedRoute>
         }/>
         <Route path="/tickets/new" element={

@@ -2,12 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, KeyRound, PlusCircle, RefreshCw, ShieldCheck, UserRoundCog, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const roles = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE", "TECHNICIAN"];
 const employeeIdPattern = /^[A-Z0-9_]{3,30}$/;
 const emptyCreateForm = {
   name: "",
   employeeId: "",
-  role: "",
+  roleId: "",
   password: "",
   active: true,
 };
@@ -46,6 +45,19 @@ function authHeaders(includeContentType = false) {
   };
 }
 
+function formatRoleLabel(role) {
+  if (!role) return "Not available";
+  const roleKey = role.roleKey ?? role.role ?? "";
+  return role.displayName ? `${role.displayName} (${roleKey})` : roleKey || "Not available";
+}
+
+function formatEmployeeRole(employee) {
+  if (employee.roleDisplayName && (employee.roleKey || employee.role)) {
+    return `${employee.roleDisplayName} (${employee.roleKey ?? employee.role})`;
+  }
+  return employee.roleKey ?? employee.role ?? "Not available";
+}
+
 function validateCreate(form) {
   const errors = {};
   if (!form.name.trim()) errors.name = "Employee name is required.";
@@ -54,7 +66,7 @@ function validateCreate(form) {
   } else if (!employeeIdPattern.test(form.employeeId.trim())) {
     errors.employeeId = "Use 3 to 30 uppercase letters, digits, or underscores.";
   }
-  if (!form.role) errors.role = "Role is required.";
+  if (!form.roleId) errors.roleId = "Role is required.";
   if (form.password.length < 8) errors.password = "Temporary password must contain at least 8 characters.";
   return errors;
 }
@@ -62,8 +74,11 @@ function validateCreate(form) {
 export default function EmployeeManagement() {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [listError, setListError] = useState("");
+  const [roleError, setRoleError] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -71,7 +86,7 @@ export default function EmployeeManagement() {
   const [createErrors, setCreateErrors] = useState({});
   const [isCreating, setIsCreating] = useState(false);
   const [openAction, setOpenAction] = useState(null);
-  const [roleValue, setRoleValue] = useState("");
+  const [roleIdValue, setRoleIdValue] = useState("");
   const [passwordValue, setPasswordValue] = useState("");
   const [actionError, setActionError] = useState("");
   const [processingKey, setProcessingKey] = useState("");
@@ -92,9 +107,26 @@ export default function EmployeeManagement() {
     }
   }, []);
 
+  const loadRoles = useCallback(async () => {
+    setIsLoadingRoles(true);
+    setRoleError("");
+    try {
+      const response = await fetch("/volt/roles", { headers: authHeaders() });
+      if (!response.ok) throw new Error("Role list request failed");
+      const data = await response.json();
+      setRoles(Array.isArray(data) ? data.filter((role) => role.active) : []);
+    } catch {
+      setRoles([]);
+      setRoleError("Unable to load roles.");
+    } finally {
+      setIsLoadingRoles(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadEmployees();
-  }, [loadEmployees]);
+    loadRoles();
+  }, [loadEmployees, loadRoles]);
 
   const closeCreateForm = () => {
     setShowCreateForm(false);
@@ -124,9 +156,11 @@ export default function EmployeeManagement() {
         method: "POST",
         headers: authHeaders(true),
         body: JSON.stringify({
-          ...createForm,
           name: createForm.name.trim(),
           employeeId: createForm.employeeId.trim(),
+          password: createForm.password,
+          roleId: Number(createForm.roleId),
+          active: createForm.active,
         }),
       });
       if (!response.ok) throw new Error(await readApiError(response, "Unable to create employee. Please check the details."));
@@ -144,7 +178,7 @@ export default function EmployeeManagement() {
 
   const closeAction = () => {
     setOpenAction(null);
-    setRoleValue("");
+    setRoleIdValue("");
     setPasswordValue("");
     setActionError("");
   };
@@ -155,7 +189,7 @@ export default function EmployeeManagement() {
       return;
     }
     setOpenAction({ id: employee.id, type });
-    setRoleValue(employee.role ?? "");
+    setRoleIdValue(employee.roleId ? String(employee.roleId) : "");
     setPasswordValue("");
     setActionError("");
     setMessage("");
@@ -186,6 +220,11 @@ export default function EmployeeManagement() {
   };
 
   const updateRole = async (employee) => {
+    if (!roleIdValue) {
+      setActionError("Role is required.");
+      return;
+    }
+
     const key = `role-${employee.id}`;
     setProcessingKey(key);
     setActionError("");
@@ -193,15 +232,15 @@ export default function EmployeeManagement() {
       const response = await fetch(`/volt/employees/${employee.id}/role`, {
         method: "PATCH",
         headers: authHeaders(true),
-        body: JSON.stringify({ role: roleValue }),
+        body: JSON.stringify({ roleId: Number(roleIdValue) }),
       });
-      if (!response.ok) throw new Error(await readApiError(response, "Unable to change employee role."));
+      if (!response.ok) throw new Error(await readApiError(response, "Unable to change role. Please try again."));
       closeAction();
       setMessageType("success");
       setMessage("Employee role updated successfully.");
       await loadEmployees();
     } catch (error) {
-      setActionError(error.message || "Unable to change employee role.");
+      setActionError(error.message || "Unable to change role. Please try again.");
     } finally {
       setProcessingKey("");
     }
@@ -247,7 +286,7 @@ export default function EmployeeManagement() {
               <h1 className="text-2xl font-extrabold sm:text-3xl">Employee Management</h1>
               <p className="mt-2 text-sm text-blue-100">Manage employee access and roles.</p>
             </div>
-            <button type="button" onClick={() => showCreateForm ? closeCreateForm() : setShowCreateForm(true)} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-yellow-400 px-4 py-3 font-bold text-black transition hover:bg-yellow-300">
+            <button type="button" onClick={() => showCreateForm ? closeCreateForm() : setShowCreateForm(true)} disabled={isLoadingRoles || roles.length === 0} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-yellow-400 px-4 py-3 font-bold text-black transition hover:bg-yellow-300 disabled:opacity-60">
               {showCreateForm ? <X size={19} aria-hidden="true" /> : <PlusCircle size={19} aria-hidden="true" />}
               {showCreateForm ? "Close Form" : "Add Employee"}
             </button>
@@ -269,11 +308,11 @@ export default function EmployeeManagement() {
             </label>
             <label className="font-semibold text-gray-700">
               Role
-              <select name="role" value={createForm.role} onChange={handleCreateChange} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
-                <option value="">Select role</option>
-                {roles.map((role) => <option key={role}>{role}</option>)}
+              <select name="roleId" value={createForm.roleId} onChange={handleCreateChange} disabled={isLoadingRoles || roles.length === 0} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950 disabled:opacity-60">
+                <option value="">{isLoadingRoles ? "Loading roles..." : "Select role"}</option>
+                {roles.map((role) => <option key={role.id} value={role.id}>{formatRoleLabel(role)}</option>)}
               </select>
-              <FieldError message={createErrors.role} />
+              <FieldError message={createErrors.roleId} />
             </label>
             <label className="font-semibold text-gray-700">
               Temporary Password
@@ -285,7 +324,7 @@ export default function EmployeeManagement() {
               Active employee
             </label>
             <div className="flex flex-col gap-3 sm:col-span-2 sm:flex-row">
-              <button type="submit" disabled={isCreating} className="rounded-xl bg-blue-950 px-5 py-3 font-bold text-white hover:bg-blue-900 disabled:opacity-60">
+              <button type="submit" disabled={isCreating || isLoadingRoles || roles.length === 0} className="rounded-xl bg-blue-950 px-5 py-3 font-bold text-white hover:bg-blue-900 disabled:opacity-60">
                 {isCreating ? "Saving..." : "Save Employee"}
               </button>
               <button type="button" onClick={closeCreateForm} className="rounded-xl border border-blue-950 px-5 py-3 font-bold text-blue-950 hover:bg-blue-50">Cancel</button>
@@ -295,11 +334,18 @@ export default function EmployeeManagement() {
 
         <Message type={messageType}>{message}</Message>
         <Message type="error">{listError}</Message>
+        <Message type="error">{roleError}</Message>
+        {isLoadingRoles && <p className="mt-4 text-sm font-semibold text-gray-600">Loading roles...</p>}
+        {!isLoadingRoles && !roleError && roles.length === 0 && (
+          <p className="mt-4 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
+            No active roles are available for employee assignment.
+          </p>
+        )}
 
         <section className="mt-6" aria-labelledby="employee-list-heading">
           <div className="flex items-center justify-between gap-3">
             <h2 id="employee-list-heading" className="text-xl font-extrabold text-blue-950">Employees</h2>
-            <button type="button" onClick={loadEmployees} disabled={isLoading} className="flex items-center gap-2 rounded-xl border border-blue-950 px-3 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50 disabled:opacity-60">
+            <button type="button" onClick={() => { loadEmployees(); loadRoles(); }} disabled={isLoading || isLoadingRoles} className="flex items-center gap-2 rounded-xl border border-blue-950 px-3 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50 disabled:opacity-60">
               <RefreshCw size={16} aria-hidden="true" /> Refresh
             </button>
           </div>
@@ -321,7 +367,7 @@ export default function EmployeeManagement() {
                 </div>
 
                 <dl className="mt-4 grid grid-cols-1 gap-3 text-sm min-[390px]:grid-cols-2">
-                  <div><dt className="font-bold text-gray-500">Role</dt><dd className="mt-1 text-gray-800">{employee.role || "Not available"}</dd></div>
+                  <div><dt className="font-bold text-gray-500">Role</dt><dd className="mt-1 text-gray-800">{formatEmployeeRole(employee)}</dd></div>
                   <div><dt className="font-bold text-gray-500">Created Date</dt><dd className="mt-1 text-gray-800">{formatDate(employee.createdAt)}</dd></div>
                 </dl>
 
@@ -341,11 +387,12 @@ export default function EmployeeManagement() {
                   <div className="mt-4 border-t border-blue-100 pt-4">
                     <label className="text-sm font-semibold text-gray-700">
                       New Role
-                      <select value={roleValue} onChange={(event) => setRoleValue(event.target.value)} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
-                        {roles.map((role) => <option key={role}>{role}</option>)}
+                      <select value={roleIdValue} onChange={(event) => setRoleIdValue(event.target.value)} disabled={isLoadingRoles || roles.length === 0} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950 disabled:opacity-60">
+                        <option value="">{isLoadingRoles ? "Loading roles..." : "Select role"}</option>
+                        {roles.map((role) => <option key={role.id} value={role.id}>{formatRoleLabel(role)}</option>)}
                       </select>
                     </label>
-                    <button type="button" onClick={() => updateRole(employee)} disabled={processingKey === `role-${employee.id}`} className="mt-3 flex items-center gap-2 rounded-xl bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60">
+                    <button type="button" onClick={() => updateRole(employee)} disabled={processingKey === `role-${employee.id}` || isLoadingRoles || roles.length === 0} className="mt-3 flex items-center gap-2 rounded-xl bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60">
                       <ShieldCheck size={16} aria-hidden="true" /> {processingKey === `role-${employee.id}` ? "Saving..." : "Save Role"}
                     </button>
                   </div>

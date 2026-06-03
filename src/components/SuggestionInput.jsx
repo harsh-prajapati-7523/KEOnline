@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { hasAccess } from "../utils/access";
 
 const DEBOUNCE_MS = 275;
 
@@ -17,9 +18,10 @@ export default function SuggestionInput({
   useEffect(() => {
     const query = value.trim();
     const token = localStorage.getItem("token");
+    const canUseSuggestions = hasAccess("USE_SMART_SUGGESTIONS");
     const requestId = ++requestIdRef.current;
 
-    if (!query || !token) {
+    if (!query || !token || !canUseSuggestions) {
       setSuggestions([]);
       setIsOpen(false);
       return undefined;

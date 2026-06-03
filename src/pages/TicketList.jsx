@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, Eye, Filter, Phone } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { hasAccess } from "../utils/access";
 
 const emptyFilters = {
   status: "",
@@ -133,11 +134,15 @@ export default function TicketList() {
   const [categories, setCategories] = useState([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [categoryError, setCategoryError] = useState("");
+  const canUseSearch = hasAccess("USE_TICKET_SEARCH");
+  const canUseFilters = hasAccess("USE_TICKET_FILTERS");
   const trimmedSearchText = searchText.trim();
-  const activeFilterCount = countActiveFilters(appliedFilters);
+  const effectiveSearchText = canUseSearch ? trimmedSearchText : "";
+  const effectiveFilters = canUseFilters ? appliedFilters : emptyFilters;
+  const activeFilterCount = countActiveFilters(effectiveFilters);
   const hasAppliedFilters = activeFilterCount > 0;
-  const isSearchActive = trimmedSearchText.length >= 2;
-  const requestParams = createUrlSearchParams(isSearchActive ? trimmedSearchText : "", appliedFilters);
+  const isSearchActive = effectiveSearchText.length >= 2;
+  const requestParams = createUrlSearchParams(isSearchActive ? effectiveSearchText : "", effectiveFilters);
   const requestUrl = hasAppliedFilters || isSearchActive
     ? `/volt/tickets/query?${requestParams.toString()}`
     : "/volt/tickets";
@@ -145,6 +150,13 @@ export default function TicketList() {
   const selectedCategoryInOptions = !selectedCategory || categories.some((category) => category.categoryKey === selectedCategory);
 
   const loadCategories = useCallback(async () => {
+    if (!canUseFilters) {
+      setCategories([]);
+      setCategoryError("");
+      setIsLoadingCategories(false);
+      return;
+    }
+
     setIsLoadingCategories(true);
     setCategoryError("");
 
@@ -165,14 +177,14 @@ export default function TicketList() {
     } finally {
       setIsLoadingCategories(false);
     }
-  }, []);
+  }, [canUseFilters]);
 
   useEffect(() => {
-    const nextSearchParams = createUrlSearchParams(searchText, appliedFilters);
+    const nextSearchParams = createUrlSearchParams(canUseSearch ? searchText : "", canUseFilters ? appliedFilters : emptyFilters);
     if (nextSearchParams.toString() !== searchParams.toString()) {
       setSearchParams(nextSearchParams, { replace: true });
     }
-  }, [appliedFilters, searchParams, searchText, setSearchParams]);
+  }, [appliedFilters, canUseFilters, canUseSearch, searchParams, searchText, setSearchParams]);
 
   useEffect(() => {
     loadCategories();
@@ -223,11 +235,13 @@ export default function TicketList() {
   };
 
   const toggleFilters = () => {
+    if (!canUseFilters) return;
     if (!showFilters) setDraftFilters(appliedFilters);
     setShowFilters((current) => !current);
   };
 
   const applyFilters = () => {
+    if (!canUseFilters) return;
     setAppliedFilters({ ...draftFilters });
     setShowFilters(false);
   };
@@ -258,18 +272,22 @@ export default function TicketList() {
           <p className="mt-2 text-sm text-blue-100">Select a ticket to view details and available actions.</p>
         </header>
 
-        <section className="mt-6 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+        {(canUseSearch || canUseFilters) && <section className="mt-6 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
           <div className="flex flex-col gap-3 sm:flex-row">
-            <label htmlFor="ticket-search" className="sr-only">Search tickets</label>
-            <input
-              id="ticket-search"
-              type="search"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder="Search ticket, mobile, name, product, area"
-              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-950 focus:ring-2 focus:ring-blue-100"
-            />
-            {searchText && (
+            {canUseSearch && (
+              <>
+                <label htmlFor="ticket-search" className="sr-only">Search tickets</label>
+                <input
+                  id="ticket-search"
+                  type="search"
+                  value={searchText}
+                  onChange={(event) => setSearchText(event.target.value)}
+                  placeholder="Search ticket, mobile, name, product, area"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-950 focus:ring-2 focus:ring-blue-100"
+                />
+              </>
+            )}
+            {canUseSearch && searchText && (
               <button
                 type="button"
                 onClick={() => setSearchText("")}
@@ -278,17 +296,19 @@ export default function TicketList() {
                 Clear
               </button>
             )}
-            <button
-              type="button"
-              onClick={toggleFilters}
-              aria-expanded={showFilters}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
-            >
-              <Filter size={16} aria-hidden="true" /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-            </button>
+            {canUseFilters && (
+              <button
+                type="button"
+                onClick={toggleFilters}
+                aria-expanded={showFilters}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
+              >
+                <Filter size={16} aria-hidden="true" /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+              </button>
+            )}
           </div>
 
-          {showFilters && (
+          {canUseFilters && showFilters && (
             <div className="mt-4 border-t border-blue-100 pt-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="text-sm font-semibold text-gray-700">
@@ -352,7 +372,7 @@ export default function TicketList() {
               </div>
             </div>
           )}
-        </section>
+        </section>}
 
         <section className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2" aria-live="polite">
           {isLoading && <p className="text-sm font-semibold text-gray-600">{loadingMessage}</p>}

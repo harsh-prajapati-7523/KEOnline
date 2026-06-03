@@ -73,12 +73,12 @@ function App() {
           </ProtectedRoute>
         }/>
         <Route path="/admin/employees" element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+          <ProtectedRoute anyAccessKey={["VIEW_EMPLOYEE_MANAGEMENT", "MANAGE_EMPLOYEES"]}>
             <EmployeeManagement />
           </ProtectedRoute>
         }/>
         <Route path="/admin/roles" element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+          <ProtectedRoute anyAccessKey={["VIEW_ROLE_MANAGEMENT", "MANAGE_ROLES"]}>
             <RoleManagement />
           </ProtectedRoute>
         }/>
@@ -88,37 +88,37 @@ function App() {
           </ProtectedRoute>
         }/>
         <Route path="/admin/ticket-categories" element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+          <ProtectedRoute anyAccessKey={["VIEW_TICKET_CATEGORY_MANAGEMENT", "MANAGE_TICKET_CATEGORIES"]}>
             <TicketCategoryManagement />
           </ProtectedRoute>
         }/>
         <Route path="/admin/ticket-fields" element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+          <ProtectedRoute anyAccessKey={["VIEW_TICKET_FIELD_MANAGEMENT", "MANAGE_TICKET_FIELDS"]}>
             <TicketFieldManagement />
           </ProtectedRoute>
         }/>
         <Route path="/admin/ticket-category-fields" element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+          <ProtectedRoute anyAccessKey={["VIEW_CATEGORY_FIELD_CONFIGURATION", "MANAGE_CATEGORY_FIELD_CONFIGS"]}>
             <TicketCategoryFieldManagement />
           </ProtectedRoute>
         }/>
         <Route path="/admin/dropdown-sources" element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+          <ProtectedRoute anyAccessKey={["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]}>
             <DropdownSourceManagement />
           </ProtectedRoute>
         }/>
         <Route path="/tickets/new" element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN", "ADMIN"]}>
+          <ProtectedRoute accessKey="CREATE_TICKET">
             <CreateTicket />
           </ProtectedRoute>
         }/>
         <Route path="/tickets" element={
-          <ProtectedRoute>
+          <ProtectedRoute accessKey="VIEW_TICKETS">
             <TicketList />
           </ProtectedRoute>
         }/>
         <Route path="/tickets/:ticketId" element={
-          <ProtectedRoute>
+          <ProtectedRoute accessKey="VIEW_TICKETS">
             <TicketDetail />
           </ProtectedRoute>
         }/>

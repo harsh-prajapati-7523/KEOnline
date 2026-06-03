@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { User, Lock, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { clearAccess, fetchCurrentAccess } from "../utils/access";
 
 export default function EmployeeLogin() {
   const navigate = useNavigate();
@@ -40,8 +41,14 @@ export default function EmployeeLogin() {
       localStorage.setItem("employeeName", data.employeeName ?? "");
       localStorage.setItem("role", data.role ?? "");
       localStorage.setItem("employeeId", data.employeeId ?? "");
+      try {
+        await fetchCurrentAccess();
+      } catch {
+        clearAccess();
+      }
       navigate("/employee-dashboard", { replace: true });
     } catch {
+      clearAccess();
       setError("Unable to log in. Please check your employee ID and password.");
     } finally {
       setIsSubmitting(false);

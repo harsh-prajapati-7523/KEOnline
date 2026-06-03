@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   Briefcase,
   CalendarCheck,
@@ -17,6 +18,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { clearAccess, fetchCurrentAccess, hasAnyAccess } from "../utils/access";
 
 const dashboardStats = [
   { label: "My Open Jobs", value: 8, icon: Briefcase },
@@ -65,22 +67,50 @@ function QuickActionCard({ label, icon: Icon }) {
 
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
+  const [, setAccessRefreshKey] = useState(0);
+  const [accessMessage, setAccessMessage] = useState("");
   const employeeName = localStorage.getItem("employeeName") ?? "";
   const role = localStorage.getItem("role") ?? "";
-  const canCreateTicket = role === "SUPER_ADMIN" || role === "ADMIN";
-  const canManageEmployees = role === "SUPER_ADMIN";
-  const canManageRoles = role === "SUPER_ADMIN";
+  const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
+  const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
+  const canManageEmployees = hasAnyAccess(["VIEW_EMPLOYEE_MANAGEMENT", "MANAGE_EMPLOYEES"]);
+  const canManageRoles = hasAnyAccess(["VIEW_ROLE_MANAGEMENT", "MANAGE_ROLES"]);
   const canManageRoleAccess = role === "SUPER_ADMIN";
-  const canManageTicketCategories = role === "SUPER_ADMIN";
-  const canManageTicketFields = role === "SUPER_ADMIN";
-  const canManageCategoryFieldConfiguration = role === "SUPER_ADMIN";
-  const canManageDropdownSources = role === "SUPER_ADMIN";
+  const canManageTicketCategories = hasAnyAccess(["VIEW_TICKET_CATEGORY_MANAGEMENT", "MANAGE_TICKET_CATEGORIES"]);
+  const canManageTicketFields = hasAnyAccess(["VIEW_TICKET_FIELD_MANAGEMENT", "MANAGE_TICKET_FIELDS"]);
+  const canManageCategoryFieldConfiguration = hasAnyAccess(["VIEW_CATEGORY_FIELD_CONFIGURATION", "MANAGE_CATEGORY_FIELD_CONFIGS"]);
+  const canManageDropdownSources = hasAnyAccess(["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]);
+  const hasDashboardActions = canCreateTicket || canViewTickets || canManageEmployees || canManageRoles || canManageRoleAccess
+    || canManageTicketCategories || canManageTicketFields || canManageCategoryFieldConfiguration || canManageDropdownSources;
+
+  useEffect(() => {
+    let isCurrent = true;
+    if (!localStorage.getItem("token")) return undefined;
+
+    fetchCurrentAccess()
+      .then(() => {
+        if (!isCurrent) return;
+        setAccessMessage("");
+        setAccessRefreshKey((current) => current + 1);
+      })
+      .catch(() => {
+        if (!isCurrent) return;
+        clearAccess();
+        setAccessMessage("Unable to load role access. Available actions may be limited.");
+        setAccessRefreshKey((current) => current + 1);
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("employeeName");
     localStorage.removeItem("role");
     localStorage.removeItem("employeeId");
+    clearAccess();
     navigate("/employee-login", { replace: true });
   };
 
@@ -145,16 +175,18 @@ export default function EmployeeDashboard() {
                 <span className="font-semibold text-blue-950">Create Ticket</span>
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => navigate("/tickets")}
-              className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-            >
-              <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                <ListChecks size={20} aria-hidden="true" />
-              </div>
-              <span className="font-semibold text-blue-950">View Tickets</span>
-            </button>
+            {canViewTickets && (
+              <button
+                type="button"
+                onClick={() => navigate("/tickets")}
+                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+              >
+                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
+                  <ListChecks size={20} aria-hidden="true" />
+                </div>
+                <span className="font-semibold text-blue-950">View Tickets</span>
+              </button>
+            )}
             {canManageEmployees && (
               <button
                 type="button"
@@ -239,7 +271,17 @@ export default function EmployeeDashboard() {
                 <span className="font-semibold text-blue-950">Dropdown Sources</span>
               </button>
             )}
+            {!hasDashboardActions && (
+              <p className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600 sm:col-span-2">
+                No actions available for your role.
+              </p>
+            )}
           </div>
+          {accessMessage && (
+            <p className="mt-3 rounded-xl bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
+              {accessMessage}
+            </p>
+          )}
         </section>
 
         <section className="mt-8" aria-labelledby="quick-actions">

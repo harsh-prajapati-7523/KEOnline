@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Calendar, Eye, MapPin, Phone, Plus } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import SuggestionInput from "../components/SuggestionInput";
+import { hasAccess } from "../utils/access";
 
 function formatDate(value) {
   if (!value) return "Not available";
@@ -469,18 +470,30 @@ export default function TicketDetail() {
   const isTicketOwner = ticket?.pickedByEmployeeId
     && currentEmployeeId
     && String(ticket.pickedByEmployeeId) === currentEmployeeId;
+  const canPickTicket = hasAccess("PICK_TICKET");
+  const canStartWork = hasAccess("START_WORK");
   const canComplete = ticket?.status === "IN_PROGRESS"
+    && hasAccess("COMPLETE_TICKET")
     && (["SUPER_ADMIN", "ADMIN"].includes(currentRole) || isTicketOwner);
   const canCancel = ["SUPER_ADMIN", "ADMIN"].includes(currentRole)
+    && hasAccess("CANCEL_TICKET")
     && ["NEW", "PICKED", "IN_PROGRESS"].includes(ticket?.status);
+  const canViewCustomerHistory = hasAccess("VIEW_CUSTOMER_HISTORY");
+  const canViewCharges = hasAccess("VIEW_CHARGES");
   const canAddCharge = ticket
+    && hasAccess("ADD_CHARGE")
     && !["NEW", "CANCELLED"].includes(ticket.status)
     && (["SUPER_ADMIN", "ADMIN"].includes(currentRole)
       ? ["PICKED", "IN_PROGRESS", "COMPLETED"].includes(ticket.status)
       : ["PICKED", "IN_PROGRESS"].includes(ticket.status) && isTicketOwner);
-  const canDeleteCharge = ["SUPER_ADMIN", "ADMIN"].includes(currentRole);
+  const canDeleteCharge = hasAccess("DELETE_CHARGE") && ["SUPER_ADMIN", "ADMIN"].includes(currentRole);
   const canUpdateWarranty = ["SUPER_ADMIN", "ADMIN", "EMPLOYEE", "TECHNICIAN"].includes(currentRole)
+    && hasAccess("UPDATE_WARRANTY")
     && ticket?.status !== "CANCELLED";
+  const hasVisibleWorkflowAction = (canPickTicket && ["NEW", "PICKED"].includes(ticket?.status))
+    || (canStartWork && ticket?.status === "PICKED")
+    || canComplete
+    || canCancel;
   const availableWarrantyStatuses = currentRole === "SUPER_ADMIN" || ticket?.warrantyStatus === "NOT_CHECKED"
     ? warrantyStatuses
     : warrantyStatuses.filter((status) => status === ticket?.warrantyStatus);
@@ -520,7 +533,7 @@ export default function TicketDetail() {
               </dl>
             </section>
 
-            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            {canViewCustomerHistory && <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-bold text-blue-950">
                   Customer History{hasLoadedCustomerHistory ? ` (${customerHistoryCount})` : ""}
@@ -562,7 +575,7 @@ export default function TicketDetail() {
                   ))}
                 </div>
               )}
-            </section>
+            </section>}
 
             <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold text-blue-950">Product &amp; Complaint</h2>
@@ -671,7 +684,7 @@ export default function TicketDetail() {
               </p>
             )}
 
-            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            {canViewCharges && <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-blue-950">Charges</h2>
@@ -744,17 +757,17 @@ export default function TicketDetail() {
                   )}
                 </div>
               )}
-            </section>
+            </section>}
 
             <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold text-blue-950">Actions</h2>
               <div className="mt-4 flex flex-wrap items-center gap-2">
-                {ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
-                {ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
-                {ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="rounded-2xl bg-blue-950 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
+                {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
+                {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
+                {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="rounded-2xl bg-blue-950 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
                 {canComplete && <button type="button" onClick={() => runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`complete-${ticketId}`]} className="rounded-2xl bg-green-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`complete-${ticketId}`] ? "Completing..." : "Complete Ticket"}</button>}
                 {canCancel && <button type="button" onClick={() => runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`cancel-${ticketId}`]} className="rounded-2xl bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket"}</button>}
-                {!["NEW", "PICKED"].includes(ticket.status) && !canComplete && !canCancel && <p className="text-sm text-gray-600">No workflow actions are available for this ticket.</p>}
+                {!hasVisibleWorkflowAction && <p className="text-sm text-gray-600">No workflow actions are available for this ticket.</p>}
               </div>
             </section>
           </div>

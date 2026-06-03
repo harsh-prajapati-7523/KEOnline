@@ -44,7 +44,13 @@ function validate(formData) {
 }
 
 function isRenderableDynamicField(field) {
-  return field?.fieldType === "TEXT" || field?.fieldType === "NUMBER" || field?.fieldType === "TEXTAREA";
+  return field?.fieldType === "TEXT" || field?.fieldType === "NUMBER" || field?.fieldType === "TEXTAREA" || field?.fieldType === "DROPDOWN";
+}
+
+function getDropdownOptions(field) {
+  return Array.isArray(field?.options)
+    ? field.options.filter((option) => typeof option?.optionKey === "string" && option.optionKey.trim())
+    : [];
 }
 
 function validateDynamicFields(dynamicFields, dynamicValues) {
@@ -56,7 +62,7 @@ function validateDynamicFields(dynamicFields, dynamicValues) {
     const trimmedValue = value.trim();
 
     if (field.required && !trimmedValue) {
-      errors[fieldId] = `${field.displayName} is required.`;
+      errors[fieldId] = field.fieldType === "DROPDOWN" ? `Please select ${field.displayName}.` : `${field.displayName} is required.`;
       return;
     }
 
@@ -367,6 +373,32 @@ export default function CreateTicket() {
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
                     <textarea name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={`${commonClassName} resize-y`} />
                     {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
+                    <FieldError message={dynamicErrors[fieldId]} />
+                  </label>
+                );
+              }
+
+              if (field.fieldType === "DROPDOWN") {
+                const options = getDropdownOptions(field);
+                return (
+                  <label key={fieldId} className="font-semibold text-gray-700">
+                    {field.displayName} {field.required && <span className="text-red-600">*</span>}
+                    <select
+                      name={fieldId}
+                      value={dynamicValues[fieldId] ?? ""}
+                      onChange={handleDynamicChange}
+                      disabled={options.length === 0}
+                      className={`${commonClassName} bg-white disabled:opacity-60`}
+                    >
+                      <option value="">{options.length === 0 ? "No options available" : `Select ${field.displayName}`}</option>
+                      {options.map((option) => (
+                        <option key={option.optionKey} value={option.optionKey}>
+                          {option.displayValue || option.optionKey}
+                        </option>
+                      ))}
+                    </select>
+                    {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
+                    {options.length === 0 && <p className="mt-1 text-sm font-normal text-gray-500">No options are currently available for this field.</p>}
                     <FieldError message={dynamicErrors[fieldId]} />
                   </label>
                 );

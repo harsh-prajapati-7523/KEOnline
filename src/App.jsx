@@ -4,6 +4,7 @@ import HomePage from "./pages/Home";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
 import EmployeeManagement from "./pages/EmployeeManagement";
+import RoleManagement from "./pages/RoleManagement";
 import CreateTicket from "./pages/CreateTicket";
 import TicketList from "./pages/TicketList";
 import TicketDetail from "./pages/TicketDetail";
@@ -69,6 +70,11 @@ function App() {
         <Route path="/admin/employees" element={
           <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
             <EmployeeManagement />
+          </ProtectedRoute>
+        }/>
+        <Route path="/admin/roles" element={
+          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+            <RoleManagement />
           </ProtectedRoute>
         }/>
         <Route path="/tickets/new" element={

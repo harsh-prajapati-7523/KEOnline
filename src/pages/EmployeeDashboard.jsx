@@ -8,6 +8,7 @@ import {
   ListChecks,
   LogOut,
   PlusCircle,
+  ShieldCheck,
   Users,
   Wrench,
 } from "lucide-react";
@@ -64,6 +65,7 @@ export default function EmployeeDashboard() {
   const role = localStorage.getItem("role") ?? "";
   const canCreateTicket = role === "SUPER_ADMIN" || role === "ADMIN";
   const canManageEmployees = role === "SUPER_ADMIN";
+  const canManageRoles = role === "SUPER_ADMIN";
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -154,6 +156,18 @@ export default function EmployeeDashboard() {
                   <Users size={20} aria-hidden="true" />
                 </div>
                 <span className="font-semibold text-blue-950">Employee Management</span>
+              </button>
+            )}
+            {canManageRoles && (
+              <button
+                type="button"
+                onClick={() => navigate("/admin/roles")}
+                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+              >
+                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
+                  <ShieldCheck size={20} aria-hidden="true" />
+                </div>
+                <span className="font-semibold text-blue-950">Role Management</span>
               </button>
             )}
           </div>

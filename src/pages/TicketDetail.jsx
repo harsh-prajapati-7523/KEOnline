@@ -30,6 +30,29 @@ function formatLabel(value) {
 
 const warrantyStatuses = ["NOT_CHECKED", "IN_WARRANTY", "OUT_OF_WARRANTY"];
 const manufacturerStatuses = ["NOT_REQUIRED", "RAISED", "IN_PROGRESS", "REPAIRED", "REPLACED", "WAITING_FOR_COMPANY_VISIT"];
+const workflowActionKeys = ["PICK_TICKET", "START_WORK", "COMPLETE_TICKET", "CANCEL_TICKET"];
+
+function normalizeAvailableActions(data) {
+  const responseActions = data?.actions ?? data;
+  const source = Array.isArray(responseActions)
+    ? responseActions.map((action) => [action?.actionKey ?? action?.key ?? action?.action, action])
+    : Object.entries(responseActions ?? {}).map(([actionKey, action]) => [action?.actionKey ?? action?.key ?? action?.action ?? actionKey, action]);
+
+  return source.reduce((actions, [key, action]) => {
+    if (!workflowActionKeys.includes(key) || typeof action !== "object" || action === null) return actions;
+    return {
+      ...actions,
+      [key]: {
+        ...action,
+        available: action?.available === true,
+      },
+    };
+  }, {});
+}
+
+function isWorkflowActionAvailable(availableActions, actionKey) {
+  return availableActions?.[actionKey]?.available === true;
+}
 
 function createWarrantyForm(ticket = {}) {
   return {
@@ -63,6 +86,9 @@ export default function TicketDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
+  const [availableActions, setAvailableActions] = useState(null);
+  const [availableActionsLoading, setAvailableActionsLoading] = useState(false);
+  const [availableActionsError, setAvailableActionsError] = useState("");
   const [processingKeys, setProcessingKeys] = useState({});
   const [showCharges, setShowCharges] = useState(false);
   const [showAddChargeForm, setShowAddChargeForm] = useState(false);
@@ -149,8 +175,33 @@ export default function TicketDetail() {
     }
   };
 
+  const loadAvailableActions = async () => {
+    if (!ticketId) return;
+
+    setAvailableActionsLoading(true);
+    setAvailableActionsError("");
+    try {
+      const response = await fetch(`/volt/tickets/${ticketId}/available-actions`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Unable to load available actions");
+
+      const data = await response.json();
+      setAvailableActions(normalizeAvailableActions(data));
+    } catch {
+      setAvailableActions(null);
+      setAvailableActionsError("Unable to load available workflow actions. Please refresh the ticket.");
+    } finally {
+      setAvailableActionsLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadTicket();
+    loadAvailableActions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
 
@@ -266,6 +317,7 @@ export default function TicketDetail() {
     if (!response.ok) throw new Error("Ticket action failed");
 
     await loadTicket();
+    await loadAvailableActions();
     if (showCharges) await loadCharges();
     setStatusMessage(successMessage);
   };
@@ -470,12 +522,16 @@ export default function TicketDetail() {
   const isTicketOwner = ticket?.pickedByEmployeeId
     && currentEmployeeId
     && String(ticket.pickedByEmployeeId) === currentEmployeeId;
-  const canPickTicket = hasAccess("PICK_TICKET");
-  const canStartWork = hasAccess("START_WORK");
+  const canPickTicket = isWorkflowActionAvailable(availableActions, "PICK_TICKET")
+    && hasAccess("PICK_TICKET");
+  const canStartWork = isWorkflowActionAvailable(availableActions, "START_WORK")
+    && hasAccess("START_WORK");
   const canComplete = ticket?.status === "IN_PROGRESS"
+    && isWorkflowActionAvailable(availableActions, "COMPLETE_TICKET")
     && hasAccess("COMPLETE_TICKET")
     && (["SUPER_ADMIN", "ADMIN"].includes(currentRole) || isTicketOwner);
   const canCancel = ["SUPER_ADMIN", "ADMIN"].includes(currentRole)
+    && isWorkflowActionAvailable(availableActions, "CANCEL_TICKET")
     && hasAccess("CANCEL_TICKET")
     && ["NEW", "PICKED", "IN_PROGRESS"].includes(ticket?.status);
   const canViewCustomerHistory = hasAccess("VIEW_CUSTOMER_HISTORY");
@@ -494,6 +550,7 @@ export default function TicketDetail() {
     || (canStartWork && ticket?.status === "PICKED")
     || canComplete
     || canCancel;
+  const hasLoadedAvailableActions = Boolean(availableActions) && !availableActionsLoading && !availableActionsError;
   const availableWarrantyStatuses = currentRole === "SUPER_ADMIN" || ticket?.warrantyStatus === "NOT_CHECKED"
     ? warrantyStatuses
     : warrantyStatuses.filter((status) => status === ticket?.warrantyStatus);
@@ -761,13 +818,21 @@ export default function TicketDetail() {
 
             <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold text-blue-950">Actions</h2>
+              {availableActionsError && (
+                <p className="mt-4 rounded-xl bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
+                  {availableActionsError}
+                </p>
+              )}
               <div className="mt-4 flex flex-wrap items-center gap-2">
+                {availableActionsLoading && <p className="text-sm font-semibold text-gray-600">Loading available workflow actions...</p>}
                 {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
                 {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
                 {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="rounded-2xl bg-blue-950 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
                 {canComplete && <button type="button" onClick={() => runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`complete-${ticketId}`]} className="rounded-2xl bg-green-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`complete-${ticketId}`] ? "Completing..." : "Complete Ticket"}</button>}
                 {canCancel && <button type="button" onClick={() => runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`cancel-${ticketId}`]} className="rounded-2xl bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket"}</button>}
-                {!hasVisibleWorkflowAction && <p className="text-sm text-gray-600">No workflow actions are available for this ticket.</p>}
+                {hasLoadedAvailableActions && !hasVisibleWorkflowAction && (
+                  <p className="text-sm text-gray-600">No workflow actions are currently available for this ticket.</p>
+                )}
               </div>
             </section>
           </div>

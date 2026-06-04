@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { ArrowLeft, Plus, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 function authHeaders(includeContentType = false) {
@@ -47,6 +47,10 @@ function Badge({ children, tone = "slate" }) {
     slate: "bg-slate-100 text-slate-700",
   };
   return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${tones[tone]}`}>{children}</span>;
+}
+
+function normalizeTransitionOptions(data) {
+  return Array.isArray(data?.options) ? data.options : [];
 }
 
 function TransitionCard({ transition, isProcessing, onToggle }) {
@@ -100,6 +104,45 @@ function TransitionCard({ transition, isProcessing, onToggle }) {
   );
 }
 
+function TransitionOptionCard({ option, isProcessing, onCreate }) {
+  const configured = Boolean(option.alreadyConfigured);
+
+  return (
+    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h3 className="break-words text-base font-extrabold text-blue-950">
+            {option.displayName || formatLabel(option.actionKey)}
+          </h3>
+          <p className="mt-1 break-words text-xs font-bold uppercase text-gray-500">
+            {option.actionKey ?? "UNKNOWN"} · {option.fromStatus ?? "UNKNOWN"} -&gt; {option.toStatus ?? "UNKNOWN"}
+          </p>
+        </div>
+
+        {!configured && (
+          <button
+            type="button"
+            onClick={() => onCreate(option)}
+            disabled={isProcessing}
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-yellow-400 px-4 py-2 text-sm font-bold text-black transition hover:bg-yellow-300 disabled:opacity-60"
+          >
+            <Plus size={18} aria-hidden="true" />
+            {isProcessing ? "Creating..." : "Create"}
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Badge tone={configured ? "green" : "yellow"}>{configured ? "Configured" : "Missing"}</Badge>
+        {configured && <Badge tone={option.active ? "green" : "red"}>{option.active ? "Active" : "Inactive"}</Badge>}
+        {configured && <Badge tone={option.systemTransition ? "blue" : "slate"}>{option.systemTransition ? "System" : "Custom"}</Badge>}
+        {configured && <Badge tone={option.protectedTransition ? "yellow" : "slate"}>{option.protectedTransition ? "Protected" : "Editable"}</Badge>}
+        <Badge>Sort {option.sortOrder ?? "Not set"}</Badge>
+      </div>
+    </article>
+  );
+}
+
 export default function WorkflowManagement() {
   const navigate = useNavigate();
   const [transitions, setTransitions] = useState([]);
@@ -108,6 +151,10 @@ export default function WorkflowManagement() {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
   const [processingId, setProcessingId] = useState(null);
+  const [transitionOptions, setTransitionOptions] = useState([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState("");
+  const [createProcessingKey, setCreateProcessingKey] = useState("");
 
   const loadTransitions = useCallback(async () => {
     setIsLoading(true);
@@ -125,13 +172,30 @@ export default function WorkflowManagement() {
     }
   }, []);
 
+  const loadTransitionOptions = useCallback(async () => {
+    setOptionsLoading(true);
+    setOptionsError("");
+    try {
+      const response = await fetch("/volt/workflow/transition-options", { headers: authHeaders() });
+      if (!response.ok) throw new Error("Unable to load workflow transition options. Please try again.");
+      const data = await response.json();
+      setTransitionOptions(normalizeTransitionOptions(data));
+    } catch (error) {
+      setTransitionOptions([]);
+      setOptionsError(error.message || "Unable to load workflow transition options. Please try again.");
+    } finally {
+      setOptionsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadTransitions();
-  }, [loadTransitions]);
+    loadTransitionOptions();
+  }, [loadTransitions, loadTransitionOptions]);
 
   const refreshTransitions = async () => {
     setMessage("");
-    await loadTransitions();
+    await Promise.all([loadTransitions(), loadTransitionOptions()]);
   };
 
   const toggleTransition = async (transition) => {
@@ -147,12 +211,61 @@ export default function WorkflowManagement() {
       if (!response.ok) throw new Error(await readApiError(response, "Unable to update workflow transition. Please try again."));
       setMessageType("success");
       setMessage("Workflow transition updated successfully.");
-      await loadTransitions();
+      await Promise.all([loadTransitions(), loadTransitionOptions()]);
     } catch (error) {
       setMessageType("error");
       setMessage(error.message || "Unable to update workflow transition. Please try again.");
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const createTransition = async (option) => {
+    if (option.alreadyConfigured) {
+      setMessageType("error");
+      setMessage("This transition is already configured.");
+      return;
+    }
+
+    const createKey = `${option.actionKey}-${option.fromStatus}-${option.toStatus}`;
+    setCreateProcessingKey(createKey);
+    setMessage("");
+    setOptionsError("");
+    try {
+      const payload = {
+        actionKey: option.actionKey,
+        displayName: option.displayName,
+        fromStatus: option.fromStatus,
+        toStatus: option.toStatus,
+        active: true,
+      };
+
+      if (option.sortOrder !== null && option.sortOrder !== undefined) {
+        payload.sortOrder = option.sortOrder;
+      }
+
+      const response = await fetch("/volt/workflow/transitions", {
+        method: "POST",
+        headers: authHeaders(true),
+        body: JSON.stringify(payload),
+      });
+
+      if (response.status === 409) {
+        throw new Error("This transition is already configured.");
+      }
+
+      if (!response.ok) {
+        throw new Error("Unable to create workflow transition. Please try again.");
+      }
+
+      setMessageType("success");
+      setMessage("Workflow transition created successfully.");
+      await Promise.all([loadTransitions(), loadTransitionOptions()]);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error.message || "Unable to create workflow transition. Please try again.");
+    } finally {
+      setCreateProcessingKey("");
     }
   };
 
@@ -167,7 +280,7 @@ export default function WorkflowManagement() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-2xl font-extrabold sm:text-3xl">Workflow Management</h1>
-              <p className="mt-2 text-sm text-blue-100">Enable or disable existing ticket workflow transitions.</p>
+              <p className="mt-2 text-sm text-blue-100">Enable existing transitions or create missing backend-approved safe transitions.</p>
             </div>
             <button
               type="button"
@@ -182,6 +295,39 @@ export default function WorkflowManagement() {
         </header>
 
         <Message type={messageType}>{message}</Message>
+
+        <section className="mt-5" aria-labelledby="workflow-transition-options">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="workflow-transition-options" className="text-xl font-extrabold text-blue-950">Create Missing Transition</h2>
+              <p className="mt-1 text-sm text-gray-500">Backend-approved safe transition options.</p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
+              {transitionOptions.length} options
+            </span>
+          </div>
+
+          {optionsLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow transition options...</p>}
+          {optionsError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{optionsError}</p>}
+          {!optionsLoading && !optionsError && transitionOptions.length === 0 && (
+            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No workflow transition options found.</p>
+          )}
+          {!optionsLoading && !optionsError && transitionOptions.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {transitionOptions.map((option) => {
+                const optionKey = `${option.actionKey}-${option.fromStatus}-${option.toStatus}`;
+                return (
+                  <TransitionOptionCard
+                    key={option.transitionId ?? optionKey}
+                    option={option}
+                    isProcessing={createProcessingKey === optionKey}
+                    onCreate={createTransition}
+                  />
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         <section className="mt-5" aria-labelledby="workflow-transition-list">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">

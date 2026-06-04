@@ -53,6 +53,10 @@ function normalizeTransitionOptions(data) {
   return Array.isArray(data?.options) ? data.options : [];
 }
 
+function normalizeWorkflowStatuses(data) {
+  return Array.isArray(data) ? data : Array.isArray(data?.statuses) ? data.statuses : [];
+}
+
 function TransitionCard({ transition, isProcessing, onToggle }) {
   const active = Boolean(transition.active);
   const Icon = active ? ToggleRight : ToggleLeft;
@@ -100,6 +104,32 @@ function TransitionCard({ transition, isProcessing, onToggle }) {
           <dd className="mt-1 text-gray-800">{formatDateTime(transition.updatedAt)}</dd>
         </div>
       </dl>
+    </article>
+  );
+}
+
+function WorkflowStatusCard({ status }) {
+  const active = Boolean(status.active);
+  const terminal = Boolean(status.terminal);
+
+  return (
+    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <div className="min-w-0">
+        <h3 className="break-words text-base font-extrabold text-blue-950">
+          {status.displayName || formatLabel(status.statusKey)}
+        </h3>
+        <p className="mt-1 break-words text-xs font-bold uppercase text-gray-500">
+          {status.statusKey ?? "UNKNOWN"}
+        </p>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Badge tone={active ? "green" : "red"}>{active ? "Active" : "Inactive"}</Badge>
+        <Badge tone={status.systemStatus ? "blue" : "slate"}>{status.systemStatus ? "System" : "Custom"}</Badge>
+        <Badge tone={status.protectedStatus ? "yellow" : "slate"}>{status.protectedStatus ? "Protected" : "Editable"}</Badge>
+        <Badge tone={terminal ? "red" : "slate"}>{terminal ? "Terminal" : "Non-terminal"}</Badge>
+        <Badge>Sort {status.sortOrder ?? "Not set"}</Badge>
+      </div>
     </article>
   );
 }
@@ -155,6 +185,9 @@ export default function WorkflowManagement() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [optionsError, setOptionsError] = useState("");
   const [createProcessingKey, setCreateProcessingKey] = useState("");
+  const [workflowStatuses, setWorkflowStatuses] = useState([]);
+  const [statusesLoading, setStatusesLoading] = useState(true);
+  const [statusesError, setStatusesError] = useState("");
 
   const loadTransitions = useCallback(async () => {
     setIsLoading(true);
@@ -188,14 +221,31 @@ export default function WorkflowManagement() {
     }
   }, []);
 
+  const loadWorkflowStatuses = useCallback(async () => {
+    setStatusesLoading(true);
+    setStatusesError("");
+    try {
+      const response = await fetch("/volt/workflow/statuses", { headers: authHeaders() });
+      if (!response.ok) throw new Error("Unable to load workflow statuses. Please try again.");
+      const data = await response.json();
+      setWorkflowStatuses(normalizeWorkflowStatuses(data));
+    } catch (error) {
+      setWorkflowStatuses([]);
+      setStatusesError(error.message || "Unable to load workflow statuses. Please try again.");
+    } finally {
+      setStatusesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadTransitions();
     loadTransitionOptions();
-  }, [loadTransitions, loadTransitionOptions]);
+    loadWorkflowStatuses();
+  }, [loadTransitions, loadTransitionOptions, loadWorkflowStatuses]);
 
   const refreshTransitions = async () => {
     setMessage("");
-    await Promise.all([loadTransitions(), loadTransitionOptions()]);
+    await Promise.all([loadTransitions(), loadTransitionOptions(), loadWorkflowStatuses()]);
   };
 
   const toggleTransition = async (transition) => {
@@ -295,6 +345,31 @@ export default function WorkflowManagement() {
         </header>
 
         <Message type={messageType}>{message}</Message>
+
+        <section className="mt-5" aria-labelledby="workflow-status-list">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="workflow-status-list" className="text-xl font-extrabold text-blue-950">Workflow Statuses</h2>
+              <p className="mt-1 text-sm text-gray-500">Current workflow status metadata.</p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
+              {workflowStatuses.length} statuses
+            </span>
+          </div>
+
+          {statusesLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow statuses...</p>}
+          {statusesError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{statusesError}</p>}
+          {!statusesLoading && !statusesError && workflowStatuses.length === 0 && (
+            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No workflow statuses found.</p>
+          )}
+          {!statusesLoading && !statusesError && workflowStatuses.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {workflowStatuses.map((status) => (
+                <WorkflowStatusCard key={status.id ?? status.statusKey} status={status} />
+              ))}
+            </div>
+          )}
+        </section>
 
         <section className="mt-5" aria-labelledby="workflow-transition-options">
           <div className="mb-3 flex flex-wrap items-end justify-between gap-3">

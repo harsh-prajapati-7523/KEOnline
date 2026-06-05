@@ -57,6 +57,10 @@ function normalizeTransitionOptions(data) {
   return Array.isArray(data?.options) ? data.options : [];
 }
 
+function normalizeWorkflowActions(data) {
+  return Array.isArray(data) ? data : Array.isArray(data?.actions) ? data.actions : [];
+}
+
 function normalizeWorkflowStatuses(data) {
   return Array.isArray(data) ? data : Array.isArray(data?.statuses) ? data.statuses : [];
 }
@@ -89,6 +93,48 @@ function validateStatusDisplayName(value) {
 function validateStatusSortOrder(value) {
   if (value === "" || value === null || value === undefined) return "";
   return Number.isInteger(Number(value)) ? "" : "Sort order must be a number.";
+}
+
+function WorkflowActionCard({ action }) {
+  const active = Boolean(action.active);
+  const requiresComment = Boolean(action.requiresComment);
+  const confirmationRequired = Boolean(action.confirmationRequired);
+
+  return (
+    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <div className="min-w-0">
+        <h3 className="break-words text-base font-extrabold text-blue-950">
+          {action.displayName || formatLabel(action.actionKey)}
+        </h3>
+        <p className="mt-1 break-words text-xs font-bold uppercase text-gray-500">
+          {action.actionKey ?? "UNKNOWN"}
+        </p>
+        {action.description && (
+          <p className="mt-2 break-words text-sm text-slate-700">{action.description}</p>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Badge tone={active ? "green" : "red"}>{active ? "Active" : "Inactive"}</Badge>
+        <Badge tone={action.systemAction ? "blue" : "slate"}>{action.systemAction ? "System" : "Custom"}</Badge>
+        <Badge tone={action.protectedAction ? "yellow" : "slate"}>{action.protectedAction ? "Protected" : "Editable"}</Badge>
+        <Badge>Sort {action.sortOrder ?? "Not set"}</Badge>
+        <Badge tone={requiresComment ? "yellow" : "slate"}>{requiresComment ? "Requires Comment" : "No Comment"}</Badge>
+        <Badge tone={confirmationRequired ? "yellow" : "slate"}>{confirmationRequired ? "Confirmation Required" : "No Confirmation"}</Badge>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+        <div>
+          <dt className="font-bold text-gray-500">Button Label</dt>
+          <dd className="mt-1 break-words text-gray-800">{action.buttonLabel || "Not available"}</dd>
+        </div>
+        <div>
+          <dt className="font-bold text-gray-500">Updated</dt>
+          <dd className="mt-1 text-gray-800">{formatDateTime(action.updatedAt)}</dd>
+        </div>
+      </dl>
+    </article>
+  );
 }
 
 function TransitionCard({ transition, isProcessing, onToggle }) {
@@ -307,6 +353,9 @@ export default function WorkflowManagement() {
   const [optionsLoading, setOptionsLoading] = useState(true);
   const [optionsError, setOptionsError] = useState("");
   const [createProcessingKey, setCreateProcessingKey] = useState("");
+  const [workflowActions, setWorkflowActions] = useState([]);
+  const [actionsLoading, setActionsLoading] = useState(true);
+  const [actionsError, setActionsError] = useState("");
   const [workflowStatuses, setWorkflowStatuses] = useState([]);
   const [statusesLoading, setStatusesLoading] = useState(true);
   const [statusesError, setStatusesError] = useState("");
@@ -350,6 +399,22 @@ export default function WorkflowManagement() {
     }
   }, []);
 
+  const loadWorkflowActions = useCallback(async () => {
+    setActionsLoading(true);
+    setActionsError("");
+    try {
+      const response = await fetch("/volt/workflow/actions", { headers: authHeaders() });
+      if (!response.ok) throw new Error("Unable to load workflow actions. Please try again.");
+      const data = await response.json();
+      setWorkflowActions(normalizeWorkflowActions(data));
+    } catch (error) {
+      setWorkflowActions([]);
+      setActionsError(error.message || "Unable to load workflow actions. Please try again.");
+    } finally {
+      setActionsLoading(false);
+    }
+  }, []);
+
   const loadWorkflowStatuses = useCallback(async () => {
     setStatusesLoading(true);
     setStatusesError("");
@@ -369,12 +434,13 @@ export default function WorkflowManagement() {
   useEffect(() => {
     loadTransitions();
     loadTransitionOptions();
+    loadWorkflowActions();
     loadWorkflowStatuses();
-  }, [loadTransitions, loadTransitionOptions, loadWorkflowStatuses]);
+  }, [loadTransitions, loadTransitionOptions, loadWorkflowActions, loadWorkflowStatuses]);
 
   const refreshTransitions = async () => {
     setMessage("");
-    await Promise.all([loadTransitions(), loadTransitionOptions(), loadWorkflowStatuses()]);
+    await Promise.all([loadTransitions(), loadTransitionOptions(), loadWorkflowActions(), loadWorkflowStatuses()]);
   };
 
   const toggleTransition = async (transition) => {
@@ -753,6 +819,31 @@ export default function WorkflowManagement() {
                   onSaveEdit={saveWorkflowStatus}
                   onToggleStatus={toggleWorkflowStatus}
                 />
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-5" aria-labelledby="workflow-action-list">
+          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 id="workflow-action-list" className="text-xl font-extrabold text-blue-950">Workflow Actions</h2>
+              <p className="mt-1 text-sm text-gray-500">Read-only metadata for current workflow actions. Custom action creation is not enabled yet.</p>
+            </div>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
+              {workflowActions.length} actions
+            </span>
+          </div>
+
+          {actionsLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow actions...</p>}
+          {actionsError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{actionsError}</p>}
+          {!actionsLoading && !actionsError && workflowActions.length === 0 && (
+            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No workflow actions found.</p>
+          )}
+          {!actionsLoading && !actionsError && workflowActions.length > 0 && (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              {workflowActions.map((action) => (
+                <WorkflowActionCard key={action.id ?? action.actionKey} action={action} />
               ))}
             </div>
           )}

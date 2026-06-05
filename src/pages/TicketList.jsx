@@ -13,8 +13,15 @@ const emptyFilters = {
   mine: false,
 };
 
+const fallbackStatusFilterOptions = [
+  { statusKey: "NEW", displayName: "New" },
+  { statusKey: "PICKED", displayName: "Picked" },
+  { statusKey: "IN_PROGRESS", displayName: "In Progress" },
+  { statusKey: "COMPLETED", displayName: "Completed" },
+  { statusKey: "CANCELLED", displayName: "Cancelled" },
+];
+
 const filterOptions = {
-  status: ["NEW", "PICKED", "IN_PROGRESS", "COMPLETED", "CANCELLED"],
   warrantyStatus: ["NOT_CHECKED", "IN_WARRANTY", "OUT_OF_WARRANTY"],
   manufacturerStatus: ["NOT_REQUIRED", "RAISED", "IN_PROGRESS", "REPAIRED", "REPLACED", "WAITING_FOR_COMPANY_VISIT"],
 };
@@ -66,9 +73,23 @@ function getTicketStatusLabel(ticket) {
   return ticket?.statusDisplayName || formatLabel(ticket?.status);
 }
 
+function normalizeStatusFilterOptions(data) {
+  const source = Array.isArray(data) ? data : Array.isArray(data?.options) ? data.options : [];
+  return source
+    .filter((option) => option?.statusKey)
+    .map((option) => ({
+      statusKey: option.statusKey,
+      displayName: option.displayName || formatLabel(option.statusKey),
+    }));
+}
+
 function formatCategoryOption(category) {
   if (!category?.categoryKey) return "Not available";
   return category.displayName ? `${category.displayName} (${category.categoryKey})` : category.categoryKey;
+}
+
+function formatStatusOption(option) {
+  return option?.displayName ? `${option.displayName}` : formatLabel(option?.statusKey);
 }
 
 function formatLegacyCategory(value) {
@@ -135,6 +156,9 @@ export default function TicketList() {
   const [appliedFilters, setAppliedFilters] = useState(() => filtersFromSearchParams(searchParams));
   const [draftFilters, setDraftFilters] = useState(() => filtersFromSearchParams(searchParams));
   const [showFilters, setShowFilters] = useState(false);
+  const [statusFilterOptions, setStatusFilterOptions] = useState(fallbackStatusFilterOptions);
+  const [isLoadingStatusOptions, setIsLoadingStatusOptions] = useState(true);
+  const [statusOptionsError, setStatusOptionsError] = useState("");
   const [categories, setCategories] = useState([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [categoryError, setCategoryError] = useState("");
@@ -150,8 +174,41 @@ export default function TicketList() {
   const requestUrl = hasAppliedFilters || isSearchActive
     ? `/volt/tickets/query?${requestParams.toString()}`
     : "/volt/tickets";
+  const selectedStatus = draftFilters.status;
+  const selectedStatusInOptions = !selectedStatus || statusFilterOptions.some((option) => option.statusKey === selectedStatus);
   const selectedCategory = draftFilters.category;
   const selectedCategoryInOptions = !selectedCategory || categories.some((category) => category.categoryKey === selectedCategory);
+
+  const loadStatusFilterOptions = useCallback(async () => {
+    if (!canUseFilters) {
+      setStatusFilterOptions(fallbackStatusFilterOptions);
+      setStatusOptionsError("");
+      setIsLoadingStatusOptions(false);
+      return;
+    }
+
+    setIsLoadingStatusOptions(true);
+    setStatusOptionsError("");
+
+    try {
+      const response = await fetch("/volt/tickets/status-filter-options", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Status filter options request failed");
+
+      const data = await response.json();
+      const options = normalizeStatusFilterOptions(data);
+      setStatusFilterOptions(options.length > 0 ? options : fallbackStatusFilterOptions);
+    } catch {
+      setStatusFilterOptions(fallbackStatusFilterOptions);
+      setStatusOptionsError("Unable to load status filter options. Showing default statuses.");
+    } finally {
+      setIsLoadingStatusOptions(false);
+    }
+  }, [canUseFilters]);
 
   const loadCategories = useCallback(async () => {
     if (!canUseFilters) {
@@ -191,8 +248,9 @@ export default function TicketList() {
   }, [appliedFilters, canUseFilters, canUseSearch, searchParams, searchText, setSearchParams]);
 
   useEffect(() => {
+    loadStatusFilterOptions();
     loadCategories();
-  }, [loadCategories]);
+  }, [loadCategories, loadStatusFilterOptions]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -319,8 +377,13 @@ export default function TicketList() {
                   Status
                   <select name="status" value={draftFilters.status} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
                     <option value="">All statuses</option>
-                    {filterOptions.status.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
+                    {!selectedStatusInOptions && <option value={selectedStatus}>{formatLabel(selectedStatus)}</option>}
+                    {statusFilterOptions.map((option) => (
+                      <option key={option.statusKey} value={option.statusKey}>{formatStatusOption(option)}</option>
+                    ))}
                   </select>
+                  {isLoadingStatusOptions && <p className="mt-1 text-xs font-semibold text-gray-500">Loading status options...</p>}
+                  {statusOptionsError && <p className="mt-1 text-xs font-semibold text-yellow-700">{statusOptionsError}</p>}
                 </label>
                 <label className="text-sm font-semibold text-gray-700">
                   Category

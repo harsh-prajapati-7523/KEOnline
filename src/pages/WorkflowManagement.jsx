@@ -22,6 +22,10 @@ function formatLabel(value) {
   return value ? value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
 }
 
+function formatWorkflowStatusLabel(displayName, statusKey) {
+  return displayName || formatLabel(statusKey);
+}
+
 function formatDateTime(value) {
   if (!value) return "Not available";
   const date = new Date(value);
@@ -90,6 +94,8 @@ function validateStatusSortOrder(value) {
 function TransitionCard({ transition, isProcessing, onToggle }) {
   const active = Boolean(transition.active);
   const Icon = active ? ToggleRight : ToggleLeft;
+  const fromStatusLabel = formatWorkflowStatusLabel(transition.fromStatusDisplayName, transition.fromStatus);
+  const toStatusLabel = formatWorkflowStatusLabel(transition.toStatusDisplayName, transition.toStatus);
 
   return (
     <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
@@ -99,7 +105,7 @@ function TransitionCard({ transition, isProcessing, onToggle }) {
             {transition.displayName || formatLabel(transition.actionKey)}
           </h2>
           <p className="mt-1 break-words text-xs font-bold uppercase text-gray-500">
-            {transition.actionKey ?? "UNKNOWN"} · {transition.fromStatus ?? "UNKNOWN"} -&gt; {transition.toStatus ?? "UNKNOWN"}
+            {transition.actionKey ?? "UNKNOWN"} · {fromStatusLabel} -&gt; {toStatusLabel}
           </p>
         </div>
         <button

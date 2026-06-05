@@ -62,6 +62,10 @@ function formatLabel(value) {
   return value ? value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
 }
 
+function getTicketStatusLabel(ticket) {
+  return ticket?.statusDisplayName || formatLabel(ticket?.status);
+}
+
 function formatCategoryOption(category) {
   if (!category?.categoryKey) return "Not available";
   return category.displayName ? `${category.displayName} (${category.categoryKey})` : category.categoryKey;
@@ -80,7 +84,7 @@ function TicketCard({ ticket, onViewDetails }) {
           <h2 className="mt-1 text-lg font-extrabold text-blue-950">{ticket.ticketNumber ?? "Not available"}</h2>
         </div>
         <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
-          {ticket.status ?? "Not available"}
+          {getTicketStatusLabel(ticket)}
         </span>
       </div>
 

@@ -28,6 +28,10 @@ function formatLabel(value) {
   return value ? value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
 }
 
+function getTicketStatusLabel(ticket) {
+  return ticket?.statusDisplayName || formatLabel(ticket?.status);
+}
+
 const warrantyStatuses = ["NOT_CHECKED", "IN_WARRANTY", "OUT_OF_WARRANTY"];
 const manufacturerStatuses = ["NOT_REQUIRED", "RAISED", "IN_PROGRESS", "REPAIRED", "REPLACED", "WAITING_FOR_COMPANY_VISIT"];
 const workflowActionKeys = ["PICK_TICKET", "START_WORK", "COMPLETE_TICKET", "CANCEL_TICKET"];
@@ -571,7 +575,7 @@ export default function TicketDetail() {
               <p className="text-xs font-bold uppercase tracking-wide text-blue-200">Ticket Number</p>
               <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
                 <h1 className="text-2xl font-extrabold sm:text-3xl">{ticket.ticketNumber ?? "Not available"}</h1>
-                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{ticket.status ?? "Not available"}</span>
+                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{getTicketStatusLabel(ticket)}</span>
               </div>
             </header>
 
@@ -646,7 +650,7 @@ export default function TicketDetail() {
             <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold text-blue-950">Status / Workflow Details</h2>
               <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                <InfoItem label="Status">{ticket.status}</InfoItem>
+                <InfoItem label="Status">{getTicketStatusLabel(ticket)}</InfoItem>
                 <InfoItem label="Picked By">{ticket.pickedByEmployeeId ?? "Not picked"}</InfoItem>
                 <InfoItem label="Created Date"><span className="inline-flex items-center gap-2"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
                 {ticket.status === "COMPLETED" && <InfoItem label="Completed By">{ticket.completedByEmployeeId}</InfoItem>}

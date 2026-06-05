@@ -205,6 +205,7 @@ function WorkflowStatusCard({
   const active = Boolean(status.active);
   const terminal = Boolean(status.terminal);
   const isCustomEditable = !status.systemStatus && !status.protectedStatus;
+  const behaviorBucketLabel = status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set";
 
   return (
     <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
@@ -248,6 +249,7 @@ function WorkflowStatusCard({
         <Badge tone={status.systemStatus ? "blue" : "slate"}>{status.systemStatus ? "System" : "Custom"}</Badge>
         <Badge tone={status.protectedStatus ? "yellow" : "slate"}>{status.protectedStatus ? "Protected" : "Editable"}</Badge>
         <Badge tone={terminal ? "red" : "slate"}>{terminal ? "Terminal" : "Non-terminal"}</Badge>
+        <Badge tone={status.behaviorBucket ? "blue" : "slate"}>Bucket: {behaviorBucketLabel}</Badge>
         <Badge>Sort {status.sortOrder ?? "Not set"}</Badge>
       </div>
 

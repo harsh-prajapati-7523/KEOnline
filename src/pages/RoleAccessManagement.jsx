@@ -142,6 +142,50 @@ function buildGroupedRules(ruleKeys) {
   return grouped;
 }
 
+function isCustomPermission(rule) {
+  return rule && !rule.systemKey && !rule.protectedKey;
+}
+
+function mergeCustomRules(catalogRules, dynamicRules) {
+  const dynamicAllowed = normalizeRules(dynamicRules);
+  const customRules = Array.isArray(catalogRules)
+    ? catalogRules
+        .filter(isCustomPermission)
+        .map((rule) => ({
+          accessKey: rule.accessKey,
+          displayName: rule.displayName || rule.accessKey,
+          description: rule.description || "",
+          category: rule.category || "Custom",
+          active: Boolean(rule.active),
+          allowed: Boolean(dynamicAllowed[rule.accessKey]),
+          systemKey: Boolean(rule.systemKey),
+          protectedKey: Boolean(rule.protectedKey),
+          sortOrder: rule.sortOrder,
+        }))
+        .filter((rule) => typeof rule.accessKey === "string" && rule.accessKey.trim())
+    : [];
+
+  return customRules.sort((a, b) => {
+    const categoryCompare = a.category.localeCompare(b.category);
+    if (categoryCompare !== 0) return categoryCompare;
+    const sortCompare = (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+    if (sortCompare !== 0) return sortCompare;
+    const nameCompare = a.displayName.localeCompare(b.displayName);
+    if (nameCompare !== 0) return nameCompare;
+    return a.accessKey.localeCompare(b.accessKey);
+  });
+}
+
+function groupCustomRules(rules) {
+  const grouped = new Map();
+  rules.forEach((rule) => {
+    const category = rule.category || "Custom";
+    if (!grouped.has(category)) grouped.set(category, []);
+    grouped.get(category).push(rule);
+  });
+  return Array.from(grouped.entries()).map(([title, items]) => ({ title, items }));
+}
+
 export default function RoleAccessManagement() {
   const navigate = useNavigate();
   const [roles, setRoles] = useState([]);
@@ -149,13 +193,21 @@ export default function RoleAccessManagement() {
   const [roleAccess, setRoleAccess] = useState(null);
   const [originalRules, setOriginalRules] = useState({});
   const [editableRules, setEditableRules] = useState({});
+  const [customRules, setCustomRules] = useState([]);
+  const [originalCustomRules, setOriginalCustomRules] = useState({});
+  const [editableCustomRules, setEditableCustomRules] = useState({});
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [isLoadingAccess, setIsLoadingAccess] = useState(false);
+  const [isLoadingCustomAccess, setIsLoadingCustomAccess] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSavingCustom, setIsSavingCustom] = useState(false);
   const [roleError, setRoleError] = useState("");
   const [accessError, setAccessError] = useState("");
+  const [customAccessError, setCustomAccessError] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
+  const [customMessage, setCustomMessage] = useState("");
+  const [customMessageType, setCustomMessageType] = useState("success");
 
   const selectedRole = useMemo(
     () => roles.find((role) => String(role.id) === String(selectedRoleId)),
@@ -164,7 +216,12 @@ export default function RoleAccessManagement() {
   const protectedRole = Boolean(roleAccess?.protectedRole || roleAccess?.roleKey === "SUPER_ADMIN" || selectedRole?.roleKey === "SUPER_ADMIN");
   const ruleKeys = useMemo(() => Object.keys(editableRules), [editableRules]);
   const groupedRules = useMemo(() => buildGroupedRules(ruleKeys), [ruleKeys]);
+  const groupedCustomRules = useMemo(() => groupCustomRules(customRules), [customRules]);
   const hasChanges = useMemo(() => !sameRuleMap(originalRules, editableRules), [originalRules, editableRules]);
+  const hasCustomChanges = useMemo(
+    () => !sameRuleMap(originalCustomRules, editableCustomRules),
+    [originalCustomRules, editableCustomRules]
+  );
 
   const loadRoles = useCallback(async () => {
     setIsLoadingRoles(true);
@@ -211,24 +268,73 @@ export default function RoleAccessManagement() {
     }
   }, []);
 
+  const loadCustomPermissions = useCallback(async (roleId) => {
+    if (!roleId) {
+      setCustomRules([]);
+      setOriginalCustomRules({});
+      setEditableCustomRules({});
+      setCustomAccessError("");
+      return;
+    }
+
+    setIsLoadingCustomAccess(true);
+    setCustomAccessError("");
+    try {
+      const [catalogResponse, dynamicResponse] = await Promise.all([
+        fetch("/volt/access/keys", { headers: authHeaders() }),
+        fetch(`/volt/role-access/${roleId}/dynamic`, { headers: authHeaders() }),
+      ]);
+      if (!catalogResponse.ok) {
+        throw new Error(await readApiError(catalogResponse, "Unable to load custom permission catalog. Please try again."));
+      }
+      if (!dynamicResponse.ok) {
+        throw new Error(await readApiError(dynamicResponse, "Unable to load custom role permissions. Please try again."));
+      }
+
+      const catalogData = await catalogResponse.json();
+      const dynamicData = await dynamicResponse.json();
+      const mergedRules = mergeCustomRules(catalogData, dynamicData.rules);
+      const mergedRuleMap = normalizeRules(mergedRules);
+      setCustomRules(mergedRules);
+      setOriginalCustomRules(mergedRuleMap);
+      setEditableCustomRules(mergedRuleMap);
+    } catch (error) {
+      setCustomRules([]);
+      setOriginalCustomRules({});
+      setEditableCustomRules({});
+      setCustomAccessError(error.message || "Unable to load custom permissions. Please try again.");
+    } finally {
+      setIsLoadingCustomAccess(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadRoles();
   }, [loadRoles]);
 
   useEffect(() => {
     loadRoleAccess(selectedRoleId);
-  }, [loadRoleAccess, selectedRoleId]);
+    loadCustomPermissions(selectedRoleId);
+  }, [loadCustomPermissions, loadRoleAccess, selectedRoleId]);
 
   const handleRoleChange = (event) => {
     setSelectedRoleId(event.target.value);
     setMessage("");
+    setCustomMessage("");
     setAccessError("");
+    setCustomAccessError("");
   };
 
   const toggleRule = (accessKey) => {
     if (protectedRole) return;
     setEditableRules((current) => ({ ...current, [accessKey]: !current[accessKey] }));
     setMessage("");
+  };
+
+  const toggleCustomRule = (rule) => {
+    if (protectedRole || !rule.active) return;
+    setEditableCustomRules((current) => ({ ...current, [rule.accessKey]: !current[rule.accessKey] }));
+    setCustomMessage("");
   };
 
   const saveChanges = async () => {
@@ -266,6 +372,46 @@ export default function RoleAccessManagement() {
       setMessage(error.message || "Unable to save role access. Please try again.");
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const saveCustomChanges = async () => {
+    if (!selectedRoleId) {
+      setCustomMessageType("error");
+      setCustomMessage("Select a role to manage custom permissions.");
+      return;
+    }
+    if (protectedRole) {
+      setCustomMessageType("error");
+      setCustomMessage("SUPER_ADMIN custom permissions are protected and cannot be changed.");
+      return;
+    }
+
+    setIsSavingCustom(true);
+    setCustomMessage("");
+    try {
+      const payload = {
+        rules: customRules
+          .filter((rule) => rule.active)
+          .map((rule) => ({
+            accessKey: rule.accessKey,
+            allowed: Boolean(editableCustomRules[rule.accessKey]),
+          })),
+      };
+      const response = await fetch(`/volt/role-access/${selectedRoleId}/dynamic`, {
+        method: "PATCH",
+        headers: authHeaders(true),
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(await readApiError(response, "Unable to save custom permissions. Please try again."));
+      setCustomMessageType("success");
+      setCustomMessage("Custom permissions updated successfully.");
+      await loadCustomPermissions(selectedRoleId);
+    } catch (error) {
+      setCustomMessageType("error");
+      setCustomMessage(error.message || "Unable to save custom permissions. Please try again.");
+    } finally {
+      setIsSavingCustom(false);
     }
   };
 
@@ -314,8 +460,11 @@ export default function RoleAccessManagement() {
             </label>
             <button
               type="button"
-              onClick={() => loadRoleAccess(selectedRoleId)}
-              disabled={!selectedRoleId || isLoadingAccess}
+              onClick={() => {
+                loadRoleAccess(selectedRoleId);
+                loadCustomPermissions(selectedRoleId);
+              }}
+              disabled={!selectedRoleId || isLoadingAccess || isLoadingCustomAccess}
               className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-blue-950 px-4 py-2 font-bold text-blue-950 transition hover:bg-blue-50 disabled:opacity-60"
             >
               <RefreshCw size={18} aria-hidden="true" />
@@ -408,6 +557,104 @@ export default function RoleAccessManagement() {
                 <span className="inline-flex items-center gap-2 text-sm font-semibold text-green-700">
                   <CheckCircle2 size={16} aria-hidden="true" />
                   No unsaved changes
+                </span>
+              )}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-5 rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold text-blue-950">Custom Permissions</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                {selectedRole ? formatRoleLabel(selectedRole) : "Select a role to manage custom permissions."}
+              </p>
+            </div>
+            {roleAccess && (
+              <span className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${protectedRole ? "bg-yellow-100 text-yellow-800" : "bg-green-50 text-green-700"}`}>
+                {protectedRole && <LockKeyhole size={14} aria-hidden="true" />}
+                {protectedRole ? "Protected / Read-only" : "Editable"}
+              </span>
+            )}
+          </div>
+
+          <Message type={customMessageType}>{customMessage}</Message>
+
+          {!selectedRoleId && (
+            <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">Select a role to manage custom permissions.</p>
+          )}
+          {isLoadingCustomAccess && (
+            <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">Loading custom permissions...</p>
+          )}
+          {customAccessError && (
+            <p className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{customAccessError}</p>
+          )}
+          {protectedRole && !isLoadingCustomAccess && !customAccessError && (
+            <p className="mt-4 rounded-xl bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
+              SUPER_ADMIN custom permissions are protected and cannot be edited.
+            </p>
+          )}
+          {selectedRoleId && !isLoadingCustomAccess && !customAccessError && customRules.length === 0 && (
+            <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">No custom permissions are available.</p>
+          )}
+
+          {selectedRoleId && !isLoadingCustomAccess && !customAccessError && groupedCustomRules.length > 0 && (
+            <div className="mt-5 space-y-5">
+              {groupedCustomRules.map((group) => (
+                <section key={group.title} className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <h3 className="text-base font-extrabold text-blue-950">{group.title}</h3>
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {group.items.map((rule) => {
+                      const disabled = protectedRole || !rule.active || isSavingCustom;
+                      return (
+                        <label key={rule.accessKey} className={`flex min-h-24 items-start gap-3 rounded-xl border p-4 ${rule.active ? "border-gray-200 bg-white" : "border-gray-200 bg-gray-100"}`}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(editableCustomRules[rule.accessKey])}
+                            onChange={() => toggleCustomRule(rule)}
+                            disabled={disabled}
+                            className="mt-1 h-5 w-5 shrink-0 accent-blue-950 disabled:opacity-60"
+                          />
+                          <span className="min-w-0">
+                            <span className="flex flex-wrap items-center gap-2">
+                              <span className="font-bold text-gray-800">{rule.displayName}</span>
+                              <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${rule.active ? "bg-green-50 text-green-700" : "bg-gray-200 text-gray-600"}`}>
+                                {rule.active ? "Active" : "Inactive"}
+                              </span>
+                            </span>
+                            <span className="mt-1 block break-words text-xs font-semibold text-gray-500">{rule.accessKey}</span>
+                            {rule.description && (
+                              <span className="mt-2 block text-sm text-gray-600">{rule.description}</span>
+                            )}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
+            </div>
+          )}
+
+          {selectedRoleId && !isLoadingCustomAccess && !customAccessError && customRules.length > 0 && (
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={saveCustomChanges}
+                disabled={protectedRole || !hasCustomChanges || isSavingCustom}
+                className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-blue-950 px-5 py-3 font-bold text-white transition hover:bg-blue-900 disabled:opacity-60"
+              >
+                {isSavingCustom ? <RefreshCw size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
+                {isSavingCustom ? "Saving..." : "Save Custom Permissions"}
+              </button>
+              {hasCustomChanges && !protectedRole && (
+                <span className="text-sm font-semibold text-yellow-700">Unsaved custom permission changes</span>
+              )}
+              {!hasCustomChanges && !protectedRole && (
+                <span className="inline-flex items-center gap-2 text-sm font-semibold text-green-700">
+                  <CheckCircle2 size={16} aria-hidden="true" />
+                  No unsaved custom changes
                 </span>
               )}
             </div>

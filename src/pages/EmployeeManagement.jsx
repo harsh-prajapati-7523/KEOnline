@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ArrowLeft, KeyRound, PlusCircle, RefreshCw, ShieldCheck, UserRoundCog, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const employeeIdPattern = /^[A-Z0-9_]{3,30}$/;
+const employeeIdPattern = /^[a-zA-Z0-9_]{3,30}$/;
 const emptyCreateForm = {
   name: "",
   employeeId: "",

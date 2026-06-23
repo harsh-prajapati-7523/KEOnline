@@ -64,7 +64,7 @@ function validateCreate(form) {
   if (!form.employeeId.trim()) {
     errors.employeeId = "Employee ID is required.";
   } else if (!employeeIdPattern.test(form.employeeId.trim())) {
-    errors.employeeId = "Use 3 to 30 uppercase letters, digits, or underscores.";
+    errors.employeeId = "Use 3 to 30 letters, digits, or underscores.";
   }
   if (!form.roleId) errors.roleId = "Role is required.";
   if (form.password.length < 8) errors.password = "Temporary password must contain at least 8 characters.";

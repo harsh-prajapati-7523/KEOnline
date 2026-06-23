@@ -10,6 +10,12 @@ function formatDate(value) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
 }
 
+function formatDateTime(value) {
+  if (!value) return "Not available";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 function formatCurrency(value) {
   const amount = Number(value);
   if (!Number.isFinite(amount)) {
@@ -30,6 +36,18 @@ function formatLabel(value) {
 
 function getTicketStatusLabel(ticket) {
   return ticket?.statusDisplayName || formatLabel(ticket?.status);
+}
+
+function getHistoryActor(historyItem) {
+  return historyItem?.executedByEmployeeNameSnapshot
+    || historyItem?.executedByEmployeeId
+    || "Not available";
+}
+
+function hasOwnerChange(historyItem) {
+  const previousOwner = historyItem?.previousOwnerEmployeeId ?? "";
+  const newOwner = historyItem?.newOwnerEmployeeId ?? "";
+  return (previousOwner || newOwner) && String(previousOwner) !== String(newOwner);
 }
 
 const warrantyStatuses = ["NOT_CHECKED", "IN_WARRANTY", "OUT_OF_WARRANTY"];
@@ -116,7 +134,14 @@ export default function TicketDetail() {
   const [dynamicValues, setDynamicValues] = useState([]);
   const [dynamicValuesLoading, setDynamicValuesLoading] = useState(false);
   const [dynamicValuesError, setDynamicValuesError] = useState("");
+  const [workflowHistory, setWorkflowHistory] = useState([]);
+  const [workflowHistoryPage, setWorkflowHistoryPage] = useState(0);
+  const [workflowHistoryLast, setWorkflowHistoryLast] = useState(true);
+  const [workflowHistoryLoading, setWorkflowHistoryLoading] = useState(false);
+  const [workflowHistoryLoadingMore, setWorkflowHistoryLoadingMore] = useState(false);
+  const [workflowHistoryError, setWorkflowHistoryError] = useState("");
   const customerHistoryTicketIdRef = useRef(ticketId);
+  const workflowHistoryTicketIdRef = useRef(ticketId);
   const currentRole = localStorage.getItem("role") ?? "";
   const currentEmployeeId = localStorage.getItem("employeeId") ?? "";
 
@@ -203,9 +228,60 @@ export default function TicketDetail() {
     }
   };
 
+  const loadWorkflowHistory = async (page = 0, replace = page === 0) => {
+    if (!ticketId) return;
+
+    const requestedTicketId = ticketId;
+    if (replace) {
+      setWorkflowHistoryLoading(true);
+    } else {
+      setWorkflowHistoryLoadingMore(true);
+    }
+    setWorkflowHistoryError("");
+
+    try {
+      const response = await fetch(`/volt/tickets/${ticketId}/workflow-history?page=${page}&size=20`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Unable to load workflow history");
+
+      const data = await response.json();
+      if (String(workflowHistoryTicketIdRef.current) !== String(requestedTicketId)) return;
+
+      const rows = Array.isArray(data.history) ? data.history : [];
+      setWorkflowHistory((current) => replace ? rows : [...current, ...rows]);
+      setWorkflowHistoryPage(Number.isInteger(data.page) ? data.page : page);
+      setWorkflowHistoryLast(data.last !== false);
+    } catch {
+      if (String(workflowHistoryTicketIdRef.current) !== String(requestedTicketId)) return;
+      if (replace) {
+        setWorkflowHistory([]);
+        setWorkflowHistoryPage(0);
+        setWorkflowHistoryLast(true);
+      }
+      setWorkflowHistoryError("Unable to load workflow history.");
+    } finally {
+      if (String(workflowHistoryTicketIdRef.current) === String(requestedTicketId)) {
+        setWorkflowHistoryLoading(false);
+        setWorkflowHistoryLoadingMore(false);
+      }
+    }
+  };
+
   useEffect(() => {
+    workflowHistoryTicketIdRef.current = ticketId;
+    setWorkflowHistory([]);
+    setWorkflowHistoryPage(0);
+    setWorkflowHistoryLast(true);
+    setWorkflowHistoryLoading(false);
+    setWorkflowHistoryLoadingMore(false);
+    setWorkflowHistoryError("");
     loadTicket();
     loadAvailableActions();
+    loadWorkflowHistory(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
 
@@ -322,6 +398,7 @@ export default function TicketDetail() {
 
     await loadTicket();
     await loadAvailableActions();
+    await loadWorkflowHistory(0, true);
     if (showCharges) await loadCharges();
     setStatusMessage(successMessage);
   };
@@ -660,6 +737,59 @@ export default function TicketDetail() {
                 {ticket.status === "CANCELLED" && <InfoItem label="Cancelled At">{formatDate(ticket.cancelledAt)}</InfoItem>}
                 {ticket.status === "CANCELLED" && <InfoItem label="Cancellation Reason" className="sm:col-span-2">{ticket.cancellationReason}</InfoItem>}
               </dl>
+            </section>
+
+            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+              <h2 className="text-lg font-bold text-blue-950">Workflow History</h2>
+
+              <div className="mt-4 space-y-3">
+                {workflowHistoryLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow history...</p>}
+                {workflowHistoryError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{workflowHistoryError}</p>}
+                {!workflowHistoryLoading && !workflowHistoryError && workflowHistory.length === 0 && (
+                  <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">No workflow history yet.</p>
+                )}
+                {!workflowHistoryLoading && workflowHistory.length > 0 && (
+                  <>
+                    <div className="space-y-3">
+                      {workflowHistory.map((historyItem) => (
+                        <article key={historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                              <h3 className="font-extrabold text-blue-950">{historyItem.actionDisplayName || formatLabel(historyItem.actionKey)}</h3>
+                              <p className="mt-1 text-sm font-semibold text-slate-700">
+                                {(historyItem.fromStatusDisplayName || formatLabel(historyItem.fromStatus))} &rarr; {(historyItem.toStatusDisplayName || formatLabel(historyItem.toStatus))}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-950">{formatDateTime(historyItem.createdAt)}</span>
+                          </div>
+
+                          <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                            <InfoItem label="Executed By">{getHistoryActor(historyItem)}</InfoItem>
+                            {hasOwnerChange(historyItem) && (
+                              <InfoItem label="Owner Change">
+                                {(historyItem.previousOwnerEmployeeId || "Unassigned")} &rarr; {(historyItem.newOwnerEmployeeId || "Unassigned")}
+                              </InfoItem>
+                            )}
+                            {historyItem.comment && <InfoItem label="Comment" className="sm:col-span-2">{historyItem.comment}</InfoItem>}
+                            {historyItem.reason && <InfoItem label="Reason" className="sm:col-span-2">{historyItem.reason}</InfoItem>}
+                          </dl>
+                        </article>
+                      ))}
+                    </div>
+
+                    {!workflowHistoryLast && (
+                      <button
+                        type="button"
+                        onClick={() => loadWorkflowHistory(workflowHistoryPage + 1, false)}
+                        disabled={workflowHistoryLoadingMore}
+                        className="rounded-2xl bg-blue-50 px-4 py-2 font-semibold text-blue-950 hover:bg-blue-100 disabled:opacity-60"
+                      >
+                        {workflowHistoryLoadingMore ? "Loading..." : "Load More"}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
             </section>
 
             <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">

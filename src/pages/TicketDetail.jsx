@@ -437,6 +437,39 @@ export default function TicketDetail() {
     }
   };
 
+  const runDynamicWorkflowAction = async (action) => {
+    const transitionId = action?.transitionId;
+    if (!transitionId) return;
+
+    const key = `dynamic-${transitionId}`;
+    setProcessing(key, true);
+    setStatusMessage("");
+    try {
+      const response = await fetch(`/volt/tickets/${ticketId}/workflow-transitions/${transitionId}/execute`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          comment: "",
+          reason: "",
+        }),
+      });
+
+      if (!response.ok) throw new Error("Dynamic workflow action failed");
+
+      await loadTicket();
+      await loadAvailableActions();
+      await loadWorkflowHistory(0, true);
+      setStatusMessage("Workflow action completed successfully.");
+    } catch {
+      setStatusMessage("Unable to execute workflow action. Please refresh and try again.");
+    } finally {
+      setProcessing(key, false);
+    }
+  };
+
   const toggleCharges = async () => {
     if (showCharges) {
       setShowCharges(false);
@@ -999,9 +1032,11 @@ export default function TicketDetail() {
                         key={`${action.transitionId}-${action.actionKey}`}
                         type="button"
                         data-transition-id={action.transitionId}
-                        className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 hover:bg-slate-50"
+                        onClick={() => runDynamicWorkflowAction(action)}
+                        disabled={processingKeys[`dynamic-${action.transitionId}`]}
+                        className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 hover:bg-slate-50 disabled:opacity-60"
                       >
-                        {action.displayName}
+                        {processingKeys[`dynamic-${action.transitionId}`] ? "Processing..." : action.displayName}
                       </button>
                     ))}
                   </div>

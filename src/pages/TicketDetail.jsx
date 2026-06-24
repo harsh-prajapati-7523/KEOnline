@@ -153,7 +153,7 @@ export default function TicketDetail() {
     setIsLoading(true);
     setError("");
     try {
-      const response = await fetch("/volt/tickets", {
+      const response = await fetch(`/volt/tickets/${ticketId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -162,17 +162,13 @@ export default function TicketDetail() {
       if (!response.ok) throw new Error("Ticket details failed");
 
       const data = await response.json();
-      const selectedTicket = Array.isArray(data)
-        ? data.find((item) => String(item.id) === String(ticketId))
-        : null;
-
-      if (!selectedTicket) {
+      if (!data || String(data.id) !== String(ticketId)) {
         setTicket(null);
         setError("Ticket not found.");
         return;
       }
 
-      setTicket(selectedTicket);
+      setTicket(data);
     } catch {
       setTicket(null);
       setError("Unable to load ticket details. Please try again.");

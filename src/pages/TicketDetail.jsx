@@ -54,13 +54,28 @@ const warrantyStatuses = ["NOT_CHECKED", "IN_WARRANTY", "OUT_OF_WARRANTY"];
 const manufacturerStatuses = ["NOT_REQUIRED", "RAISED", "IN_PROGRESS", "REPAIRED", "REPLACED", "WAITING_FOR_COMPANY_VISIT"];
 const workflowActionKeys = ["PICK_TICKET", "START_WORK", "COMPLETE_TICKET", "CANCEL_TICKET"];
 
+function normalizeDynamicActions(data) {
+  return Array.isArray(data?.dynamicActions)
+    ? data.dynamicActions
+      .filter((action) => action?.allowed === true && action?.transitionId && action?.displayName)
+      .map((action) => ({
+        transitionId: action.transitionId,
+        actionKey: action.actionKey ?? "",
+        displayName: action.displayName,
+        fromStatus: action.fromStatus ?? "",
+        toStatus: action.toStatus ?? "",
+        allowed: true,
+      }))
+    : [];
+}
+
 function normalizeAvailableActions(data) {
   const responseActions = data?.actions ?? data;
   const source = Array.isArray(responseActions)
     ? responseActions.map((action) => [action?.actionKey ?? action?.key ?? action?.action, action])
     : Object.entries(responseActions ?? {}).map(([actionKey, action]) => [action?.actionKey ?? action?.key ?? action?.action ?? actionKey, action]);
 
-  return source.reduce((actions, [key, action]) => {
+  const fixedActions = source.reduce((actions, [key, action]) => {
     if (!workflowActionKeys.includes(key) || typeof action !== "object" || action === null) return actions;
     return {
       ...actions,
@@ -70,6 +85,11 @@ function normalizeAvailableActions(data) {
       },
     };
   }, {});
+
+  return {
+    ...fixedActions,
+    dynamicActions: normalizeDynamicActions(data),
+  };
 }
 
 function isWorkflowActionAvailable(availableActions, actionKey) {
@@ -631,6 +651,8 @@ export default function TicketDetail() {
     || (canStartWork && ticket?.status === "PICKED")
     || canComplete
     || canCancel;
+  const dynamicActions = Array.isArray(availableActions?.dynamicActions) ? availableActions.dynamicActions : [];
+  const hasDynamicActions = dynamicActions.length > 0;
   const hasLoadedAvailableActions = Boolean(availableActions) && !availableActionsLoading && !availableActionsError;
   const availableWarrantyStatuses = currentRole === "SUPER_ADMIN" || ticket?.warrantyStatus === "NOT_CHECKED"
     ? warrantyStatuses
@@ -968,6 +990,23 @@ export default function TicketDetail() {
                   <p className="text-sm text-gray-600">No workflow actions are currently available for this ticket.</p>
                 )}
               </div>
+              {hasDynamicActions && (
+                <div className="mt-5 border-t border-slate-200 pt-4">
+                  <h3 className="text-sm font-bold text-slate-700">Additional Workflow Actions</h3>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {dynamicActions.map((action) => (
+                      <button
+                        key={`${action.transitionId}-${action.actionKey}`}
+                        type="button"
+                        data-transition-id={action.transitionId}
+                        className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 hover:bg-slate-50"
+                      >
+                        {action.displayName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </section>
           </div>
         )}

@@ -6,8 +6,6 @@ import { hasAccess } from "../utils/access";
 const emptyFilters = {
   status: "",
   category: "",
-  warrantyStatus: "",
-  manufacturerStatus: "",
   createdFrom: "",
   createdTo: "",
   mine: false,
@@ -21,17 +19,10 @@ const fallbackStatusFilterOptions = [
   { statusKey: "CANCELLED", displayName: "Cancelled" },
 ];
 
-const filterOptions = {
-  warrantyStatus: ["NOT_CHECKED", "IN_WARRANTY", "OUT_OF_WARRANTY"],
-  manufacturerStatus: ["NOT_REQUIRED", "RAISED", "IN_PROGRESS", "REPAIRED", "REPLACED", "WAITING_FOR_COMPANY_VISIT"],
-};
-
 function filtersFromSearchParams(searchParams) {
   return {
     status: searchParams.get("status") ?? "",
     category: searchParams.get("category") ?? "",
-    warrantyStatus: searchParams.get("warrantyStatus") ?? "",
-    manufacturerStatus: searchParams.get("manufacturerStatus") ?? "",
     createdFrom: searchParams.get("createdFrom") ?? "",
     createdTo: searchParams.get("createdTo") ?? "",
     mine: searchParams.get("mine") === "true",
@@ -123,14 +114,6 @@ function TicketCard({ ticket, onViewDetails }) {
         <div>
           <dt className="font-bold text-gray-500">Total Charge</dt>
           <dd className="mt-1 text-gray-800">{formatCurrency(ticket.totalCharge ?? 0)}</dd>
-        </div>
-        <div>
-          <dt className="font-bold text-gray-500">Warranty</dt>
-          <dd className="mt-1 text-gray-800">{formatLabel(ticket.warrantyStatus)}</dd>
-        </div>
-        <div>
-          <dt className="font-bold text-gray-500">Mfg Status</dt>
-          <dd className="mt-1 text-gray-800">{formatLabel(ticket.manufacturerStatus)}</dd>
         </div>
       </dl>
 
@@ -401,20 +384,6 @@ export default function TicketList() {
                   {!isLoadingCategories && !categoryError && categories.length === 0 && (
                     <p className="mt-1 text-xs font-semibold text-yellow-700">No active categories available.</p>
                   )}
-                </label>
-                <label className="text-sm font-semibold text-gray-700">
-                  Warranty Status
-                  <select name="warrantyStatus" value={draftFilters.warrantyStatus} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
-                    <option value="">All warranty statuses</option>
-                    {filterOptions.warrantyStatus.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
-                  </select>
-                </label>
-                <label className="text-sm font-semibold text-gray-700">
-                  Manufacturer Status
-                  <select name="manufacturerStatus" value={draftFilters.manufacturerStatus} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
-                    <option value="">All manufacturer statuses</option>
-                    {filterOptions.manufacturerStatus.map((value) => <option key={value} value={value}>{formatLabel(value)}</option>)}
-                  </select>
                 </label>
                 <label className="text-sm font-semibold text-gray-700">
                   Created From

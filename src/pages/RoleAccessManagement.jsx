@@ -16,7 +16,6 @@ const accessGroups = [
       "START_WORK",
       "COMPLETE_TICKET",
       "CANCEL_TICKET",
-      "UPDATE_WARRANTY",
       "VIEW_CUSTOMER_HISTORY",
       "USE_TICKET_SEARCH",
       "USE_TICKET_FILTERS",
@@ -54,7 +53,6 @@ const accessLabels = {
   START_WORK: "Start Work",
   COMPLETE_TICKET: "Complete Ticket",
   CANCEL_TICKET: "Cancel Ticket",
-  UPDATE_WARRANTY: "Update Warranty",
   VIEW_CUSTOMER_HISTORY: "View Customer History",
   VIEW_CHARGES: "View Charges",
   ADD_CHARGE: "Add Charge",
@@ -75,6 +73,8 @@ const accessLabels = {
   VIEW_DROPDOWN_SOURCE_MANAGEMENT: "View Dropdown Sources",
   MANAGE_DROPDOWN_SOURCES: "Manage Dropdown Sources",
 };
+
+const hiddenSystemAccessKeys = new Set(["UPDATE_WARRANTY"]);
 
 function authHeaders(includeContentType = false) {
   return {
@@ -126,16 +126,17 @@ function sameRuleMap(a, b) {
 }
 
 function buildGroupedRules(ruleKeys) {
+  const visibleRuleKeys = ruleKeys.filter((key) => !hiddenSystemAccessKeys.has(key));
   const seen = new Set();
   const grouped = accessGroups
     .map((group) => {
-      const keys = group.keys.filter((key) => ruleKeys.includes(key));
+      const keys = group.keys.filter((key) => visibleRuleKeys.includes(key));
       keys.forEach((key) => seen.add(key));
       return { ...group, keys };
     })
     .filter((group) => group.keys.length > 0);
 
-  const unknownKeys = ruleKeys.filter((key) => !seen.has(key));
+  const unknownKeys = visibleRuleKeys.filter((key) => !seen.has(key));
   if (unknownKeys.length > 0) {
     grouped.push({ title: "Other", keys: unknownKeys });
   }

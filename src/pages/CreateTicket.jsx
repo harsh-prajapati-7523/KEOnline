@@ -10,10 +10,6 @@ const emptyForm = {
   productType: "",
   categoryId: "",
   complaintDescription: "",
-  warrantyStatus: "",
-  manufacturerComplaintNumber: "",
-  manufacturerOrBrandName: "",
-  productSerialNumber: "",
 };
 
 function validate(formData) {
@@ -29,15 +25,6 @@ function validate(formData) {
   if (!formData.categoryId) errors.categoryId = "Ticket category is required.";
   if (!formData.complaintDescription.trim()) {
     errors.complaintDescription = "Complaint description is required.";
-  }
-  if (!formData.warrantyStatus) errors.warrantyStatus = "Warranty status is required.";
-  if (formData.warrantyStatus === "IN_WARRANTY") {
-    if (!formData.manufacturerOrBrandName.trim()) {
-      errors.manufacturerOrBrandName = "Brand name is required for in-warranty tickets.";
-    }
-    if (!formData.productSerialNumber.trim()) {
-      errors.productSerialNumber = "Product serial number is required for in-warranty tickets.";
-    }
   }
 
   return errors;
@@ -239,10 +226,6 @@ export default function CreateTicket() {
           productType: formData.productType.trim(),
           categoryId: Number(formData.categoryId),
           complaintDescription: formData.complaintDescription.trim(),
-          warrantyStatus: formData.warrantyStatus,
-          manufacturerComplaintNumber: formData.manufacturerComplaintNumber.trim(),
-          manufacturerOrBrandName: formData.manufacturerOrBrandName.trim(),
-          productSerialNumber: formData.productSerialNumber.trim(),
           dynamicValues: dynamicValuesPayload,
         }),
       });
@@ -319,34 +302,6 @@ export default function CreateTicket() {
               Complaint Description
               <textarea name="complaintDescription" rows="4" value={formData.complaintDescription} onChange={handleChange} className="mt-2 w-full resize-y rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
               <FieldError message={errors.complaintDescription} />
-            </label>
-
-            <label className="font-semibold text-gray-700 sm:col-span-2">
-              Warranty Status
-              <select name="warrantyStatus" value={formData.warrantyStatus} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
-                <option value="">Select warranty status</option>
-                <option value="NOT_CHECKED">Not Checked</option>
-                <option value="IN_WARRANTY">In Warranty</option>
-                <option value="OUT_OF_WARRANTY">Out Of Warranty</option>
-              </select>
-              <FieldError message={errors.warrantyStatus} />
-            </label>
-
-            <label className="font-semibold text-gray-700">
-              Manufacturer / Brand Name <span className="text-sm font-normal text-gray-500">(Required for in-warranty)</span>
-              <SuggestionInput endpoint="/volt/suggestions/manufacturers" name="manufacturerOrBrandName" value={formData.manufacturerOrBrandName} onChange={handleChange} maxLength={80} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
-              <FieldError message={errors.manufacturerOrBrandName} />
-            </label>
-
-            <label className="font-semibold text-gray-700">
-              Product Serial Number <span className="text-sm font-normal text-gray-500">(Required for in-warranty)</span>
-              <input name="productSerialNumber" value={formData.productSerialNumber} onChange={handleChange} maxLength={80} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
-              <FieldError message={errors.productSerialNumber} />
-            </label>
-
-            <label className="font-semibold text-gray-700 sm:col-span-2">
-              Manufacturer Complaint Number <span className="text-sm font-normal text-gray-500">(Optional)</span>
-              <input name="manufacturerComplaintNumber" value={formData.manufacturerComplaintNumber} onChange={handleChange} maxLength={80} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
             </label>
 
             {formData.categoryId && (

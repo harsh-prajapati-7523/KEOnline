@@ -105,19 +105,19 @@ function Navbar() {
     navigate("/employee-login", { replace: true });
   };
 
-  const buttonClassName = (isActive) => `flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition sm:px-4 sm:text-base ${
+  const buttonClassName = (isActive) => `flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm font-semibold transition sm:min-h-11 sm:gap-2 sm:px-4 sm:py-2 sm:text-base ${
     isActive ? "bg-yellow-400 text-black" : "bg-white/10 hover:bg-white/20"
   }`;
 
   return (
     <nav className="w-full overflow-hidden bg-blue-950 text-white shadow-lg">
-      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-4 lg:flex-row">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3 lg:flex-row">
         <div className="flex min-w-0 items-center gap-2 text-center sm:gap-3 lg:text-left">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-[3px] border-yellow-400 text-base font-bold italic sm:h-12 sm:w-12 sm:border-4 sm:text-2xl md:h-14 md:w-14 md:text-3xl">
+          <div className="flex h-[clamp(2rem,8vw,2.25rem)] w-[clamp(2rem,8vw,2.25rem)] shrink-0 items-center justify-center rounded-full border-[3px] border-yellow-400 text-[clamp(1rem,4vw,1.25rem)] font-bold italic sm:h-11 sm:w-11 sm:text-xl md:h-12 md:w-12 md:text-2xl">
             ke
           </div>
           <div className="min-w-0">
-            <h1 className="break-words text-xs font-extrabold leading-tight sm:text-lg md:text-2xl">
+            <h1 className="break-words text-[clamp(0.75rem,3.3vw,0.875rem)] font-extrabold leading-tight sm:text-base md:text-xl">
               KUMAR ELECTRONICS & ELECTRICALS
             </h1>
             <p className="hidden text-xs font-semibold text-yellow-400 sm:block md:text-sm">

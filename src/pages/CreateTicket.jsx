@@ -244,7 +244,7 @@ export default function CreateTicket() {
   };
 
   return (
-    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-3 sm:px-6 sm:py-6 lg:px-8">
+    <main className="ke-page-main bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mobile-full-width-actions mb-2 flex flex-wrap gap-2 sm:mb-4 sm:gap-3">
           <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:py-2">
@@ -256,12 +256,12 @@ export default function CreateTicket() {
         </div>
 
         <section className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-lg sm:rounded-3xl">
-          <header className="bg-blue-950 px-4 py-3 text-white sm:px-7 sm:py-6">
-            <h1 className="break-words text-lg font-extrabold sm:text-3xl">Create Ticket</h1>
+          <header className="ke-page-header bg-blue-950 text-white">
+            <h1 className="ke-page-title break-words font-extrabold">Create Ticket</h1>
             <p className="mt-1 text-xs text-blue-100 sm:mt-2 sm:text-sm">Record a customer service request.</p>
           </header>
 
-          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-5 p-4 sm:grid-cols-2 sm:gap-5 sm:p-7">
+          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-5 sm:p-6">
             <label className="font-semibold text-gray-700">
               Customer Name
               <input name="customerName" value={formData.customerName} onChange={handleChange} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />

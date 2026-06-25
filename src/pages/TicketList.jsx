@@ -337,14 +337,14 @@ export default function TicketList() {
         : "No tickets found.";
 
   return (
-    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-3 sm:px-6 sm:py-6 lg:px-8">
+    <main className="ke-page-main bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
         <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:py-2">
           <ArrowLeft size={18} aria-hidden="true" /> Dashboard
         </button>
 
-        <header className="mt-2 rounded-2xl bg-blue-950 p-3 text-white shadow-lg sm:mt-4 sm:rounded-3xl sm:p-7">
-          <h1 className="break-words text-lg font-extrabold sm:text-3xl">Tickets</h1>
+        <header className="ke-page-header mt-2 bg-blue-950 text-white shadow-lg sm:mt-4">
+          <h1 className="ke-page-title break-words font-extrabold">Tickets</h1>
           <p className="mt-1 text-xs text-blue-100 sm:mt-2 sm:text-sm">Select a ticket to view details and available actions.</p>
         </header>
 

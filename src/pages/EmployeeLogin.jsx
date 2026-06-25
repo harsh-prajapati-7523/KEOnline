@@ -58,33 +58,33 @@ export default function EmployeeLogin() {
   };
 
   return (
-    <div className="flex min-h-screen w-full overflow-x-hidden bg-gradient-to-r from-blue-950 to-blue-800 px-3 py-6 sm:items-center sm:justify-center sm:px-4">
+    <div className="ke-login-page">
       
-      <div className="mx-auto w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-8">
+      <div className="ke-login-card">
 
         <div className="flex flex-col items-center">
           
-          <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-yellow-400 text-3xl font-bold italic text-blue-950 sm:h-20 sm:w-20 sm:text-4xl">
+          <div className="ke-login-logo">
             ke
           </div>
 
-          <h1 className="mt-4 text-center text-2xl font-extrabold text-blue-950 sm:text-3xl">
+          <h1 className="ke-login-title">
             Employee Login
           </h1>
 
-          <p className="text-gray-500 text-sm mt-2 text-center">
+          <p className="ke-login-subtitle">
             Secure Staff Access
           </p>
 
         </div>
 
-        <form onSubmit={handleLogin} className="mt-7 sm:mt-8">
+        <form onSubmit={handleLogin} className="ke-login-form">
 
-          <label className="font-semibold text-gray-700 block mb-2">
+          <label className="ke-login-label">
             Employee ID
           </label>
 
-          <div className="mb-4 flex min-h-12 items-center rounded-2xl border-2 border-gray-200 px-4 py-3 focus-within:border-blue-950">
+          <div className="ke-login-control mb-4">
             
             <User className="text-blue-950 mr-3" size={22} />
 
@@ -93,18 +93,18 @@ export default function EmployeeLogin() {
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
               placeholder="Enter Employee ID"
-              className="w-full min-w-0 bg-transparent text-base outline-none"
+              className="ke-login-input"
               autoComplete="username"
               required
             />
 
           </div>
 
-          <label className="font-semibold text-gray-700 block mb-2">
+          <label className="ke-login-label">
             Password
           </label>
 
-          <div className="flex min-h-12 items-center rounded-2xl border-2 border-gray-200 px-4 py-3 focus-within:border-blue-950">
+          <div className="ke-login-control">
             
             <Lock className="text-blue-950 mr-3" size={22} />
 
@@ -113,7 +113,7 @@ export default function EmployeeLogin() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter Password"
-              className="w-full min-w-0 bg-transparent text-base outline-none"
+              className="ke-login-input"
               autoComplete="current-password"
               required
             />
@@ -124,7 +124,7 @@ export default function EmployeeLogin() {
             type="submit"
             disabled={isSubmitting}
             aria-busy={isSubmitting}
-            className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 px-5 py-3 text-lg font-bold text-black transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70"
+            className="ke-login-button"
           >
             <ShieldCheck size={22} />
             {isSubmitting ? "Logging in..." : "Login"}

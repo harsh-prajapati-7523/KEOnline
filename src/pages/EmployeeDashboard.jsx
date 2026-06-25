@@ -24,7 +24,7 @@ function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex min-h-20 w-full min-w-0 items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
+      className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-2xl border border-blue-100 bg-white p-3.5 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md sm:min-h-[4.5rem] sm:p-4"
     >
       <div className={`${iconClassName} shrink-0`}>
         <Icon size={20} aria-hidden="true" />
@@ -88,13 +88,13 @@ export default function EmployeeDashboard() {
   };
 
   return (
-    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-3 sm:px-6 sm:py-6 lg:px-8">
+    <main className="ke-page-main bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
-        <header className="rounded-2xl bg-blue-950 p-3 text-white shadow-lg sm:rounded-3xl sm:p-7">
+        <header className="ke-page-header bg-blue-950 text-white shadow-lg">
           <p className="break-words text-xs font-semibold uppercase text-yellow-400 sm:text-sm">
             Technician Dashboard
           </p>
-          <h1 className="mt-1 break-words text-lg font-extrabold sm:mt-2 sm:text-3xl">
+          <h1 className="ke-page-title mt-1 break-words font-extrabold sm:mt-2">
             Welcome{employeeName ? `, ${employeeName}` : ""}
           </h1>
           <p className="mt-1 break-words text-xs font-semibold text-blue-100 sm:mt-2 sm:text-sm">
@@ -189,7 +189,7 @@ export default function EmployeeDashboard() {
           )}
         </section>
 
-        <section className="mt-8 border-t border-gray-200 pt-5">
+        <section className="mt-6 border-t border-gray-200 pt-4 sm:mt-8 sm:pt-5">
           <button
             type="button"
             onClick={handleLogout}

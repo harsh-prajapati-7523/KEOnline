@@ -153,7 +153,14 @@ function Navbar() {
       <div className="ke-app-header-inner mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
         <div className="flex min-w-0 items-center gap-2.5 text-center sm:gap-3 lg:text-left">
           <span className="ke-brand-logo-badge shrink-0" aria-hidden="true">
-            <img src="/ke-logo-256w.png" alt="" className="ke-brand-logo" />
+            <img
+              src="/ke-icon-64.png"
+              alt=""
+              aria-hidden="true"
+              width="34"
+              height="34"
+              className="ke-brand-logo"
+            />
           </span>
           <div className="min-w-0">
             <h1 className="ke-brand-title break-words font-extrabold leading-tight">

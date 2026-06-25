@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Eye, Filter, Phone, X } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { hasAccess } from "../utils/access";
+
+const TicketFilterPanel = lazy(() => import("../components/TicketFilterPanel"));
 
 const emptyFilters = {
   status: "",
@@ -161,7 +163,7 @@ function getMonthStartDate() {
   return formatLocalDate(date);
 }
 
-function TicketCard({ ticket, onViewDetails }) {
+const TicketCard = memo(function TicketCard({ ticket, onViewDetails }) {
   const productType = formatOptionalLabel(ticket.productType);
   const complaintPreview = ticket.complaintDescription?.trim() ?? "";
   const villageOrArea = ticket.villageOrArea?.trim() ?? "";
@@ -209,11 +211,12 @@ function TicketCard({ ticket, onViewDetails }) {
       </button>
     </article>
   );
-}
+});
 
 export default function TicketList() {
   const navigate = useNavigate();
   const location = useLocation();
+  const locationSearchRef = useRef(location.search);
   const [searchParams, setSearchParams] = useSearchParams();
   const [tickets, setTickets] = useState([]);
   const [currentPage, setCurrentPage] = useState(0);
@@ -233,22 +236,40 @@ export default function TicketList() {
   const [categoryError, setCategoryError] = useState("");
   const canUseSearch = hasAccess("USE_TICKET_SEARCH");
   const canUseFilters = hasAccess("USE_TICKET_FILTERS");
-  const trimmedSearchText = searchText.trim();
-  const effectiveSearchText = canUseSearch ? trimmedSearchText : "";
-  const effectiveFilters = canUseFilters ? appliedFilters : emptyFilters;
-  const activeFilterCount = countActiveFilters(effectiveFilters);
+  const effectiveSearchText = useMemo(() => canUseSearch ? searchText.trim() : "", [canUseSearch, searchText]);
+  const effectiveFilters = useMemo(() => canUseFilters ? appliedFilters : emptyFilters, [appliedFilters, canUseFilters]);
+  const activeFilterCount = useMemo(() => countActiveFilters(effectiveFilters), [effectiveFilters]);
   const hasAppliedFilters = activeFilterCount > 0;
   const isSearchActive = effectiveSearchText.length >= 2;
-  const requestParams = createUrlSearchParams(isSearchActive ? effectiveSearchText : "", effectiveFilters);
-  const requestKey = `${hasAppliedFilters || isSearchActive ? "query" : "list"}:${requestParams.toString()}`;
-  const pagedRequestParams = appendPagingParams(requestParams, currentPage);
-  const requestUrl = hasAppliedFilters || isSearchActive
-    ? `/volt/tickets/query?${pagedRequestParams.toString()}`
-    : `/volt/tickets?${pagedRequestParams.toString()}`;
+  const syncedSearchParams = useMemo(
+    () => createUrlSearchParams(canUseSearch ? searchText : "", effectiveFilters),
+    [canUseSearch, effectiveFilters, searchText],
+  );
+  const requestParams = useMemo(
+    () => createUrlSearchParams(isSearchActive ? effectiveSearchText : "", effectiveFilters),
+    [effectiveFilters, effectiveSearchText, isSearchActive],
+  );
+  const requestKey = useMemo(
+    () => `${hasAppliedFilters || isSearchActive ? "query" : "list"}:${requestParams.toString()}`,
+    [hasAppliedFilters, isSearchActive, requestParams],
+  );
+  const pagedRequestParams = useMemo(() => appendPagingParams(requestParams, currentPage), [currentPage, requestParams]);
+  const requestUrl = useMemo(() => {
+    const queryString = pagedRequestParams.toString();
+    return hasAppliedFilters || isSearchActive
+      ? `/volt/tickets/query?${queryString}`
+      : `/volt/tickets?${queryString}`;
+  }, [hasAppliedFilters, isSearchActive, pagedRequestParams]);
   const selectedStatus = draftFilters.status;
-  const selectedStatusInOptions = !selectedStatus || statusFilterOptions.some((option) => option.statusKey === selectedStatus);
+  const selectedStatusInOptions = useMemo(
+    () => !selectedStatus || statusFilterOptions.some((option) => option.statusKey === selectedStatus),
+    [selectedStatus, statusFilterOptions],
+  );
   const selectedCategory = draftFilters.category;
-  const selectedCategoryInOptions = !selectedCategory || categories.some((category) => category.categoryKey === selectedCategory);
+  const selectedCategoryInOptions = useMemo(
+    () => !selectedCategory || categories.some((category) => category.categoryKey === selectedCategory),
+    [categories, selectedCategory],
+  );
 
   const loadStatusFilterOptions = useCallback(async () => {
     if (!canUseFilters) {
@@ -312,11 +333,14 @@ export default function TicketList() {
   }, [canUseFilters]);
 
   useEffect(() => {
-    const nextSearchParams = createUrlSearchParams(canUseSearch ? searchText : "", canUseFilters ? appliedFilters : emptyFilters);
-    if (nextSearchParams.toString() !== searchParams.toString()) {
-      setSearchParams(nextSearchParams, { replace: true });
+    if (syncedSearchParams.toString() !== searchParams.toString()) {
+      setSearchParams(syncedSearchParams, { replace: true });
     }
-  }, [appliedFilters, canUseFilters, canUseSearch, searchParams, searchText, setSearchParams]);
+  }, [searchParams, setSearchParams, syncedSearchParams]);
+
+  useEffect(() => {
+    locationSearchRef.current = location.search;
+  }, [location.search]);
 
   useEffect(() => {
     setCurrentPage(0);
@@ -371,69 +395,71 @@ export default function TicketList() {
     };
   }, [currentPage, isSearchActive, requestUrl]);
 
-  const handleFilterInput = (event) => {
+  const handleFilterInput = useCallback((event) => {
     const { checked, name, type, value } = event.target;
     setDraftFilters((current) => ({
       ...current,
       [name]: type === "checkbox" ? checked : value,
     }));
-  };
+  }, []);
 
-  const toggleFilters = () => {
+  const toggleFilters = useCallback(() => {
     if (!canUseFilters) return;
     if (!showFilters) setDraftFilters(appliedFilters);
     setShowFilters((current) => !current);
-  };
+  }, [appliedFilters, canUseFilters, showFilters]);
 
-  const applyFilters = () => {
+  const applyFilters = useCallback(() => {
     if (!canUseFilters) return;
     setAppliedFilters({ ...draftFilters });
     setShowFilters(false);
-  };
+  }, [canUseFilters, draftFilters]);
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setDraftFilters({ ...emptyFilters });
     setAppliedFilters({ ...emptyFilters });
-  };
+  }, []);
 
-  const loadMoreTickets = () => {
+  const loadMoreTickets = useCallback(() => {
     if (isLoading || isLoadingMore || !hasMoreTickets) return;
     setCurrentPage((page) => page + 1);
-  };
+  }, [hasMoreTickets, isLoading, isLoadingMore]);
 
-  const loadingMessage = isSearchActive ? "Searching tickets..." : hasAppliedFilters ? "Applying filters..." : "Loading tickets...";
-  const emptyMessage = isSearchActive && hasAppliedFilters
-    ? `No tickets found for "${effectiveSearchText}"`
-    : hasAppliedFilters
-      ? "No tickets match the selected filters."
-      : isSearchActive
-        ? `No tickets found for "${effectiveSearchText}"`
-        : "No tickets yet";
-  const emptyHint = isSearchActive
-    ? "Try searching by ticket number, customer name, mobile number, or area."
-    : hasAppliedFilters
-      ? "Try clearing filters or changing the selected options."
-      : "Create a ticket to get started.";
-  const resultSummary = isSearchActive
-    ? `Showing ${tickets.length} result${tickets.length === 1 ? "" : "s"} for "${effectiveSearchText}"`
-    : hasAppliedFilters
-      ? `Showing ${tickets.length} filtered ticket${tickets.length === 1 ? "" : "s"}`
-      : "Showing newest tickets first";
-  const appliedFilterChips = [
+  const loadingMessage = useMemo(
+    () => isSearchActive ? "Searching tickets..." : hasAppliedFilters ? "Applying filters..." : "Loading tickets...",
+    [hasAppliedFilters, isSearchActive],
+  );
+  const emptyMessage = useMemo(() => {
+    if (isSearchActive && hasAppliedFilters) return `No tickets found for "${effectiveSearchText}"`;
+    if (hasAppliedFilters) return "No tickets match the selected filters.";
+    if (isSearchActive) return `No tickets found for "${effectiveSearchText}"`;
+    return "No tickets yet";
+  }, [effectiveSearchText, hasAppliedFilters, isSearchActive]);
+  const emptyHint = useMemo(() => {
+    if (isSearchActive) return "Try searching by ticket number, customer name, mobile number, or area.";
+    if (hasAppliedFilters) return "Try clearing filters or changing the selected options.";
+    return "Create a ticket to get started.";
+  }, [hasAppliedFilters, isSearchActive]);
+  const resultSummary = useMemo(() => {
+    if (isSearchActive) return `Showing ${tickets.length} result${tickets.length === 1 ? "" : "s"} for "${effectiveSearchText}"`;
+    if (hasAppliedFilters) return `Showing ${tickets.length} filtered ticket${tickets.length === 1 ? "" : "s"}`;
+    return "Showing newest tickets first";
+  }, [effectiveSearchText, hasAppliedFilters, isSearchActive, tickets.length]);
+  const appliedFilterChips = useMemo(() => [
     effectiveFilters.mine ? { key: "mine", label: "My Tickets" } : null,
     effectiveFilters.status ? { key: "status", label: formatLabel(effectiveFilters.status) } : null,
     effectiveFilters.category ? { key: "category", label: formatLegacyCategory(effectiveFilters.category) } : null,
     effectiveFilters.createdFrom ? { key: "createdFrom", label: `From ${effectiveFilters.createdFrom}` } : null,
     effectiveFilters.createdTo ? { key: "createdTo", label: `To ${effectiveFilters.createdTo}` } : null,
-  ].filter(Boolean);
+  ].filter(Boolean), [effectiveFilters]);
 
-  const removeAppliedFilter = (filterKey) => {
+  const removeAppliedFilter = useCallback((filterKey) => {
     const nextFilters = { ...appliedFilters, [filterKey]: filterKey === "mine" ? false : "" };
     setAppliedFilters(nextFilters);
     setDraftFilters(nextFilters);
-  };
+  }, [appliedFilters]);
 
-  const setDateRange = (range) => {
+  const setDateRange = useCallback((range) => {
     const today = getTodayDate();
     if (range === "today") {
       setDraftFilters((current) => ({ ...current, createdFrom: today, createdTo: today }));
@@ -448,7 +474,11 @@ export default function TicketList() {
     if (range === "month") {
       setDraftFilters((current) => ({ ...current, createdFrom: getMonthStartDate(), createdTo: today }));
     }
-  };
+  }, []);
+
+  const handleViewDetails = useCallback((ticketId) => {
+    navigate(`/tickets/${ticketId}${locationSearchRef.current}`);
+  }, [navigate]);
 
   return (
     <main className="ke-page-main lg:px-8">
@@ -522,75 +552,29 @@ export default function TicketList() {
           )}
 
           {canUseFilters && showFilters && (
-              <div className="ticket-filter-panel mt-3 border-t border-blue-100 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:mt-4 sm:pb-0 sm:pt-4">
-              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
-                <label className="flex min-h-11 items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-950 sm:col-span-2">
-                  <input name="mine" type="checkbox" checked={draftFilters.mine} onChange={handleFilterInput} className="h-5 w-5 rounded border-gray-300 text-blue-950 focus:ring-blue-950" />
-                  My Tickets
-                </label>
-                <label className="text-sm font-semibold text-gray-700">
-                  Status
-                  <select name="status" value={draftFilters.status} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-blue-950">
-                    <option value="">All statuses</option>
-                    {!selectedStatusInOptions && <option value={selectedStatus}>{formatLabel(selectedStatus)}</option>}
-                    {statusFilterOptions.map((option) => (
-                      <option key={option.statusKey} value={option.statusKey}>{formatStatusOption(option)}</option>
-                    ))}
-                  </select>
-                  {isLoadingStatusOptions && <p className="mt-1 text-xs font-semibold text-gray-500">Loading status options...</p>}
-                  {statusOptionsError && <p className="mt-1 text-xs font-semibold text-yellow-700">{statusOptionsError}</p>}
-                </label>
-                <label className="text-sm font-semibold text-gray-700">
-                  Category
-                  <select name="category" value={draftFilters.category} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-blue-950">
-                    <option value="">All categories</option>
-                    {!selectedCategoryInOptions && <option value={selectedCategory}>{formatLegacyCategory(selectedCategory)}</option>}
-                    {categories.map((category) => (
-                      <option key={category.id ?? category.categoryKey} value={category.categoryKey}>
-                        {formatCategoryOption(category)}
-                      </option>
-                    ))}
-                  </select>
-                  {isLoadingCategories && <p className="mt-1 text-xs font-semibold text-gray-500">Loading categories...</p>}
-                  {categoryError && <p className="mt-1 text-xs font-semibold text-red-600">{categoryError}</p>}
-                  {!isLoadingCategories && !categoryError && categories.length === 0 && (
-                    <p className="mt-1 text-xs font-semibold text-yellow-700">No active categories available.</p>
-                  )}
-                </label>
-                <div className="sm:col-span-2">
-                  <p className="text-sm font-semibold text-gray-700">Date Range</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => setDateRange("today")} className="min-h-9 rounded-full border border-blue-100 px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-50">
-                      Today
-                    </button>
-                    <button type="button" onClick={() => setDateRange("last7")} className="min-h-9 rounded-full border border-blue-100 px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-50">
-                      Last 7 Days
-                    </button>
-                    <button type="button" onClick={() => setDateRange("month")} className="min-h-9 rounded-full border border-blue-100 px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-50">
-                      This Month
-                    </button>
-                  </div>
-                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <label className="text-sm font-semibold text-gray-700">
-                      From Date
-                      <input name="createdFrom" type="date" value={draftFilters.createdFrom} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
-                    </label>
-                    <label className="text-sm font-semibold text-gray-700">
-                      To Date
-                      <input name="createdTo" type="date" value={draftFilters.createdTo} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
-                    </label>
-                  </div>
-                </div>
-              </div>
-              <div className="filter-actions sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-10 mt-4 grid grid-cols-2 gap-2 border-t border-blue-100 bg-white py-3 sm:static sm:flex sm:flex-wrap sm:border-t-0 sm:py-0">
-                <button type="button" onClick={clearFilters} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2.5 text-sm font-bold text-blue-950 hover:bg-blue-50">
-                  Clear Filters
-                </button>
-                <button type="button" onClick={applyFilters} className="min-h-11 rounded-xl bg-blue-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-900">
-                  Apply
-                </button>
-              </div>
-            </div>
+            <Suspense fallback={null}>
+              <TicketFilterPanel
+                categories={categories}
+                categoryError={categoryError}
+                clearFilters={clearFilters}
+                draftFilters={draftFilters}
+                formatCategoryOption={formatCategoryOption}
+                formatLabel={formatLabel}
+                formatLegacyCategory={formatLegacyCategory}
+                formatStatusOption={formatStatusOption}
+                handleFilterInput={handleFilterInput}
+                isLoadingCategories={isLoadingCategories}
+                isLoadingStatusOptions={isLoadingStatusOptions}
+                selectedCategory={selectedCategory}
+                selectedCategoryInOptions={selectedCategoryInOptions}
+                selectedStatus={selectedStatus}
+                selectedStatusInOptions={selectedStatusInOptions}
+                setDateRange={setDateRange}
+                statusFilterOptions={statusFilterOptions}
+                statusOptionsError={statusOptionsError}
+                applyFilters={applyFilters}
+              />
+            </Suspense>
           )}
         </section>}
 
@@ -607,7 +591,7 @@ export default function TicketList() {
             <TicketCard
               key={ticket.id ?? ticket.ticketNumber}
               ticket={ticket}
-              onViewDetails={(ticketId) => navigate(`/tickets/${ticketId}${location.search}`)}
+              onViewDetails={handleViewDetails}
             />
           ))}
         </section>

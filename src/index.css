@@ -170,7 +170,6 @@ textarea {
   background: transparent;
   font-size: 1rem;
   min-width: 0;
-  outline: none;
   width: 100%;
 }
 
@@ -378,6 +377,12 @@ textarea {
   width: 100%;
 }
 
+.ke-form-control-invalid,
+.ke-form-control[aria-invalid="true"] {
+  border-color: #dc2626;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.12);
+}
+
 .ke-form-control::placeholder {
   color: #9ca3af;
   font-weight: 500;
@@ -387,7 +392,6 @@ textarea {
 .ke-form-control:focus {
   border-color: var(--ke-primary);
   box-shadow: 0 0 0 3px rgba(16, 27, 77, 0.1);
-  outline: none;
 }
 
 .ke-form-control:disabled {

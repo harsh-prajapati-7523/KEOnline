@@ -19,7 +19,7 @@ function validate(formData) {
   if (!formData.mobileNumber.trim()) {
     errors.mobileNumber = "Mobile number is required.";
   } else if (!/^\d{10}$/.test(formData.mobileNumber)) {
-    errors.mobileNumber = "Mobile number must contain exactly 10 digits.";
+    errors.mobileNumber = "Please enter a valid 10-digit mobile number.";
   }
   if (!formData.productType.trim()) errors.productType = "Product type is required.";
   if (!formData.categoryId) errors.categoryId = "Ticket category is required.";
@@ -76,8 +76,8 @@ function buildDynamicValuesPayload(dynamicFields, dynamicValues) {
     .filter(Boolean);
 }
 
-function FieldError({ message }) {
-  return message ? <p className="mt-1 text-sm font-semibold text-red-600">{message}</p> : null;
+function FieldError({ id, message }) {
+  return message ? <p id={id} className="mt-1 text-sm font-semibold text-red-600">{message}</p> : null;
 }
 
 function authHeaders() {
@@ -115,6 +115,9 @@ export default function CreateTicket() {
   const [dynamicErrors, setDynamicErrors] = useState({});
   const [isLoadingDynamicFields, setIsLoadingDynamicFields] = useState(false);
   const [dynamicConfigError, setDynamicConfigError] = useState("");
+
+  const getFieldClassName = (fieldName, extraClassName = "") => `ke-form-control mt-1 ${errors[fieldName] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
+  const getDynamicFieldClassName = (fieldId, extraClassName = "") => `ke-form-control mt-1 ${dynamicErrors[fieldId] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
 
   const loadCategories = useCallback(async () => {
     setIsLoadingCategories(true);
@@ -191,6 +194,8 @@ export default function CreateTicket() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    if (isSubmitting) return;
+
     const validationErrors = validate(formData);
     const dynamicValidationErrors = validateDynamicFields(dynamicFields, dynamicValues);
 
@@ -230,21 +235,20 @@ export default function CreateTicket() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(await readErrorMessage(response, "Unable to create the ticket. Please try again."));
-      }
+      if (!response.ok) throw new Error(await readErrorMessage(response, "Unable to create ticket. Please check the details and try again."));
 
       const ticket = await response.json();
+      setMessage("Ticket created successfully.");
       navigate(`/tickets/${ticket.id}`);
-    } catch (error) {
-      setMessage(error.message || "Unable to create the ticket. Please try again.");
+    } catch {
+      setMessage("Unable to create ticket. Please check the details and try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <main className="ke-page-main lg:px-8">
+    <main id="main-content" className="ke-page-main lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-2.5 flex min-w-0 items-center gap-2 sm:mb-4">
           <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2">
@@ -252,53 +256,53 @@ export default function CreateTicket() {
             <span className="sr-only sm:not-sr-only">Dashboard</span>
           </button>
           <h1 className="min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Create Ticket</h1>
-          <button type="button" onClick={() => navigate("/tickets")} className="ke-secondary-link-button flex min-h-9 shrink-0 items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold sm:min-h-10 sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-sm">
+          <button type="button" onClick={() => navigate("/tickets")} className="ke-secondary-link-button flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold sm:min-h-11 sm:px-3 sm:py-2 sm:text-sm" aria-label="View Tickets">
             <ListChecks size={15} aria-hidden="true" /> <span className="sm:hidden">Tickets</span><span className="hidden sm:inline">View Tickets</span>
           </button>
         </div>
 
         <section className="ke-create-card min-w-0 overflow-hidden">
           <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-2.5 p-3 sm:grid-cols-2 sm:gap-4 sm:p-6">
-            <label className="ke-form-label">
+            <label htmlFor="customer-name" className="ke-form-label">
               Customer Name
-              <input name="customerName" value={formData.customerName} onChange={handleChange} placeholder="Enter customer name" className="ke-form-control mt-1" />
-              <FieldError message={errors.customerName} />
+              <input id="customer-name" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="Enter customer name" className={getFieldClassName("customerName")} aria-invalid={Boolean(errors.customerName)} aria-describedby={errors.customerName ? "customer-name-error" : undefined} />
+              <FieldError id="customer-name-error" message={errors.customerName} />
             </label>
 
-            <label className="ke-form-label">
+            <label htmlFor="mobile-number" className="ke-form-label">
               Mobile Number
-              <input name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} placeholder="Enter 10-digit mobile number" className="ke-form-control mt-1" />
-              <FieldError message={errors.mobileNumber} />
+              <input id="mobile-number" name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} placeholder="Enter 10-digit mobile number" className={getFieldClassName("mobileNumber")} aria-invalid={Boolean(errors.mobileNumber)} aria-describedby={errors.mobileNumber ? "mobile-number-error" : undefined} />
+              <FieldError id="mobile-number-error" message={errors.mobileNumber} />
             </label>
 
-            <label className="ke-form-label">
+            <label htmlFor="village-or-area" className="ke-form-label">
               Village / Area <span className="text-sm font-normal text-gray-500">(Optional)</span>
-              <SuggestionInput endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} placeholder="Enter village or area" className="ke-form-control mt-1" />
+              <SuggestionInput id="village-or-area" endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} placeholder="Enter village or area" className="ke-form-control mt-1" />
             </label>
 
-            <label className="ke-form-label">
+            <label htmlFor="product-type" className="ke-form-label">
               Product Type
-              <SuggestionInput endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} placeholder="Battery, inverter, UPS, stabilizer..." className="ke-form-control mt-1" />
-              <FieldError message={errors.productType} />
+              <SuggestionInput id="product-type" endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} placeholder="e.g., Battery, Inverter, UPS, Stabilizer" className={getFieldClassName("productType")} aria-invalid={Boolean(errors.productType)} aria-describedby={errors.productType ? "product-type-error" : undefined} />
+              <FieldError id="product-type-error" message={errors.productType} />
             </label>
 
-            <label className="ke-form-label sm:col-span-2">
+            <label htmlFor="ticket-category" className="ke-form-label sm:col-span-2">
               Ticket Category
-              <select name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className="ke-form-control mt-1 bg-white">
+              <select id="ticket-category" name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className={getFieldClassName("categoryId", "bg-white")} aria-invalid={Boolean(errors.categoryId)} aria-describedby={errors.categoryId ? "ticket-category-error" : undefined}>
                 <option value="">{isLoadingCategories ? "Loading ticket categories..." : "Select ticket category"}</option>
                 {categories.map((category) => <option key={category.id} value={category.id}>{formatCategoryLabel(category)}</option>)}
               </select>
-              <FieldError message={errors.categoryId} />
+              <FieldError id="ticket-category-error" message={errors.categoryId} />
               {categoryError && <p className="mt-1 text-sm font-semibold text-red-600">{categoryError}</p>}
               {!isLoadingCategories && !categoryError && categories.length === 0 && (
                 <p className="mt-1 text-sm font-semibold text-yellow-700">No active ticket categories are available.</p>
               )}
             </label>
 
-            <label className="ke-form-label sm:col-span-2">
+            <label htmlFor="complaint-description" className="ke-form-label sm:col-span-2">
               Complaint Description
-              <textarea name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} placeholder="Describe the customer complaint" className="ke-form-control mt-1 min-h-24 resize-y sm:min-h-28" />
-              <FieldError message={errors.complaintDescription} />
+              <textarea id="complaint-description" name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} placeholder="Describe the issue, e.g., inverter not charging" className={getFieldClassName("complaintDescription", "min-h-24 resize-y sm:min-h-28")} aria-invalid={Boolean(errors.complaintDescription)} aria-describedby={errors.complaintDescription ? "complaint-description-error" : undefined} />
+              <FieldError id="complaint-description-error" message={errors.complaintDescription} />
             </label>
 
             {formData.categoryId && (
@@ -317,15 +321,16 @@ export default function CreateTicket() {
 
             {!isLoadingDynamicFields && !dynamicConfigError && dynamicFields.map((field) => {
               const fieldId = String(field.categoryFieldConfigId);
-              const commonClassName = "ke-form-control mt-1";
+              const inputId = `dynamic-field-${fieldId}`;
+              const errorId = `dynamic-field-${fieldId}-error`;
 
               if (field.fieldType === "TEXTAREA") {
                 return (
-                  <label key={fieldId} className="ke-form-label sm:col-span-2">
+                  <label key={fieldId} htmlFor={inputId} className="ke-form-label sm:col-span-2">
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
-                    <textarea name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={`${commonClassName} min-h-24 resize-y`} />
+                    <textarea id={inputId} name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={getDynamicFieldClassName(fieldId, "min-h-24 resize-y")} aria-invalid={Boolean(dynamicErrors[fieldId])} aria-describedby={dynamicErrors[fieldId] ? errorId : undefined} />
                     {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
-                    <FieldError message={dynamicErrors[fieldId]} />
+                    <FieldError id={errorId} message={dynamicErrors[fieldId]} />
                   </label>
                 );
               }
@@ -333,14 +338,17 @@ export default function CreateTicket() {
               if (field.fieldType === "DROPDOWN") {
                 const options = getDropdownOptions(field);
                 return (
-                  <label key={fieldId} className="ke-form-label">
+                  <label key={fieldId} htmlFor={inputId} className="ke-form-label">
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
                     <select
+                      id={inputId}
                       name={fieldId}
                       value={dynamicValues[fieldId] ?? ""}
                       onChange={handleDynamicChange}
                       disabled={options.length === 0}
-                      className={`${commonClassName} bg-white disabled:opacity-60`}
+                      className={getDynamicFieldClassName(fieldId, "bg-white disabled:opacity-60")}
+                      aria-invalid={Boolean(dynamicErrors[fieldId])}
+                      aria-describedby={dynamicErrors[fieldId] ? errorId : undefined}
                     >
                       <option value="">{options.length === 0 ? "No options available" : `Select ${field.displayName}`}</option>
                       {options.map((option) => (
@@ -351,34 +359,39 @@ export default function CreateTicket() {
                     </select>
                     {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
                     {options.length === 0 && <p className="mt-1 text-sm font-normal text-gray-500">No options are currently available for this field.</p>}
-                    <FieldError message={dynamicErrors[fieldId]} />
+                    <FieldError id={errorId} message={dynamicErrors[fieldId]} />
                   </label>
                 );
               }
 
               return (
-                <label key={fieldId} className="ke-form-label">
+                <label key={fieldId} htmlFor={inputId} className="ke-form-label">
                   {field.displayName} {field.required && <span className="text-red-600">*</span>}
                   <input
+                    id={inputId}
                     name={fieldId}
                     type={field.fieldType === "NUMBER" ? "number" : "text"}
                     value={dynamicValues[fieldId] ?? ""}
                     onChange={handleDynamicChange}
                     maxLength={field.fieldType === "TEXT" ? 255 : undefined}
                     step={field.fieldType === "NUMBER" ? "0.01" : undefined}
-                    className={commonClassName}
+                    className={getDynamicFieldClassName(fieldId)}
+                    aria-invalid={Boolean(dynamicErrors[fieldId])}
+                    aria-describedby={dynamicErrors[fieldId] ? errorId : undefined}
                   />
                   {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
-                  <FieldError message={dynamicErrors[fieldId]} />
+                  <FieldError id={errorId} message={dynamicErrors[fieldId]} />
                 </label>
               );
             })}
 
-            {message && (
-              <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:col-span-2">
-                {message}
-              </p>
-            )}
+            <div aria-live="polite" className="sm:col-span-2">
+              {message && (
+                <p role="status" className={`rounded-xl px-4 py-3 text-sm font-semibold ${message.startsWith("Unable") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+                  {message}
+                </p>
+              )}
+            </div>
 
             <button type="submit" disabled={isSubmitting || isLoadingCategories || isLoadingDynamicFields || categories.length === 0} aria-busy={isSubmitting} className="ke-accent-action mt-1 flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 font-bold transition disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2">
               <Send size={18} aria-hidden="true" />

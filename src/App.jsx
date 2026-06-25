@@ -1,5 +1,6 @@
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { Home, LayoutDashboard, ListChecks, LogIn, LogOut, PlusCircle } from "lucide-react";
+import { Download, Home, LayoutDashboard, ListChecks, LogIn, LogOut, PlusCircle, X } from "lucide-react";
 import HomePage from "./pages/Home";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
@@ -16,6 +17,77 @@ import TicketList from "./pages/TicketList";
 import TicketDetail from "./pages/TicketDetail";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { clearAccess, hasAnyAccess } from "./utils/access";
+
+function isStandaloneDisplay() {
+  return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+}
+
+function InstallAppPrompt() {
+  const [installPromptEvent, setInstallPromptEvent] = useState(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (isStandaloneDisplay()) return undefined;
+
+    const handleBeforeInstallPrompt = (event) => {
+      event.preventDefault();
+      setInstallPromptEvent(event);
+      setIsVisible(true);
+    };
+
+    const handleAppInstalled = () => {
+      setInstallPromptEvent(null);
+      setIsVisible(false);
+    };
+
+    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+    window.addEventListener("appinstalled", handleAppInstalled);
+
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener("appinstalled", handleAppInstalled);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    if (!installPromptEvent) return;
+
+    installPromptEvent.prompt();
+    const choice = await installPromptEvent.userChoice;
+    setInstallPromptEvent(null);
+
+    if (choice?.outcome !== "accepted") {
+      setIsVisible(false);
+    }
+  };
+
+  if (!installPromptEvent || !isVisible) return null;
+
+  return (
+    <aside className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-2xl border border-blue-100 bg-white p-3 text-blue-950 shadow-2xl sm:bottom-4 sm:right-4 sm:left-auto sm:mx-0 sm:w-full" aria-label="Install RiseTicket app">
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-950 text-white">
+          <Download size={19} aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-extrabold">Add RiseTicket to Home Screen</h2>
+          <p className="mt-1 text-xs font-semibold text-gray-600">Install for faster access from your phone.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={handleInstall} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-yellow-400 px-4 py-2 text-sm font-bold text-black hover:bg-yellow-300">
+              <Download size={16} aria-hidden="true" /> Add
+            </button>
+            <button type="button" onClick={() => setIsVisible(false)} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50">
+              Not now
+            </button>
+          </div>
+        </div>
+        <button type="button" onClick={() => setIsVisible(false)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-blue-950 hover:bg-blue-50" aria-label="Dismiss install prompt">
+          <X size={18} aria-hidden="true" />
+        </button>
+      </div>
+    </aside>
+  );
+}
 
 function Navbar() {
   const navigate = useNavigate();
@@ -215,6 +287,7 @@ function App() {
     <BrowserRouter>
       <Navbar />
       <AppRoutes />
+      <InstallAppPrompt />
       <AuthenticatedBottomNav />
       
     </BrowserRouter>

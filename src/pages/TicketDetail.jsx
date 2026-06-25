@@ -47,6 +47,11 @@ function formatLabel(value) {
   return value ? value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
 }
 
+function formatEnumDisplay(value) {
+  if (typeof value !== "string" || !value.trim()) return "Not available";
+  return /_/.test(value) || value === value.toUpperCase() ? formatLabel(value) : value;
+}
+
 function getTicketStatusLabel(ticket) {
   return ticket?.statusDisplayName || formatLabel(ticket?.status);
 }
@@ -160,6 +165,8 @@ export default function TicketDetail() {
   const [showStatusDetails, setShowStatusDetails] = useState(false);
   const [showWorkflowHistory, setShowWorkflowHistory] = useState(false);
   const [expandedWorkflowHistoryId, setExpandedWorkflowHistoryId] = useState(null);
+  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
+  const [pendingDeleteChargeId, setPendingDeleteChargeId] = useState(null);
   const customerHistoryTicketIdRef = useRef(ticketId);
   const workflowHistoryTicketIdRef = useRef(ticketId);
   const currentRole = localStorage.getItem("role") ?? "";
@@ -297,11 +304,23 @@ export default function TicketDetail() {
     setShowStatusDetails(false);
     setShowWorkflowHistory(false);
     setExpandedWorkflowHistoryId(null);
+    setShowCancelConfirmation(false);
+    setPendingDeleteChargeId(null);
     loadTicket();
     loadAvailableActions();
     loadWorkflowHistory(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
+
+  useEffect(() => {
+    if (!chargeActionMessage || chargeActionMessage.startsWith("Unable")) return undefined;
+
+    const timeoutId = window.setTimeout(() => {
+      setChargeActionMessage("");
+    }, 3000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [chargeActionMessage]);
 
   useEffect(() => {
     customerHistoryTicketIdRef.current = ticketId;
@@ -431,6 +450,11 @@ export default function TicketDetail() {
     } finally {
       setProcessing(key, false);
     }
+  };
+
+  const confirmCancelTicket = async () => {
+    setShowCancelConfirmation(false);
+    await runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.");
   };
 
   const runDynamicWorkflowAction = async (action) => {
@@ -565,6 +589,13 @@ export default function TicketDetail() {
     }
   };
 
+  const confirmDeleteCharge = async () => {
+    if (!pendingDeleteChargeId) return;
+    const chargeItemId = pendingDeleteChargeId;
+    setPendingDeleteChargeId(null);
+    await deleteCharge(chargeItemId);
+  };
+
   const handleChargeInput = (event) => {
     const { name, value } = event.target;
     setChargeForm((current) => ({ ...current, [name]: value }));
@@ -642,15 +673,20 @@ export default function TicketDetail() {
           {availableActionsError}
         </p>
       )}
-      <div className={`mobile-full-width-actions mt-4 flex flex-wrap items-center gap-2 ${prominent ? "sm:gap-3" : ""}`}>
+      <div className={`mt-4 flex flex-col gap-2 ${prominent ? "sm:gap-3" : ""}`}>
         {availableActionsLoading && <p className="text-sm font-semibold text-gray-600">Loading available workflow actions...</p>}
-        {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
-        {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
-        {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="min-h-11 rounded-2xl bg-blue-950 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
+        {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="min-h-12 rounded-2xl bg-blue-950 px-4 py-3 font-bold text-white disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
+        {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className={`${canStartWork ? "min-h-11 border border-blue-950 bg-white text-blue-950" : "min-h-12 bg-yellow-400 text-black"} rounded-2xl px-4 py-2 font-semibold disabled:opacity-60`}>{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
+        {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl border border-blue-950 bg-white px-4 py-2 font-semibold text-blue-950 disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take Ownership"}</button>}
         {canComplete && <button type="button" onClick={() => runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`complete-${ticketId}`]} className="min-h-11 rounded-2xl bg-green-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`complete-${ticketId}`] ? "Completing..." : "Complete Ticket"}</button>}
-        {canCancel && <button type="button" onClick={() => runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`cancel-${ticketId}`]} className="min-h-11 rounded-2xl bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket"}</button>}
         {hasNoActions && !isCompletedNoActions && (
           <p className="text-sm text-gray-600">No workflow actions are currently available for this ticket.</p>
+        )}
+        {canCancel && (
+          <div className="mt-2 border-t border-red-100 pt-3">
+            <p className="mb-2 text-xs font-bold uppercase text-red-700">Danger zone</p>
+            <button type="button" onClick={() => setShowCancelConfirmation(true)} disabled={processingKeys[`cancel-${ticketId}`]} className="min-h-11 w-full rounded-2xl border border-red-500 bg-white px-4 py-2 font-semibold text-red-700 disabled:opacity-60">{processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket"}</button>
+          </div>
         )}
       </div>
       {hasDynamicActions && (
@@ -677,7 +713,7 @@ export default function TicketDetail() {
   };
 
   return (
-    <main className="ke-page-main bg-gray-50 lg:px-8">
+    <main className="ke-page-main ticket-detail-page bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-4xl">
         <button type="button" onClick={() => navigate(`/tickets${location.search}`)} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950">
           <ArrowLeft size={18} aria-hidden="true" /> Back to Tickets
@@ -693,7 +729,7 @@ export default function TicketDetail() {
                 <h1 className="min-w-0 break-words text-2xl font-extrabold sm:text-3xl">{ticket.ticketNumber ?? "Not available"}</h1>
                 <span className="max-w-full break-words rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{getTicketStatusLabel(ticket)}</span>
               </div>
-              <p className="mt-3 break-words text-sm font-bold text-blue-100">{ticket.category ?? "Category not available"}</p>
+              <p className="mt-3 break-words text-sm font-bold text-blue-100">{formatEnumDisplay(ticket.category)}</p>
               <p className="mt-1 break-words text-base font-semibold">{ticket.customerName ?? "Customer not available"}</p>
             </header>
 
@@ -706,8 +742,7 @@ export default function TicketDetail() {
             {renderWorkflowActions(true)}
 
             <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <h2 className="text-lg font-bold text-blue-950">Customer Details</h2>
-              <h3 className="mt-1 text-sm font-semibold text-gray-500">Product &amp; Complaint</h3>
+              <h2 className="text-lg font-bold text-blue-950">Ticket Information</h2>
               <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <InfoItem label="Customer Name">{ticket.customerName}</InfoItem>
                 <InfoItem label="Mobile Number">
@@ -724,7 +759,7 @@ export default function TicketDetail() {
                 </InfoItem>
                 <InfoItem label="Village / Area" className="sm:col-span-2"><span className="inline-flex min-w-0 items-center gap-2 break-words"><MapPin size={15} aria-hidden="true" /> {ticket.villageOrArea ?? "Not available"}</span></InfoItem>
                 <InfoItem label="Product Type">{ticket.productType}</InfoItem>
-                <InfoItem label="Category">{ticket.category}</InfoItem>
+                <InfoItem label="Category">{formatEnumDisplay(ticket.category)}</InfoItem>
                 <InfoItem label="Complaint Description" className="sm:col-span-2">{ticket.complaintDescription}</InfoItem>
               </dl>
             </section>
@@ -890,10 +925,10 @@ export default function TicketDetail() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-blue-950">Charges</h2>
-                  <p className="mt-1 text-sm text-gray-600">Total Charge: {formatCurrency(ticket.totalCharge ?? chargeTotal)}</p>
+                  <p className="mt-1 text-xl font-extrabold text-blue-950">{formatCurrency(ticket.totalCharge ?? chargeTotal)}</p>
                 </div>
-                <button type="button" onClick={toggleCharges} className="rounded-2xl bg-blue-50 px-4 py-2 font-semibold text-blue-950 hover:bg-blue-100">
-                  <span className="inline-flex items-center gap-2"><Eye size={16} aria-hidden="true" /> {showCharges ? "Hide Charges" : "View Charges"}</span>
+                <button type="button" onClick={toggleCharges} className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-bold text-blue-950 hover:bg-blue-100">
+                  <span className="inline-flex items-center gap-2"><Eye size={15} aria-hidden="true" /> {showCharges ? "Hide" : "View"}</span>
                 </button>
               </div>
 
@@ -945,7 +980,7 @@ export default function TicketDetail() {
                               <div className="mt-1 flex shrink-0 items-center justify-between gap-3 sm:mt-0">
                                 <span className="text-sm font-semibold text-slate-900">{formatCurrency(item.amount)}</span>
                                 {canDeleteCharge && ticket.status !== "CANCELLED" && (
-                                  <button type="button" onClick={() => deleteCharge(item.id)} disabled={processingKeys[`delete-charge-${item.id}`]} className="rounded-lg px-2 py-1 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-60">
+                                  <button type="button" onClick={() => setPendingDeleteChargeId(item.id)} disabled={processingKeys[`delete-charge-${item.id}`]} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-60">
                                     {processingKeys[`delete-charge-${item.id}`] ? "Deleting..." : "Delete"}
                                   </button>
                                 )}
@@ -954,12 +989,52 @@ export default function TicketDetail() {
                           ))}
                         </div>
                       )}
-                      {chargeActionMessage && <p className="rounded-xl bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-950">{chargeActionMessage}</p>}
+                      {chargeActionMessage && chargeActionMessage.startsWith("Unable") && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{chargeActionMessage}</p>}
                     </>
                   )}
                 </div>
               )}
             </section>}
+
+            {chargeActionMessage && !chargeActionMessage.startsWith("Unable") && (
+              <div className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white shadow-2xl sm:bottom-4" role="status">
+                {chargeActionMessage}
+              </div>
+            )}
+
+            {showCancelConfirmation && (
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="cancel-ticket-title">
+                <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl">
+                  <h2 id="cancel-ticket-title" className="text-lg font-extrabold text-blue-950">Cancel this ticket?</h2>
+                  <p className="mt-2 text-sm font-semibold text-gray-600">This will mark the ticket as cancelled.</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setShowCancelConfirmation(false)} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50">
+                      Keep Ticket
+                    </button>
+                    <button type="button" onClick={confirmCancelTicket} disabled={processingKeys[`cancel-${ticketId}`]} className="min-h-11 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60">
+                      Cancel Ticket
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {pendingDeleteChargeId !== null && (
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="delete-charge-title">
+                <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl">
+                  <h2 id="delete-charge-title" className="text-lg font-extrabold text-blue-950">Delete this charge?</h2>
+                  <p className="mt-2 text-sm font-semibold text-gray-600">This cannot be undone.</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setPendingDeleteChargeId(null)} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50">
+                      Cancel
+                    </button>
+                    <button type="button" onClick={confirmDeleteCharge} disabled={processingKeys[`delete-charge-${pendingDeleteChargeId}`]} className="min-h-11 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60">
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
           </div>
         )}

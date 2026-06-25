@@ -169,6 +169,10 @@ textarea {
   line-height: 1.15;
 }
 
+.ticket-detail-page {
+  padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+}
+
 @media (min-width: 640px) {
   .ke-login-page {
     align-items: center;
@@ -193,6 +197,10 @@ textarea {
 
   .ke-page-title {
     font-size: 1.625rem;
+  }
+
+  .ticket-detail-page {
+    padding-bottom: 1.5rem;
   }
 }
 

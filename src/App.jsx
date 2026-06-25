@@ -39,16 +39,16 @@ function Navbar() {
 
   return (
     <nav className="w-full overflow-hidden bg-blue-950 text-white shadow-lg">
-      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-4 px-3 py-4 sm:px-4 lg:flex-row">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-3 px-3 py-3 sm:px-4 sm:py-4 lg:flex-row">
         <div className="flex min-w-0 items-center gap-3 text-center lg:text-left">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-4 border-yellow-400 text-2xl font-bold italic md:h-14 md:w-14 md:text-3xl">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 border-yellow-400 text-xl font-bold italic sm:h-12 sm:w-12 sm:text-2xl md:h-14 md:w-14 md:text-3xl">
             ke
           </div>
           <div className="min-w-0">
-            <h1 className="break-words text-base font-extrabold leading-tight tracking-wide sm:text-lg md:text-2xl">
+            <h1 className="break-words text-sm font-extrabold leading-tight sm:text-lg md:text-2xl">
               KUMAR ELECTRONICS & ELECTRICALS
             </h1>
-            <p className="text-xs font-semibold text-yellow-400 md:text-sm">
+            <p className="hidden text-xs font-semibold text-yellow-400 sm:block md:text-sm">
               POWER BACKUP & SOLAR SOLUTIONS
             </p>
           </div>
@@ -56,7 +56,7 @@ function Navbar() {
         <div className="flex w-full min-w-0 flex-wrap justify-center gap-2 sm:gap-3 lg:w-auto">
           {isAuthenticated ? (
             <>
-              <span className="flex min-h-11 min-w-0 max-w-full items-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-blue-100">
+              <span className="flex min-h-11 min-w-0 max-w-full items-center overflow-hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-blue-100">
                 {employeeName || "Employee"}
               </span>
               <button type="button" onClick={() => navigate("/employee-dashboard")} className={buttonClassName(active === "/employee-dashboard")}>

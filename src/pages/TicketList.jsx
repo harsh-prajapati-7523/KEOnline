@@ -98,29 +98,29 @@ function formatLegacyCategory(value) {
 
 function TicketCard({ ticket, onViewDetails }) {
   return (
-    <article className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+    <article className="min-w-0 overflow-hidden rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Ticket Number</p>
-          <h2 className="mt-1 break-words text-lg font-extrabold text-blue-950">{ticket.ticketNumber ?? "Not available"}</h2>
+          <p className="text-xs font-bold uppercase text-gray-500">Ticket Number</p>
+          <h2 className="mt-1 overflow-wrap-anywhere text-lg font-extrabold text-blue-950">{ticket.ticketNumber ?? "Not available"}</h2>
         </div>
-        <span className="max-w-full break-words rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
+        <span className="max-w-full overflow-wrap-anywhere rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
           {getTicketStatusLabel(ticket)}
         </span>
       </div>
 
-      <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <div>
+      <dl className="mt-4 grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+        <div className="min-w-0">
           <dt className="font-bold text-gray-500">Customer Name</dt>
-          <dd className="mt-1 break-words text-gray-800">{ticket.customerName ?? "Not available"}</dd>
+          <dd className="mt-1 overflow-wrap-anywhere text-gray-800">{ticket.customerName ?? "Not available"}</dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="font-bold text-gray-500">Mobile Number</dt>
-          <dd className="mt-1 flex min-w-0 items-center gap-2 break-words text-gray-800">
-            <Phone size={15} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
+          <dd className="mt-1 flex min-w-0 items-center gap-2 overflow-wrap-anywhere text-gray-800">
+            <Phone className="shrink-0" size={15} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
           </dd>
         </div>
-        <div>
+        <div className="min-w-0">
           <dt className="font-bold text-gray-500">Total Charge</dt>
           <dd className="mt-1 text-gray-800">{formatCurrency(ticket.totalCharge ?? 0)}</dd>
         </div>
@@ -339,7 +339,7 @@ export default function TicketList() {
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
-        <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex items-center gap-2 font-semibold text-blue-950">
+        <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-11 items-center gap-2 rounded-xl px-1 py-2 font-semibold text-blue-950">
           <ArrowLeft size={18} aria-hidden="true" /> Dashboard
         </button>
 
@@ -349,7 +349,7 @@ export default function TicketList() {
         </header>
 
         {(canUseSearch || canUseFilters) && <section className="mt-6 min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="mobile-full-width-actions flex flex-col gap-3 sm:flex-row">
             {canUseSearch && (
               <>
                 <label htmlFor="ticket-search" className="sr-only">Search tickets</label>
@@ -359,7 +359,7 @@ export default function TicketList() {
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
                   placeholder="Search ticket, mobile, name, product, area"
-                  className="w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none focus:border-blue-950 focus:ring-2 focus:ring-blue-100"
+                  className="min-h-12 w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-base text-gray-900 outline-none focus:border-blue-950 focus:ring-2 focus:ring-blue-100 sm:text-sm"
                 />
               </>
             )}
@@ -367,7 +367,7 @@ export default function TicketList() {
               <button
                 type="button"
                 onClick={() => setSearchText("")}
-                className="min-h-11 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
+                className="min-h-12 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
               >
                 Clear
               </button>
@@ -377,7 +377,7 @@ export default function TicketList() {
                 type="button"
                 onClick={toggleFilters}
                 aria-expanded={showFilters}
-                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
               >
                 <Filter size={16} aria-hidden="true" /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
               </button>
@@ -389,7 +389,7 @@ export default function TicketList() {
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="text-sm font-semibold text-gray-700">
                   Status
-                  <select name="status" value={draftFilters.status} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
+                  <select name="status" value={draftFilters.status} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-blue-950">
                     <option value="">All statuses</option>
                     {!selectedStatusInOptions && <option value={selectedStatus}>{formatLabel(selectedStatus)}</option>}
                     {statusFilterOptions.map((option) => (
@@ -401,7 +401,7 @@ export default function TicketList() {
                 </label>
                 <label className="text-sm font-semibold text-gray-700">
                   Category
-                  <select name="category" value={draftFilters.category} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950">
+                  <select name="category" value={draftFilters.category} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-blue-950">
                     <option value="">All categories</option>
                     {!selectedCategoryInOptions && <option value={selectedCategory}>{formatLegacyCategory(selectedCategory)}</option>}
                     {categories.map((category) => (
@@ -418,22 +418,22 @@ export default function TicketList() {
                 </label>
                 <label className="text-sm font-semibold text-gray-700">
                   Created From
-                  <input name="createdFrom" type="date" value={draftFilters.createdFrom} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+                  <input name="createdFrom" type="date" value={draftFilters.createdFrom} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
                 </label>
                 <label className="text-sm font-semibold text-gray-700">
                   Created To
-                  <input name="createdTo" type="date" value={draftFilters.createdTo} onChange={handleFilterInput} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+                  <input name="createdTo" type="date" value={draftFilters.createdTo} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
                 </label>
-                <label className="flex items-center gap-3 text-sm font-semibold text-gray-700 sm:col-span-2">
-                  <input name="mine" type="checkbox" checked={draftFilters.mine} onChange={handleFilterInput} className="h-4 w-4 rounded border-gray-300 text-blue-950 focus:ring-blue-950" />
+                <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-gray-700 sm:col-span-2">
+                  <input name="mine" type="checkbox" checked={draftFilters.mine} onChange={handleFilterInput} className="h-5 w-5 rounded border-gray-300 text-blue-950 focus:ring-blue-950" />
                   My Tickets
                 </label>
               </div>
               <div className="mobile-full-width-actions mt-4 flex flex-wrap gap-3">
-                <button type="button" onClick={applyFilters} className="min-h-11 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900">
+                <button type="button" onClick={applyFilters} className="min-h-12 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900">
                   Apply
                 </button>
-                <button type="button" onClick={clearFilters} className="min-h-11 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50">
+                <button type="button" onClick={clearFilters} className="min-h-12 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50">
                   Clear Filters
                 </button>
               </div>
@@ -464,7 +464,7 @@ export default function TicketList() {
                   type="button"
                   onClick={loadMoreTickets}
                   disabled={isLoadingMore}
-                  className="rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
+                  className="min-h-12 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60 sm:w-auto"
                 >
                   {isLoadingMore ? "Loading..." : "Load More Tickets"}
                 </button>

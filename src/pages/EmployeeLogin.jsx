@@ -12,6 +12,8 @@ export default function EmployeeLogin() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     setError("");
     setIsSubmitting(true);
 
@@ -56,17 +58,17 @@ export default function EmployeeLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-r from-blue-950 to-blue-800 flex items-center justify-center px-4">
+    <div className="flex min-h-screen w-full overflow-x-hidden bg-gradient-to-r from-blue-950 to-blue-800 px-3 py-6 sm:items-center sm:justify-center sm:px-4">
       
-      <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl p-8">
+      <div className="mx-auto w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl sm:rounded-3xl sm:p-8">
 
         <div className="flex flex-col items-center">
           
-          <div className="w-20 h-20 rounded-full border-4 border-yellow-400 flex items-center justify-center text-4xl font-bold italic text-blue-950">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-yellow-400 text-3xl font-bold italic text-blue-950 sm:h-20 sm:w-20 sm:text-4xl">
             ke
           </div>
 
-          <h1 className="text-3xl font-extrabold text-blue-950 mt-4 text-center">
+          <h1 className="mt-4 text-center text-2xl font-extrabold text-blue-950 sm:text-3xl">
             Employee Login
           </h1>
 
@@ -76,13 +78,13 @@ export default function EmployeeLogin() {
 
         </div>
 
-        <form onSubmit={handleLogin} className="mt-8">
+        <form onSubmit={handleLogin} className="mt-7 sm:mt-8">
 
           <label className="font-semibold text-gray-700 block mb-2">
             Employee ID
           </label>
 
-          <div className="flex items-center border-2 border-gray-200 rounded-2xl px-4 py-3 mb-4">
+          <div className="mb-4 flex min-h-12 items-center rounded-2xl border-2 border-gray-200 px-4 py-3 focus-within:border-blue-950">
             
             <User className="text-blue-950 mr-3" size={22} />
 
@@ -91,7 +93,8 @@ export default function EmployeeLogin() {
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
               placeholder="Enter Employee ID"
-              className="w-full outline-none"
+              className="w-full min-w-0 bg-transparent text-base outline-none"
+              autoComplete="username"
               required
             />
 
@@ -101,7 +104,7 @@ export default function EmployeeLogin() {
             Password
           </label>
 
-          <div className="flex items-center border-2 border-gray-200 rounded-2xl px-4 py-3">
+          <div className="flex min-h-12 items-center rounded-2xl border-2 border-gray-200 px-4 py-3 focus-within:border-blue-950">
             
             <Lock className="text-blue-950 mr-3" size={22} />
 
@@ -110,7 +113,8 @@ export default function EmployeeLogin() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter Password"
-              className="w-full outline-none"
+              className="w-full min-w-0 bg-transparent text-base outline-none"
+              autoComplete="current-password"
               required
             />
 
@@ -119,14 +123,15 @@ export default function EmployeeLogin() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full mt-6 bg-yellow-400 hover:bg-yellow-300 text-black py-3 rounded-2xl font-bold text-lg flex items-center justify-center gap-2 transition"
+            aria-busy={isSubmitting}
+            className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-yellow-400 px-5 py-3 text-lg font-bold text-black transition hover:bg-yellow-300 disabled:cursor-wait disabled:opacity-70"
           >
             <ShieldCheck size={22} />
             {isSubmitting ? "Logging in..." : "Login"}
           </button>
 
           {error && (
-            <p className="mt-4 text-center text-sm font-semibold text-red-600">
+            <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-700">
               {error}
             </p>
           )}

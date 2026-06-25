@@ -65,7 +65,7 @@ export default function SuggestionInput({
   };
 
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <input
         {...inputProps}
         name={name}
@@ -84,7 +84,7 @@ export default function SuggestionInput({
                 type="button"
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={() => selectSuggestion(suggestion)}
-                className="w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-blue-50"
+                className="min-h-11 w-full px-3 py-2 text-left text-sm font-medium text-slate-800 hover:bg-blue-50"
               >
                 {suggestion}
               </button>

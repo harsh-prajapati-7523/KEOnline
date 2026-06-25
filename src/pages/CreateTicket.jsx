@@ -246,11 +246,11 @@ export default function CreateTicket() {
   return (
     <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-4 flex flex-wrap gap-3">
-          <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex items-center gap-2 font-semibold text-blue-950">
+        <div className="mobile-full-width-actions mb-4 flex flex-wrap gap-3">
+          <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-11 items-center gap-2 rounded-xl px-1 py-2 font-semibold text-blue-950">
             <ArrowLeft size={18} aria-hidden="true" /> Dashboard
           </button>
-          <button type="button" onClick={() => navigate("/tickets")} className="flex items-center gap-2 font-semibold text-blue-950 sm:ml-auto">
+          <button type="button" onClick={() => navigate("/tickets")} className="flex min-h-11 items-center gap-2 rounded-xl px-1 py-2 font-semibold text-blue-950 sm:ml-auto">
             <ListChecks size={18} aria-hidden="true" /> View Tickets
           </button>
         </div>
@@ -261,33 +261,33 @@ export default function CreateTicket() {
             <p className="mt-2 text-sm text-blue-100">Record a customer service request.</p>
           </header>
 
-          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-5 p-4 sm:grid-cols-2 sm:p-7">
+          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-6 p-4 sm:grid-cols-2 sm:gap-5 sm:p-7">
             <label className="font-semibold text-gray-700">
               Customer Name
-              <input name="customerName" value={formData.customerName} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+              <input name="customerName" value={formData.customerName} onChange={handleChange} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
               <FieldError message={errors.customerName} />
             </label>
 
             <label className="font-semibold text-gray-700">
               Mobile Number
-              <input name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+              <input name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
               <FieldError message={errors.mobileNumber} />
             </label>
 
             <label className="font-semibold text-gray-700">
               Village / Area <span className="text-sm font-normal text-gray-500">(Optional)</span>
-              <SuggestionInput endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+              <SuggestionInput endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
             </label>
 
             <label className="font-semibold text-gray-700">
               Product Type
-              <SuggestionInput endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+              <SuggestionInput endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
               <FieldError message={errors.productType} />
             </label>
 
             <label className="font-semibold text-gray-700 sm:col-span-2">
               Ticket Category
-              <select name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950 disabled:opacity-60">
+              <select name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-blue-950 disabled:opacity-60">
                 <option value="">{isLoadingCategories ? "Loading ticket categories..." : "Select ticket category"}</option>
                 {categories.map((category) => <option key={category.id} value={category.id}>{formatCategoryLabel(category)}</option>)}
               </select>
@@ -300,7 +300,7 @@ export default function CreateTicket() {
 
             <label className="font-semibold text-gray-700 sm:col-span-2">
               Complaint Description
-              <textarea name="complaintDescription" rows="4" value={formData.complaintDescription} onChange={handleChange} className="mt-2 w-full resize-y rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+              <textarea name="complaintDescription" rows="4" value={formData.complaintDescription} onChange={handleChange} className="mt-2 min-h-28 w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
               <FieldError message={errors.complaintDescription} />
             </label>
 
@@ -320,13 +320,13 @@ export default function CreateTicket() {
 
             {!isLoadingDynamicFields && !dynamicConfigError && dynamicFields.map((field) => {
               const fieldId = String(field.categoryFieldConfigId);
-              const commonClassName = "mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950";
+              const commonClassName = "mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950";
 
               if (field.fieldType === "TEXTAREA") {
                 return (
                   <label key={fieldId} className="font-semibold text-gray-700 sm:col-span-2">
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
-                    <textarea name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={`${commonClassName} resize-y`} />
+                    <textarea name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={`${commonClassName} min-h-24 resize-y`} />
                     {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
                     <FieldError message={dynamicErrors[fieldId]} />
                   </label>
@@ -378,12 +378,12 @@ export default function CreateTicket() {
             })}
 
             {message && (
-              <p className="sm:col-span-2 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 sm:col-span-2">
                 {message}
               </p>
             )}
 
-            <button type="submit" disabled={isSubmitting || isLoadingCategories || isLoadingDynamicFields || categories.length === 0} className="flex items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black transition hover:bg-yellow-300 disabled:opacity-60 sm:col-span-2">
+            <button type="submit" disabled={isSubmitting || isLoadingCategories || isLoadingDynamicFields || categories.length === 0} aria-busy={isSubmitting} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2">
               <Send size={18} aria-hidden="true" />
               {isSubmitting ? "Creating Ticket..." : "Create Ticket"}
             </button>

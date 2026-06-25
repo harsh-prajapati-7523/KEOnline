@@ -19,10 +19,25 @@ body {
 }
 
 button,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+button,
 input,
 select,
 textarea {
   max-width: 100%;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+.overflow-wrap-anywhere {
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 420px) {

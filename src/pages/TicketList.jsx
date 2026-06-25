@@ -337,18 +337,18 @@ export default function TicketList() {
         : "No tickets found.";
 
   return (
-    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-6 sm:px-6 lg:px-8">
+    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
         <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-11 items-center gap-2 rounded-xl px-1 py-2 font-semibold text-blue-950">
           <ArrowLeft size={18} aria-hidden="true" /> Dashboard
         </button>
 
-        <header className="mt-4 rounded-2xl bg-blue-950 p-5 text-white shadow-lg sm:rounded-3xl sm:p-7">
-          <h1 className="break-words text-2xl font-extrabold sm:text-3xl">Tickets</h1>
-          <p className="mt-2 text-sm text-blue-100">Select a ticket to view details and available actions.</p>
+        <header className="mt-3 rounded-2xl bg-blue-950 p-4 text-white shadow-lg sm:mt-4 sm:rounded-3xl sm:p-7">
+          <h1 className="break-words text-xl font-extrabold sm:text-3xl">Tickets</h1>
+          <p className="mt-1 text-sm text-blue-100 sm:mt-2">Select a ticket to view details and available actions.</p>
         </header>
 
-        {(canUseSearch || canUseFilters) && <section className="mt-6 min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+        {(canUseSearch || canUseFilters) && <section className="mt-4 min-w-0 rounded-2xl border border-blue-100 bg-white p-3 shadow-sm sm:mt-6 sm:p-4">
           <div className="mobile-full-width-actions flex flex-col gap-3 sm:flex-row">
             {canUseSearch && (
               <>
@@ -385,7 +385,7 @@ export default function TicketList() {
           </div>
 
           {canUseFilters && showFilters && (
-            <div className="mt-4 border-t border-blue-100 pt-4">
+              <div className="mt-3 border-t border-blue-100 pt-3 sm:mt-4 sm:pt-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <label className="text-sm font-semibold text-gray-700">
                   Status
@@ -441,7 +441,7 @@ export default function TicketList() {
           )}
         </section>}
 
-        <section className="mt-6 grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2" aria-live="polite">
+        <section className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:mt-6 lg:grid-cols-2" aria-live="polite">
           {isLoading && <p className="text-sm font-semibold text-gray-600">{loadingMessage}</p>}
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
           {!isLoading && !error && tickets.length === 0 && <p className="text-sm font-semibold text-gray-600">{emptyMessage}</p>}

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { Home, LayoutDashboard, ListChecks, LogIn } from "lucide-react";
+import { Home, LayoutDashboard, ListChecks, LogIn, LogOut, PlusCircle } from "lucide-react";
 import HomePage from "./pages/Home";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
@@ -15,7 +15,7 @@ import CreateTicket from "./pages/CreateTicket";
 import TicketList from "./pages/TicketList";
 import TicketDetail from "./pages/TicketDetail";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { clearAccess } from "./utils/access";
+import { clearAccess, hasAnyAccess } from "./utils/access";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -53,7 +53,7 @@ function Navbar() {
             </p>
           </div>
         </div>
-        <div className="flex w-full min-w-0 flex-wrap justify-center gap-2 sm:gap-3 lg:w-auto">
+        <div className={`${isAuthenticated ? "hidden sm:flex" : "flex"} w-full min-w-0 flex-wrap justify-center gap-2 sm:gap-3 lg:w-auto`}>
           {isAuthenticated ? (
             <>
               <span className="flex min-h-11 min-w-0 max-w-full items-center overflow-hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-blue-100">
@@ -85,10 +85,63 @@ function Navbar() {
   );
 }
 
-function App() {
+function AuthenticatedBottomNav() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const active = location.pathname;
+  const isAuthenticated = Boolean(localStorage.getItem("token"));
+  const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
+  const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
+
+  if (!isAuthenticated) return null;
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("employeeName");
+    localStorage.removeItem("role");
+    localStorage.removeItem("employeeId");
+    clearAccess();
+    navigate("/employee-login", { replace: true });
+  };
+
+  const itemClassName = (isActive) => `flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-bold transition ${
+    isActive ? "bg-yellow-400 text-black" : "text-blue-950"
+  }`;
+
   return (
-    <BrowserRouter>
-      <Navbar />
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-blue-100 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden" aria-label="Employee mobile navigation">
+      <div className="mx-auto flex max-w-md gap-1">
+        <button type="button" onClick={() => navigate("/employee-dashboard")} className={itemClassName(active === "/employee-dashboard")}>
+          <LayoutDashboard size={19} aria-hidden="true" />
+          Dashboard
+        </button>
+        {canCreateTicket && (
+          <button type="button" onClick={() => navigate("/tickets/new")} className={itemClassName(active === "/tickets/new")}>
+            <PlusCircle size={19} aria-hidden="true" />
+            Create
+          </button>
+        )}
+        {canViewTickets && (
+          <button type="button" onClick={() => navigate("/tickets")} className={itemClassName(active.startsWith("/tickets") && active !== "/tickets/new")}>
+            <ListChecks size={19} aria-hidden="true" />
+            Tickets
+          </button>
+        )}
+        <button type="button" onClick={logout} className={itemClassName(false)}>
+          <LogOut size={19} aria-hidden="true" />
+          Logout
+        </button>
+      </div>
+    </nav>
+  );
+}
+
+function AppRoutes() {
+  useLocation();
+  const isAuthenticated = Boolean(localStorage.getItem("token"));
+
+  return (
+    <div className={isAuthenticated ? "pb-20 sm:pb-0" : ""}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/employee-login" element={<EmployeeLogin />} />
@@ -153,6 +206,16 @@ function App() {
           </ProtectedRoute>
         }/>
       </Routes>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <Navbar />
+      <AppRoutes />
+      <AuthenticatedBottomNav />
       
     </BrowserRouter>
   );

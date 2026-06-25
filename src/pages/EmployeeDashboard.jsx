@@ -88,21 +88,21 @@ export default function EmployeeDashboard() {
   };
 
   return (
-    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-6 sm:px-6 lg:px-8">
+    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
-        <header className="rounded-2xl bg-blue-950 p-5 text-white shadow-lg sm:rounded-3xl sm:p-7">
+        <header className="rounded-2xl bg-blue-950 p-4 text-white shadow-lg sm:rounded-3xl sm:p-7">
           <p className="break-words text-sm font-semibold uppercase text-yellow-400">
             Technician Dashboard
           </p>
-          <h1 className="mt-2 break-words text-2xl font-extrabold sm:text-3xl">
+          <h1 className="mt-1 break-words text-xl font-extrabold sm:mt-2 sm:text-3xl">
             Welcome{employeeName ? `, ${employeeName}` : ""}
           </h1>
-          <p className="mt-2 break-words text-sm font-semibold text-blue-100">
+          <p className="mt-1 break-words text-sm font-semibold text-blue-100 sm:mt-2">
             Role: {role}
           </p>
         </header>
 
-        <section className="mt-6" aria-labelledby="ticket-actions">
+        <section className="mt-5 sm:mt-6" aria-labelledby="ticket-actions">
           <h2 id="ticket-actions" className="text-xl font-extrabold text-blue-950">
             Available Work Areas
           </h2>

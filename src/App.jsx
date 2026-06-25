@@ -1,25 +1,34 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Download, Home, LayoutDashboard, ListChecks, LogIn, LogOut, PlusCircle, X } from "lucide-react";
-import HomePage from "./pages/Home";
 import EmployeeLogin from "./pages/EmployeeLogin";
-import EmployeeDashboard from "./pages/EmployeeDashboard";
-import EmployeeManagement from "./pages/EmployeeManagement";
-import RoleManagement from "./pages/RoleManagement";
-import RoleAccessManagement from "./pages/RoleAccessManagement";
-import WorkflowManagement from "./pages/WorkflowManagement";
-import TicketCategoryManagement from "./pages/TicketCategoryManagement";
-import TicketCategoryFieldManagement from "./pages/TicketCategoryFieldManagement";
-import TicketFieldManagement from "./pages/TicketFieldManagement";
-import DropdownSourceManagement from "./pages/DropdownSourceManagement";
-import CreateTicket from "./pages/CreateTicket";
-import TicketList from "./pages/TicketList";
-import TicketDetail from "./pages/TicketDetail";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { clearAccess, hasAnyAccess } from "./utils/access";
 
+const HomePage = lazy(() => import("./pages/Home"));
+const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
+const EmployeeManagement = lazy(() => import("./pages/EmployeeManagement"));
+const RoleManagement = lazy(() => import("./pages/RoleManagement"));
+const RoleAccessManagement = lazy(() => import("./pages/RoleAccessManagement"));
+const WorkflowManagement = lazy(() => import("./pages/WorkflowManagement"));
+const TicketCategoryManagement = lazy(() => import("./pages/TicketCategoryManagement"));
+const TicketCategoryFieldManagement = lazy(() => import("./pages/TicketCategoryFieldManagement"));
+const TicketFieldManagement = lazy(() => import("./pages/TicketFieldManagement"));
+const DropdownSourceManagement = lazy(() => import("./pages/DropdownSourceManagement"));
+const CreateTicket = lazy(() => import("./pages/CreateTicket"));
+const TicketList = lazy(() => import("./pages/TicketList"));
+const TicketDetail = lazy(() => import("./pages/TicketDetail"));
+
 function isStandaloneDisplay() {
   return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
+}
+
+function RouteLoadingFallback() {
+  return (
+    <main className="ke-page-main">
+      <p className="text-sm font-semibold text-gray-600">Loading...</p>
+    </main>
+  );
 }
 
 function InstallAppPrompt() {
@@ -216,70 +225,72 @@ function AppRoutes() {
 
   return (
     <div className={isAuthenticated ? "sm:pb-0" : ""}>
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/employee-login" element={<EmployeeLogin />} />
-        <Route path="/employee-dashboard" element={
-          <ProtectedRoute>
-            <EmployeeDashboard />
-          </ProtectedRoute>
-        }/>
-        <Route path="/admin/employees" element={
-          <ProtectedRoute anyAccessKey={["VIEW_EMPLOYEE_MANAGEMENT", "MANAGE_EMPLOYEES"]}>
-            <EmployeeManagement />
-          </ProtectedRoute>
-        }/>
-        <Route path="/admin/roles" element={
-          <ProtectedRoute anyAccessKey={["VIEW_ROLE_MANAGEMENT", "MANAGE_ROLES"]}>
-            <RoleManagement />
-          </ProtectedRoute>
-        }/>
-        <Route path="/admin/role-access" element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
-            <RoleAccessManagement />
-          </ProtectedRoute>
-        }/>
-        <Route path="/admin/workflow" element={
-          <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
-            <WorkflowManagement />
-          </ProtectedRoute>
-        }/>
-        <Route path="/admin/ticket-categories" element={
-          <ProtectedRoute anyAccessKey={["VIEW_TICKET_CATEGORY_MANAGEMENT", "MANAGE_TICKET_CATEGORIES"]}>
-            <TicketCategoryManagement />
-          </ProtectedRoute>
-        }/>
-        <Route path="/admin/ticket-fields" element={
-          <ProtectedRoute anyAccessKey={["VIEW_TICKET_FIELD_MANAGEMENT", "MANAGE_TICKET_FIELDS"]}>
-            <TicketFieldManagement />
-          </ProtectedRoute>
-        }/>
-        <Route path="/admin/ticket-category-fields" element={
-          <ProtectedRoute anyAccessKey={["VIEW_CATEGORY_FIELD_CONFIGURATION", "MANAGE_CATEGORY_FIELD_CONFIGS"]}>
-            <TicketCategoryFieldManagement />
-          </ProtectedRoute>
-        }/>
-        <Route path="/admin/dropdown-sources" element={
-          <ProtectedRoute anyAccessKey={["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]}>
-            <DropdownSourceManagement />
-          </ProtectedRoute>
-        }/>
-        <Route path="/tickets/new" element={
-          <ProtectedRoute accessKey="CREATE_TICKET">
-            <CreateTicket />
-          </ProtectedRoute>
-        }/>
-        <Route path="/tickets" element={
-          <ProtectedRoute accessKey="VIEW_TICKETS">
-            <TicketList />
-          </ProtectedRoute>
-        }/>
-        <Route path="/tickets/:ticketId" element={
-          <ProtectedRoute accessKey="VIEW_TICKETS">
-            <TicketDetail />
-          </ProtectedRoute>
-        }/>
-      </Routes>
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/employee-login" element={<EmployeeLogin />} />
+          <Route path="/employee-dashboard" element={
+            <ProtectedRoute>
+              <EmployeeDashboard />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/employees" element={
+            <ProtectedRoute anyAccessKey={["VIEW_EMPLOYEE_MANAGEMENT", "MANAGE_EMPLOYEES"]}>
+              <EmployeeManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/roles" element={
+            <ProtectedRoute anyAccessKey={["VIEW_ROLE_MANAGEMENT", "MANAGE_ROLES"]}>
+              <RoleManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/role-access" element={
+            <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+              <RoleAccessManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/workflow" element={
+            <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+              <WorkflowManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/ticket-categories" element={
+            <ProtectedRoute anyAccessKey={["VIEW_TICKET_CATEGORY_MANAGEMENT", "MANAGE_TICKET_CATEGORIES"]}>
+              <TicketCategoryManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/ticket-fields" element={
+            <ProtectedRoute anyAccessKey={["VIEW_TICKET_FIELD_MANAGEMENT", "MANAGE_TICKET_FIELDS"]}>
+              <TicketFieldManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/ticket-category-fields" element={
+            <ProtectedRoute anyAccessKey={["VIEW_CATEGORY_FIELD_CONFIGURATION", "MANAGE_CATEGORY_FIELD_CONFIGS"]}>
+              <TicketCategoryFieldManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/dropdown-sources" element={
+            <ProtectedRoute anyAccessKey={["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]}>
+              <DropdownSourceManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/tickets/new" element={
+            <ProtectedRoute accessKey="CREATE_TICKET">
+              <CreateTicket />
+            </ProtectedRoute>
+          }/>
+          <Route path="/tickets" element={
+            <ProtectedRoute accessKey="VIEW_TICKETS">
+              <TicketList />
+            </ProtectedRoute>
+          }/>
+          <Route path="/tickets/:ticketId" element={
+            <ProtectedRoute accessKey="VIEW_TICKETS">
+              <TicketDetail />
+            </ProtectedRoute>
+          }/>
+        </Routes>
+      </Suspense>
     </div>
   );
 }

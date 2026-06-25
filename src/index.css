@@ -199,14 +199,27 @@ textarea {
 }
 
 .ke-app-header-inner {
-  padding-top: calc(0.5rem + env(safe-area-inset-top));
+  padding-top: calc(0.625rem + env(safe-area-inset-top));
+}
+
+.ke-brand-logo-badge {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid rgba(255, 204, 0, 0.45);
+  border-radius: 0.875rem;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  display: flex;
+  height: 2.75rem;
+  justify-content: center;
+  padding: 0.35rem;
+  width: 2.75rem;
 }
 
 .ke-brand-logo {
   display: block;
-  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.22));
-  height: 2.25rem;
-  max-width: 2.25rem;
+  height: 100%;
+  max-height: 2.05rem;
+  max-width: 2.05rem;
   object-fit: contain;
   width: auto;
 }
@@ -217,7 +230,7 @@ textarea {
 }
 
 .ke-brand-subtitle {
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.82);
   line-height: 1.15;
   margin-top: 0.125rem;
 }
@@ -327,9 +340,16 @@ textarea {
     font-size: 1.625rem;
   }
 
+  .ke-brand-logo-badge {
+    border-radius: 1rem;
+    height: 3rem;
+    padding: 0.4rem;
+    width: 3rem;
+  }
+
   .ke-brand-logo {
-    height: 2.75rem;
-    max-width: 2.75rem;
+    max-height: 2.2rem;
+    max-width: 2.2rem;
   }
 
   .ke-brand-title {

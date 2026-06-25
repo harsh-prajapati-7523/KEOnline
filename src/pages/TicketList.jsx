@@ -96,6 +96,29 @@ function formatLegacyCategory(value) {
   return value ? `${formatLabel(value)} (${value})` : "Not available";
 }
 
+function formatLocalDate(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getTodayDate() {
+  return formatLocalDate(new Date());
+}
+
+function getDateDaysAgo(days) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return formatLocalDate(date);
+}
+
+function getMonthStartDate() {
+  const date = new Date();
+  date.setDate(1);
+  return formatLocalDate(date);
+}
+
 function TicketCard({ ticket, onViewDetails }) {
   return (
     <article className="min-w-0 overflow-hidden rounded-xl border border-blue-100 bg-white p-3 shadow-sm sm:p-4">
@@ -323,6 +346,36 @@ export default function TicketList() {
       : isSearchActive
         ? "No matching tickets found."
         : "No tickets found.";
+  const appliedFilterChips = [
+    effectiveFilters.mine ? { key: "mine", label: "My Tickets" } : null,
+    effectiveFilters.status ? { key: "status", label: formatLabel(effectiveFilters.status) } : null,
+    effectiveFilters.category ? { key: "category", label: formatLegacyCategory(effectiveFilters.category) } : null,
+    effectiveFilters.createdFrom ? { key: "createdFrom", label: `From ${effectiveFilters.createdFrom}` } : null,
+    effectiveFilters.createdTo ? { key: "createdTo", label: `To ${effectiveFilters.createdTo}` } : null,
+  ].filter(Boolean);
+
+  const removeAppliedFilter = (filterKey) => {
+    const nextFilters = { ...appliedFilters, [filterKey]: filterKey === "mine" ? false : "" };
+    setAppliedFilters(nextFilters);
+    setDraftFilters(nextFilters);
+  };
+
+  const setDateRange = (range) => {
+    const today = getTodayDate();
+    if (range === "today") {
+      setDraftFilters((current) => ({ ...current, createdFrom: today, createdTo: today }));
+      return;
+    }
+
+    if (range === "last7") {
+      setDraftFilters((current) => ({ ...current, createdFrom: getDateDaysAgo(6), createdTo: today }));
+      return;
+    }
+
+    if (range === "month") {
+      setDraftFilters((current) => ({ ...current, createdFrom: getMonthStartDate(), createdTo: today }));
+    }
+  };
 
   return (
     <main className="ke-page-main bg-gray-50 lg:px-8">
@@ -345,7 +398,7 @@ export default function TicketList() {
                   type="search"
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
-                  placeholder="Search ticket, mobile, name, product, area"
+                  placeholder="Search tickets"
                   className="min-h-11 min-w-0 flex-1 rounded-xl border border-gray-300 px-3.5 py-2.5 text-base text-gray-900 outline-none focus:border-blue-950 focus:ring-2 focus:ring-blue-100 sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
                 />
               </>
@@ -369,14 +422,35 @@ export default function TicketList() {
                 aria-label={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ""}`}
               >
                 <Filter size={16} aria-hidden="true" />
-                <span className="hidden sm:inline">Filters</span>{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+                <span className={activeFilterCount > 0 ? "hidden min-[380px]:inline" : "hidden sm:inline"}>Filters</span>{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
               </button>
             )}
           </div>
 
+          {canUseFilters && appliedFilterChips.length > 0 && (
+            <div className="mt-2 flex min-w-0 flex-wrap gap-2" aria-label="Active filters">
+              {appliedFilterChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={() => removeAppliedFilter(chip.key)}
+                  className="inline-flex min-h-9 max-w-full items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-100"
+                  aria-label={`Remove ${chip.label} filter`}
+                >
+                  <span className="min-w-0 overflow-wrap-anywhere">{chip.label}</span>
+                  <X size={14} aria-hidden="true" />
+                </button>
+              ))}
+            </div>
+          )}
+
           {canUseFilters && showFilters && (
-              <div className="mt-3 border-t border-blue-100 pt-3 sm:mt-4 sm:pt-4">
+              <div className="ticket-filter-panel mt-3 border-t border-blue-100 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-3 sm:mt-4 sm:pb-0 sm:pt-4">
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
+                <label className="flex min-h-11 items-center gap-3 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-950 sm:col-span-2">
+                  <input name="mine" type="checkbox" checked={draftFilters.mine} onChange={handleFilterInput} className="h-5 w-5 rounded border-gray-300 text-blue-950 focus:ring-blue-950" />
+                  My Tickets
+                </label>
                 <label className="text-sm font-semibold text-gray-700">
                   Status
                   <select name="status" value={draftFilters.status} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-blue-950">
@@ -406,25 +480,37 @@ export default function TicketList() {
                     <p className="mt-1 text-xs font-semibold text-yellow-700">No active categories available.</p>
                   )}
                 </label>
-                <label className="text-sm font-semibold text-gray-700">
-                  Created From
-                  <input name="createdFrom" type="date" value={draftFilters.createdFrom} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
-                </label>
-                <label className="text-sm font-semibold text-gray-700">
-                  Created To
-                  <input name="createdTo" type="date" value={draftFilters.createdTo} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
-                </label>
-                <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-gray-700 sm:col-span-2">
-                  <input name="mine" type="checkbox" checked={draftFilters.mine} onChange={handleFilterInput} className="h-5 w-5 rounded border-gray-300 text-blue-950 focus:ring-blue-950" />
-                  My Tickets
-                </label>
+                <div className="sm:col-span-2">
+                  <p className="text-sm font-semibold text-gray-700">Date Range</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => setDateRange("today")} className="min-h-9 rounded-full border border-blue-100 px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-50">
+                      Today
+                    </button>
+                    <button type="button" onClick={() => setDateRange("last7")} className="min-h-9 rounded-full border border-blue-100 px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-50">
+                      Last 7 Days
+                    </button>
+                    <button type="button" onClick={() => setDateRange("month")} className="min-h-9 rounded-full border border-blue-100 px-3 py-1.5 text-xs font-bold text-blue-950 hover:bg-blue-50">
+                      This Month
+                    </button>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label className="text-sm font-semibold text-gray-700">
+                      From Date
+                      <input name="createdFrom" type="date" value={draftFilters.createdFrom} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
+                    </label>
+                    <label className="text-sm font-semibold text-gray-700">
+                      To Date
+                      <input name="createdTo" type="date" value={draftFilters.createdTo} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
+                    </label>
+                  </div>
+                </div>
               </div>
-              <div className="mobile-full-width-actions mt-4 flex flex-wrap gap-3">
-                <button type="button" onClick={applyFilters} className="min-h-12 rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900">
-                  Apply
-                </button>
-                <button type="button" onClick={clearFilters} className="min-h-12 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50">
+              <div className="filter-actions sticky bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-10 mt-4 grid grid-cols-2 gap-2 border-t border-blue-100 bg-white py-3 sm:static sm:flex sm:flex-wrap sm:border-t-0 sm:py-0">
+                <button type="button" onClick={clearFilters} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2.5 text-sm font-bold text-blue-950 hover:bg-blue-50">
                   Clear Filters
+                </button>
+                <button type="button" onClick={applyFilters} className="min-h-11 rounded-xl bg-blue-950 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-900">
+                  Apply
                 </button>
               </div>
             </div>

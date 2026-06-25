@@ -244,7 +244,7 @@ export default function CreateTicket() {
   };
 
   return (
-    <main className="ke-page-main bg-gray-50 lg:px-8">
+    <main className="ke-page-main lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <div className="mb-3 flex min-w-0 items-center gap-2 sm:mb-4">
           <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2">
@@ -252,39 +252,39 @@ export default function CreateTicket() {
             <span className="sr-only sm:not-sr-only">Dashboard</span>
           </button>
           <h1 className="min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Create Ticket</h1>
-          <button type="button" onClick={() => navigate("/tickets")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 text-sm font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2 sm:text-base">
-            <ListChecks size={18} aria-hidden="true" /> View Tickets
+          <button type="button" onClick={() => navigate("/tickets")} className="ke-secondary-link-button flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold sm:min-h-11 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm">
+            <ListChecks size={16} aria-hidden="true" /> <span className="sm:hidden">Tickets</span><span className="hidden sm:inline">View Tickets</span>
           </button>
         </div>
 
-        <section className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-lg sm:rounded-3xl">
-          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-3.5 p-4 sm:grid-cols-2 sm:gap-5 sm:p-6">
-            <label className="text-[15px] font-semibold text-gray-700 sm:text-base">
+        <section className="ke-create-card min-w-0 overflow-hidden">
+          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-3 p-3.5 sm:grid-cols-2 sm:gap-4 sm:p-6">
+            <label className="ke-form-label">
               Customer Name
-              <input name="customerName" value={formData.customerName} onChange={handleChange} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3" />
+              <input name="customerName" value={formData.customerName} onChange={handleChange} placeholder="Enter customer name" className="ke-form-control mt-1" />
               <FieldError message={errors.customerName} />
             </label>
 
-            <label className="text-[15px] font-semibold text-gray-700 sm:text-base">
+            <label className="ke-form-label">
               Mobile Number
-              <input name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3" />
+              <input name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} placeholder="Enter 10-digit mobile number" className="ke-form-control mt-1" />
               <FieldError message={errors.mobileNumber} />
             </label>
 
-            <label className="text-[15px] font-semibold text-gray-700 sm:text-base">
+            <label className="ke-form-label">
               Village / Area <span className="text-sm font-normal text-gray-500">(Optional)</span>
-              <SuggestionInput endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3" />
+              <SuggestionInput endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} placeholder="Enter village or area" className="ke-form-control mt-1" />
             </label>
 
-            <label className="text-[15px] font-semibold text-gray-700 sm:text-base">
+            <label className="ke-form-label">
               Product Type
-              <SuggestionInput endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3" />
+              <SuggestionInput endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} placeholder="Battery, inverter, UPS, stabilizer..." className="ke-form-control mt-1" />
               <FieldError message={errors.productType} />
             </label>
 
-            <label className="text-[15px] font-semibold text-gray-700 sm:col-span-2 sm:text-base">
+            <label className="ke-form-label sm:col-span-2">
               Ticket Category
-              <select name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-base outline-none focus:border-blue-950 disabled:opacity-60 sm:min-h-12 sm:px-4 sm:py-3">
+              <select name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className="ke-form-control mt-1 bg-white">
                 <option value="">{isLoadingCategories ? "Loading ticket categories..." : "Select ticket category"}</option>
                 {categories.map((category) => <option key={category.id} value={category.id}>{formatCategoryLabel(category)}</option>)}
               </select>
@@ -295,9 +295,9 @@ export default function CreateTicket() {
               )}
             </label>
 
-            <label className="text-[15px] font-semibold text-gray-700 sm:col-span-2 sm:text-base">
+            <label className="ke-form-label sm:col-span-2">
               Complaint Description
-              <textarea name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} className="mt-1.5 min-h-24 w-full resize-y rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-28 sm:px-4 sm:py-3" />
+              <textarea name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} placeholder="Describe the customer complaint" className="ke-form-control mt-1 min-h-24 resize-y sm:min-h-28" />
               <FieldError message={errors.complaintDescription} />
             </label>
 
@@ -317,11 +317,11 @@ export default function CreateTicket() {
 
             {!isLoadingDynamicFields && !dynamicConfigError && dynamicFields.map((field) => {
               const fieldId = String(field.categoryFieldConfigId);
-              const commonClassName = "mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3";
+              const commonClassName = "ke-form-control mt-1";
 
               if (field.fieldType === "TEXTAREA") {
                 return (
-                  <label key={fieldId} className="text-[15px] font-semibold text-gray-700 sm:col-span-2 sm:text-base">
+                  <label key={fieldId} className="ke-form-label sm:col-span-2">
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
                     <textarea name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={`${commonClassName} min-h-24 resize-y`} />
                     {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
@@ -333,7 +333,7 @@ export default function CreateTicket() {
               if (field.fieldType === "DROPDOWN") {
                 const options = getDropdownOptions(field);
                 return (
-                  <label key={fieldId} className="text-[15px] font-semibold text-gray-700 sm:text-base">
+                  <label key={fieldId} className="ke-form-label">
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
                     <select
                       name={fieldId}
@@ -357,7 +357,7 @@ export default function CreateTicket() {
               }
 
               return (
-                <label key={fieldId} className="text-[15px] font-semibold text-gray-700 sm:text-base">
+                <label key={fieldId} className="ke-form-label">
                   {field.displayName} {field.required && <span className="text-red-600">*</span>}
                   <input
                     name={fieldId}
@@ -380,7 +380,7 @@ export default function CreateTicket() {
               </p>
             )}
 
-            <button type="submit" disabled={isSubmitting || isLoadingCategories || isLoadingDynamicFields || categories.length === 0} aria-busy={isSubmitting} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2">
+            <button type="submit" disabled={isSubmitting || isLoadingCategories || isLoadingDynamicFields || categories.length === 0} aria-busy={isSubmitting} className="ke-accent-action mt-1 flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 font-bold transition disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2">
               <Send size={18} aria-hidden="true" />
               {isSubmitting ? "Creating Ticket..." : "Create Ticket"}
             </button>

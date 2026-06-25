@@ -242,7 +242,7 @@ textarea {
 }
 
 .ke-bottom-nav-inner {
-  min-height: 4.25rem;
+  min-height: 4rem;
 }
 
 .ke-nav-active {
@@ -314,6 +314,54 @@ textarea {
   color: var(--ke-primary);
 }
 
+.ke-create-card {
+  background: var(--ke-card);
+  border: 1px solid var(--ke-border);
+  border-radius: 1rem;
+  box-shadow: 0 10px 24px rgba(16, 27, 77, 0.09);
+}
+
+.ke-form-label {
+  color: #344054;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.ke-form-control {
+  border: 1px solid var(--ke-border);
+  border-radius: 0.875rem;
+  color: var(--ke-text);
+  min-height: 2.875rem;
+  padding: 0.625rem 0.875rem;
+  width: 100%;
+}
+
+.ke-form-control::placeholder {
+  color: #98a2b3;
+  opacity: 1;
+}
+
+.ke-form-control:focus {
+  border-color: var(--ke-primary);
+  box-shadow: 0 0 0 3px rgba(16, 27, 77, 0.1);
+  outline: none;
+}
+
+.ke-form-control:disabled {
+  opacity: 0.6;
+}
+
+.ke-secondary-link-button {
+  background: #ffffff;
+  border: 1px solid var(--ke-border);
+  color: var(--ke-primary);
+}
+
+.ke-secondary-link-button:hover {
+  background: #f8fafc;
+  border-color: rgba(16, 27, 77, 0.28);
+}
+
 @media (min-width: 640px) {
   .ke-login-page {
     align-items: center;
@@ -358,6 +406,10 @@ textarea {
 
   .ticket-detail-page {
     padding-bottom: 1.5rem;
+  }
+
+  .ke-create-card {
+    border-radius: 1.25rem;
   }
 }
 

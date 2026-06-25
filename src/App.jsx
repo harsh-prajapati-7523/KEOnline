@@ -178,7 +178,7 @@ function AuthenticatedBottomNav() {
     navigate("/employee-login", { replace: true });
   };
 
-  const itemClassName = (isActive) => `flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[0.72rem] font-bold transition ${
+  const itemClassName = (isActive) => `flex min-h-[3.75rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[0.72rem] font-bold transition ${
     isActive ? "ke-nav-active" : "text-blue-950"
   }`;
 

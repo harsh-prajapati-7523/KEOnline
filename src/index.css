@@ -199,33 +199,33 @@ textarea {
 }
 
 .ke-app-header-inner {
-  padding-top: calc(0.625rem + env(safe-area-inset-top));
+  padding-top: calc(0.5rem + env(safe-area-inset-top));
 }
 
 .ke-brand-logo-badge {
   align-items: center;
   background: #ffffff;
   border: 1px solid rgba(255, 204, 0, 0.45);
-  border-radius: 0.875rem;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  border-radius: 0.75rem;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   display: flex;
-  height: 2.75rem;
+  height: 2.5rem;
   justify-content: center;
-  padding: 0.35rem;
-  width: 2.75rem;
+  padding: 0.32rem;
+  width: 2.5rem;
 }
 
 .ke-brand-logo {
   display: block;
   height: 100%;
-  max-height: 2.05rem;
-  max-width: 2.05rem;
+  max-height: 1.86rem;
+  max-width: 1.86rem;
   object-fit: contain;
   width: auto;
 }
 
 .ke-brand-title {
-  font-size: clamp(0.95rem, 4.1vw, 1.12rem);
+  font-size: clamp(0.92rem, 4vw, 1.08rem);
   letter-spacing: 0;
 }
 
@@ -242,12 +242,12 @@ textarea {
 }
 
 .ke-bottom-nav-inner {
-  min-height: 4rem;
+  min-height: 3.875rem;
 }
 
 .ke-nav-active {
-  background: var(--ke-accent);
-  box-shadow: 0 6px 16px rgba(255, 204, 0, 0.28);
+  background: rgba(255, 204, 0, 0.86);
+  box-shadow: 0 4px 12px rgba(255, 204, 0, 0.22);
   color: #000000;
 }
 
@@ -318,26 +318,28 @@ textarea {
   background: var(--ke-card);
   border: 1px solid var(--ke-border);
   border-radius: 1rem;
-  box-shadow: 0 10px 24px rgba(16, 27, 77, 0.09);
+  box-shadow: 0 8px 20px rgba(16, 27, 77, 0.08);
 }
 
 .ke-form-label {
   color: #344054;
   font-size: 0.9375rem;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .ke-form-control {
   border: 1px solid var(--ke-border);
   border-radius: 0.875rem;
   color: var(--ke-text);
-  min-height: 2.875rem;
-  padding: 0.625rem 0.875rem;
+  font-weight: 600;
+  min-height: 2.75rem;
+  padding: 0.5625rem 0.8125rem;
   width: 100%;
 }
 
 .ke-form-control::placeholder {
-  color: #98a2b3;
+  color: #9ca3af;
+  font-weight: 500;
   opacity: 1;
 }
 
@@ -355,6 +357,7 @@ textarea {
   background: #ffffff;
   border: 1px solid var(--ke-border);
   color: var(--ke-primary);
+  box-shadow: 0 4px 12px rgba(16, 27, 77, 0.05);
 }
 
 .ke-secondary-link-button:hover {
@@ -389,15 +392,15 @@ textarea {
   }
 
   .ke-brand-logo-badge {
-    border-radius: 1rem;
-    height: 3rem;
-    padding: 0.4rem;
-    width: 3rem;
+    border-radius: 0.875rem;
+    height: 2.875rem;
+    padding: 0.38rem;
+    width: 2.875rem;
   }
 
   .ke-brand-logo {
-    max-height: 2.2rem;
-    max-width: 2.2rem;
+    max-height: 2.1rem;
+    max-width: 2.1rem;
   }
 
   .ke-brand-title {

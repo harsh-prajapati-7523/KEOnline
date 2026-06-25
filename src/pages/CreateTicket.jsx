@@ -246,19 +246,19 @@ export default function CreateTicket() {
   return (
     <main className="ke-page-main lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-3 flex min-w-0 items-center gap-2 sm:mb-4">
+        <div className="mb-2.5 flex min-w-0 items-center gap-2 sm:mb-4">
           <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2">
             <ArrowLeft size={18} aria-hidden="true" />
             <span className="sr-only sm:not-sr-only">Dashboard</span>
           </button>
           <h1 className="min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Create Ticket</h1>
-          <button type="button" onClick={() => navigate("/tickets")} className="ke-secondary-link-button flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold sm:min-h-11 sm:gap-2 sm:px-3 sm:py-2 sm:text-sm">
-            <ListChecks size={16} aria-hidden="true" /> <span className="sm:hidden">Tickets</span><span className="hidden sm:inline">View Tickets</span>
+          <button type="button" onClick={() => navigate("/tickets")} className="ke-secondary-link-button flex min-h-9 shrink-0 items-center gap-1 rounded-xl px-2 py-1 text-xs font-semibold sm:min-h-10 sm:gap-1.5 sm:px-2.5 sm:py-1.5 sm:text-sm">
+            <ListChecks size={15} aria-hidden="true" /> <span className="sm:hidden">Tickets</span><span className="hidden sm:inline">View Tickets</span>
           </button>
         </div>
 
         <section className="ke-create-card min-w-0 overflow-hidden">
-          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-3 p-3.5 sm:grid-cols-2 sm:gap-4 sm:p-6">
+          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-2.5 p-3 sm:grid-cols-2 sm:gap-4 sm:p-6">
             <label className="ke-form-label">
               Customer Name
               <input name="customerName" value={formData.customerName} onChange={handleChange} placeholder="Enter customer name" className="ke-form-control mt-1" />

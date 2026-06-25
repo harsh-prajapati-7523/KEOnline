@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Eye, Filter, Phone } from "lucide-react";
+import { ArrowLeft, Eye, Filter, Phone, X } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { hasAccess } from "../utils/access";
 
@@ -98,38 +98,26 @@ function formatLegacyCategory(value) {
 
 function TicketCard({ ticket, onViewDetails }) {
   return (
-    <article className="min-w-0 overflow-hidden rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase text-gray-500">Ticket Number</p>
-          <h2 className="mt-1 overflow-wrap-anywhere text-lg font-extrabold text-blue-950">{ticket.ticketNumber ?? "Not available"}</h2>
-        </div>
-        <span className="max-w-full overflow-wrap-anywhere rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
+    <article className="min-w-0 overflow-hidden rounded-xl border border-blue-100 bg-white p-3 shadow-sm sm:p-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <h2 className="min-w-0 overflow-wrap-anywhere text-lg font-extrabold leading-tight text-blue-950">{ticket.ticketNumber ?? "Not available"}</h2>
+        <span className="max-w-[45%] shrink-0 overflow-wrap-anywhere rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold leading-tight text-blue-950">
           {getTicketStatusLabel(ticket)}
         </span>
       </div>
 
-      <dl className="mt-4 grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <div className="min-w-0">
-          <dt className="font-bold text-gray-500">Customer Name</dt>
-          <dd className="mt-1 overflow-wrap-anywhere text-gray-800">{ticket.customerName ?? "Not available"}</dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="font-bold text-gray-500">Mobile Number</dt>
-          <dd className="mt-1 flex min-w-0 items-center gap-2 overflow-wrap-anywhere text-gray-800">
-            <Phone className="shrink-0" size={15} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
-          </dd>
-        </div>
-        <div className="min-w-0">
-          <dt className="font-bold text-gray-500">Total Charge</dt>
-          <dd className="mt-1 text-gray-800">{formatCurrency(ticket.totalCharge ?? 0)}</dd>
-        </div>
-      </dl>
+      <p className="mt-2 overflow-wrap-anywhere text-sm font-semibold leading-snug text-gray-800">{ticket.customerName ?? "Not available"}</p>
+      <div className="mt-2 flex min-w-0 items-center justify-between gap-3 text-sm text-gray-700">
+        <span className="flex min-w-0 items-center gap-1.5 overflow-wrap-anywhere">
+          <Phone className="shrink-0" size={14} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
+        </span>
+        <span className="shrink-0 font-bold text-blue-950">{formatCurrency(ticket.totalCharge ?? 0)}</span>
+      </div>
 
       <button
         type="button"
         onClick={() => onViewDetails(ticket.id)}
-        className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-2xl bg-blue-950 px-4 py-2 font-semibold text-white hover:bg-blue-900 sm:w-auto"
+        className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900 sm:w-auto"
       >
         <Eye size={16} aria-hidden="true" /> View Details
       </button>
@@ -339,17 +327,16 @@ export default function TicketList() {
   return (
     <main className="ke-page-main bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
-        <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:py-2">
-          <ArrowLeft size={18} aria-hidden="true" /> Dashboard
-        </button>
+        <div className="mb-3 flex min-w-0 items-center gap-2 sm:mb-4">
+          <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2">
+            <ArrowLeft size={18} aria-hidden="true" />
+            <span className="sr-only sm:not-sr-only">Dashboard</span>
+          </button>
+          <h1 className="min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Tickets</h1>
+        </div>
 
-        <header className="ke-page-header mt-2 bg-blue-950 text-white shadow-lg sm:mt-4">
-          <h1 className="ke-page-title break-words font-extrabold">Tickets</h1>
-          <p className="mt-1 text-xs text-blue-100 sm:mt-2 sm:text-sm">Select a ticket to view details and available actions.</p>
-        </header>
-
-        {(canUseSearch || canUseFilters) && <section className="mt-3 min-w-0 rounded-2xl border border-blue-100 bg-white p-3 shadow-sm sm:mt-6 sm:p-4">
-          <div className="mobile-full-width-actions flex flex-col gap-3 sm:flex-row">
+        {(canUseSearch || canUseFilters) && <section className="min-w-0 rounded-xl border border-blue-100 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4">
+          <div className="flex items-center gap-2">
             {canUseSearch && (
               <>
                 <label htmlFor="ticket-search" className="sr-only">Search tickets</label>
@@ -359,7 +346,7 @@ export default function TicketList() {
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
                   placeholder="Search ticket, mobile, name, product, area"
-                  className="min-h-12 w-full min-w-0 rounded-xl border border-gray-300 px-4 py-3 text-base text-gray-900 outline-none focus:border-blue-950 focus:ring-2 focus:ring-blue-100 sm:text-sm"
+                  className="min-h-11 min-w-0 flex-1 rounded-xl border border-gray-300 px-3.5 py-2.5 text-base text-gray-900 outline-none focus:border-blue-950 focus:ring-2 focus:ring-blue-100 sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
                 />
               </>
             )}
@@ -367,9 +354,10 @@ export default function TicketList() {
               <button
                 type="button"
                 onClick={() => setSearchText("")}
-                className="min-h-12 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 text-blue-950 hover:bg-blue-50 sm:h-12 sm:w-12"
+                aria-label="Clear search"
               >
-                Clear
+                <X size={17} aria-hidden="true" />
               </button>
             )}
             {canUseFilters && (
@@ -377,16 +365,18 @@ export default function TicketList() {
                 type="button"
                 onClick={toggleFilters}
                 aria-expanded={showFilters}
-                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 hover:bg-blue-50"
+                className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-blue-950 px-3 text-sm font-bold text-blue-950 hover:bg-blue-50 sm:h-12 sm:px-4"
+                aria-label={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ""}`}
               >
-                <Filter size={16} aria-hidden="true" /> Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+                <Filter size={16} aria-hidden="true" />
+                <span className="hidden sm:inline">Filters</span>{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
               </button>
             )}
           </div>
 
           {canUseFilters && showFilters && (
               <div className="mt-3 border-t border-blue-100 pt-3 sm:mt-4 sm:pt-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4">
                 <label className="text-sm font-semibold text-gray-700">
                   Status
                   <select name="status" value={draftFilters.status} onChange={handleFilterInput} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-blue-950">
@@ -441,7 +431,7 @@ export default function TicketList() {
           )}
         </section>}
 
-        <section className="mt-4 grid min-w-0 grid-cols-1 gap-4 sm:mt-6 lg:grid-cols-2" aria-live="polite">
+        <section className="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:mt-5 sm:gap-4 lg:grid-cols-2" aria-live="polite">
           {isLoading && <p className="text-sm font-semibold text-gray-600">{loadingMessage}</p>}
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
           {!isLoading && !error && tickets.length === 0 && <p className="text-sm font-semibold text-gray-600">{emptyMessage}</p>}

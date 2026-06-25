@@ -154,7 +154,8 @@ textarea {
 .ke-page-main {
   min-height: 100svh;
   overflow-x: hidden;
-  padding: clamp(0.75rem, 3vw, 1rem);
+  padding: clamp(0.625rem, 2.5vw, 1rem);
+  padding-bottom: calc(6.875rem + env(safe-area-inset-bottom));
   width: 100%;
 }
 
@@ -182,6 +183,7 @@ textarea {
 
   .ke-page-main {
     padding: 1.5rem;
+    padding-bottom: 1.5rem;
   }
 
   .ke-page-header {

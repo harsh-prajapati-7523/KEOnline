@@ -246,48 +246,45 @@ export default function CreateTicket() {
   return (
     <main className="ke-page-main bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-3xl">
-        <div className="mobile-full-width-actions mb-2 flex flex-wrap gap-2 sm:mb-4 sm:gap-3">
-          <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:py-2">
-            <ArrowLeft size={18} aria-hidden="true" /> Dashboard
+        <div className="mb-3 flex min-w-0 items-center gap-2 sm:mb-4">
+          <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2">
+            <ArrowLeft size={18} aria-hidden="true" />
+            <span className="sr-only sm:not-sr-only">Dashboard</span>
           </button>
-          <button type="button" onClick={() => navigate("/tickets")} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:ml-auto sm:min-h-11 sm:py-2">
+          <h1 className="min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Create Ticket</h1>
+          <button type="button" onClick={() => navigate("/tickets")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 text-sm font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2 sm:text-base">
             <ListChecks size={18} aria-hidden="true" /> View Tickets
           </button>
         </div>
 
         <section className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-lg sm:rounded-3xl">
-          <header className="ke-page-header bg-blue-950 text-white">
-            <h1 className="ke-page-title break-words font-extrabold">Create Ticket</h1>
-            <p className="mt-1 text-xs text-blue-100 sm:mt-2 sm:text-sm">Record a customer service request.</p>
-          </header>
-
-          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-4 p-4 sm:grid-cols-2 sm:gap-5 sm:p-6">
-            <label className="font-semibold text-gray-700">
+          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-3.5 p-4 sm:grid-cols-2 sm:gap-5 sm:p-6">
+            <label className="text-[15px] font-semibold text-gray-700 sm:text-base">
               Customer Name
-              <input name="customerName" value={formData.customerName} onChange={handleChange} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
+              <input name="customerName" value={formData.customerName} onChange={handleChange} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3" />
               <FieldError message={errors.customerName} />
             </label>
 
-            <label className="font-semibold text-gray-700">
+            <label className="text-[15px] font-semibold text-gray-700 sm:text-base">
               Mobile Number
-              <input name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
+              <input name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3" />
               <FieldError message={errors.mobileNumber} />
             </label>
 
-            <label className="font-semibold text-gray-700">
+            <label className="text-[15px] font-semibold text-gray-700 sm:text-base">
               Village / Area <span className="text-sm font-normal text-gray-500">(Optional)</span>
-              <SuggestionInput endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
+              <SuggestionInput endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3" />
             </label>
 
-            <label className="font-semibold text-gray-700">
+            <label className="text-[15px] font-semibold text-gray-700 sm:text-base">
               Product Type
-              <SuggestionInput endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
+              <SuggestionInput endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3" />
               <FieldError message={errors.productType} />
             </label>
 
-            <label className="font-semibold text-gray-700 sm:col-span-2">
+            <label className="text-[15px] font-semibold text-gray-700 sm:col-span-2 sm:text-base">
               Ticket Category
-              <select name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-blue-950 disabled:opacity-60">
+              <select name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className="mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 bg-white px-3.5 py-2.5 text-base outline-none focus:border-blue-950 disabled:opacity-60 sm:min-h-12 sm:px-4 sm:py-3">
                 <option value="">{isLoadingCategories ? "Loading ticket categories..." : "Select ticket category"}</option>
                 {categories.map((category) => <option key={category.id} value={category.id}>{formatCategoryLabel(category)}</option>)}
               </select>
@@ -298,9 +295,9 @@ export default function CreateTicket() {
               )}
             </label>
 
-            <label className="font-semibold text-gray-700 sm:col-span-2">
+            <label className="text-[15px] font-semibold text-gray-700 sm:col-span-2 sm:text-base">
               Complaint Description
-              <textarea name="complaintDescription" rows="4" value={formData.complaintDescription} onChange={handleChange} className="mt-2 min-h-28 w-full resize-y rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950" />
+              <textarea name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} className="mt-1.5 min-h-24 w-full resize-y rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-28 sm:px-4 sm:py-3" />
               <FieldError message={errors.complaintDescription} />
             </label>
 
@@ -320,11 +317,11 @@ export default function CreateTicket() {
 
             {!isLoadingDynamicFields && !dynamicConfigError && dynamicFields.map((field) => {
               const fieldId = String(field.categoryFieldConfigId);
-              const commonClassName = "mt-2 min-h-12 w-full rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950";
+              const commonClassName = "mt-1.5 min-h-11 w-full rounded-xl border border-gray-300 px-3.5 py-2.5 text-base outline-none focus:border-blue-950 sm:min-h-12 sm:px-4 sm:py-3";
 
               if (field.fieldType === "TEXTAREA") {
                 return (
-                  <label key={fieldId} className="font-semibold text-gray-700 sm:col-span-2">
+                  <label key={fieldId} className="text-[15px] font-semibold text-gray-700 sm:col-span-2 sm:text-base">
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
                     <textarea name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={`${commonClassName} min-h-24 resize-y`} />
                     {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
@@ -336,7 +333,7 @@ export default function CreateTicket() {
               if (field.fieldType === "DROPDOWN") {
                 const options = getDropdownOptions(field);
                 return (
-                  <label key={fieldId} className="font-semibold text-gray-700">
+                  <label key={fieldId} className="text-[15px] font-semibold text-gray-700 sm:text-base">
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
                     <select
                       name={fieldId}
@@ -360,7 +357,7 @@ export default function CreateTicket() {
               }
 
               return (
-                <label key={fieldId} className="font-semibold text-gray-700">
+                <label key={fieldId} className="text-[15px] font-semibold text-gray-700 sm:text-base">
                   {field.displayName} {field.required && <span className="text-red-600">*</span>}
                   <input
                     name={fieldId}

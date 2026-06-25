@@ -113,12 +113,13 @@ function Navbar() {
     <nav className="w-full overflow-hidden bg-blue-950 text-white shadow-lg">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3 lg:flex-row">
         <div className="flex min-w-0 items-center gap-2 text-center sm:gap-3 lg:text-left">
-          <div className="flex h-[clamp(2rem,8vw,2.25rem)] w-[clamp(2rem,8vw,2.25rem)] shrink-0 items-center justify-center rounded-full border-[3px] border-yellow-400 text-[clamp(1rem,4vw,1.25rem)] font-bold italic sm:h-11 sm:w-11 sm:text-xl md:h-12 md:w-12 md:text-2xl">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-yellow-400 text-base font-bold italic sm:h-11 sm:w-11 sm:border-[3px] sm:text-xl md:h-12 md:w-12 md:text-2xl">
             ke
           </div>
           <div className="min-w-0">
             <h1 className="break-words text-[clamp(0.75rem,3.3vw,0.875rem)] font-extrabold leading-tight sm:text-base md:text-xl">
-              KUMAR ELECTRONICS & ELECTRICALS
+              <span className="sm:hidden">Kumar Electronics</span>
+              <span className="hidden sm:inline">KUMAR ELECTRONICS & ELECTRICALS</span>
             </h1>
             <p className="hidden text-xs font-semibold text-yellow-400 sm:block md:text-sm">
               POWER BACKUP & SOLAR SOLUTIONS
@@ -176,7 +177,7 @@ function AuthenticatedBottomNav() {
     navigate("/employee-login", { replace: true });
   };
 
-  const itemClassName = (isActive) => `flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-xs font-bold transition ${
+  const itemClassName = (isActive) => `flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[0.72rem] font-bold transition ${
     isActive ? "bg-yellow-400 text-black" : "text-blue-950"
   }`;
 
@@ -184,23 +185,23 @@ function AuthenticatedBottomNav() {
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-blue-100 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden" aria-label="Employee mobile navigation">
       <div className="mx-auto flex max-w-md gap-1">
         <button type="button" onClick={() => navigate("/employee-dashboard")} className={itemClassName(active === "/employee-dashboard")}>
-          <LayoutDashboard size={19} aria-hidden="true" />
+          <LayoutDashboard size={17} aria-hidden="true" />
           Dashboard
         </button>
         {canCreateTicket && (
           <button type="button" onClick={() => navigate("/tickets/new")} className={itemClassName(active === "/tickets/new")}>
-            <PlusCircle size={19} aria-hidden="true" />
+            <PlusCircle size={17} aria-hidden="true" />
             Create
           </button>
         )}
         {canViewTickets && (
           <button type="button" onClick={() => navigate("/tickets")} className={itemClassName(active.startsWith("/tickets") && active !== "/tickets/new")}>
-            <ListChecks size={19} aria-hidden="true" />
+            <ListChecks size={17} aria-hidden="true" />
             Tickets
           </button>
         )}
         <button type="button" onClick={logout} className={itemClassName(false)}>
-          <LogOut size={19} aria-hidden="true" />
+          <LogOut size={17} aria-hidden="true" />
           Logout
         </button>
       </div>
@@ -213,7 +214,7 @@ function AppRoutes() {
   const isAuthenticated = Boolean(localStorage.getItem("token"));
 
   return (
-    <div className={isAuthenticated ? "pb-20 sm:pb-0" : ""}>
+    <div className={isAuthenticated ? "sm:pb-0" : ""}>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/employee-login" element={<EmployeeLogin />} />

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Calendar, Eye, MapPin, Phone, Plus } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronDown, ChevronRight, Eye, MapPin, Phone, PhoneCall, Plus } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import SuggestionInput from "../components/SuggestionInput";
 import { hasAccess } from "../utils/access";
@@ -7,13 +7,26 @@ import { hasAccess } from "../utils/access";
 function formatDate(value) {
   if (!value) return "Not available";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+  return Number.isNaN(date.getTime()) ? value : new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
 }
 
 function formatDateTime(value) {
   if (!value) return "Not available";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  if (Number.isNaN(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date).replace(/\b(am|pm)\b/i, (match) => match.toUpperCase());
 }
 
 function formatCurrency(value) {
@@ -144,6 +157,9 @@ export default function TicketDetail() {
   const [workflowHistoryLoading, setWorkflowHistoryLoading] = useState(false);
   const [workflowHistoryLoadingMore, setWorkflowHistoryLoadingMore] = useState(false);
   const [workflowHistoryError, setWorkflowHistoryError] = useState("");
+  const [showStatusDetails, setShowStatusDetails] = useState(false);
+  const [showWorkflowHistory, setShowWorkflowHistory] = useState(false);
+  const [expandedWorkflowHistoryId, setExpandedWorkflowHistoryId] = useState(null);
   const customerHistoryTicketIdRef = useRef(ticketId);
   const workflowHistoryTicketIdRef = useRef(ticketId);
   const currentRole = localStorage.getItem("role") ?? "";
@@ -278,6 +294,9 @@ export default function TicketDetail() {
     setWorkflowHistoryLoading(false);
     setWorkflowHistoryLoadingMore(false);
     setWorkflowHistoryError("");
+    setShowStatusDetails(false);
+    setShowWorkflowHistory(false);
+    setExpandedWorkflowHistoryId(null);
     loadTicket();
     loadAvailableActions();
     loadWorkflowHistory(0, true);
@@ -597,18 +616,26 @@ export default function TicketDetail() {
   const dynamicActions = Array.isArray(availableActions?.dynamicActions) ? availableActions.dynamicActions : [];
   const hasDynamicActions = dynamicActions.length > 0;
   const hasLoadedAvailableActions = Boolean(availableActions) && !availableActionsLoading && !availableActionsError;
-  const renderWorkflowActions = (prominent = false) => (
-    <section className={`min-w-0 ${prominent ? "rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-4 shadow-sm sm:p-5" : "rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5"}`}>
+  const renderWorkflowActions = (prominent = false) => {
+    const hasNoActions = hasLoadedAvailableActions && !hasVisibleWorkflowAction && !hasDynamicActions;
+    const isCompletedNoActions = hasNoActions && ticket?.status === "COMPLETED";
+    const actionSectionClassName = prominent && !isCompletedNoActions
+      ? "rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-4 shadow-sm sm:p-5"
+      : "rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5";
+
+    return (
+    <section className={`min-w-0 ${actionSectionClassName}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-lg font-bold text-blue-950">{prominent ? "Available Actions" : "Actions"}</h2>
-          {prominent && (
-            <p className="mt-1 text-sm font-semibold text-yellow-800">
-              Use these workflow actions for this ticket.
-            </p>
+          <h2 className="text-lg font-bold text-blue-950">{isCompletedNoActions ? "No Actions Available" : prominent ? "Available Actions" : "More Actions"}</h2>
+          {prominent && !isCompletedNoActions && (
+            <p className="mt-1 text-sm font-semibold text-yellow-800">Use these workflow actions for this ticket.</p>
+          )}
+          {isCompletedNoActions && (
+            <p className="mt-1 text-sm font-semibold text-gray-600">This ticket is already completed.</p>
           )}
         </div>
-        {prominent && <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-yellow-900">Workflow</span>}
+        {prominent && !isCompletedNoActions && <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-yellow-900">Workflow</span>}
       </div>
       {availableActionsError && (
         <p className="mt-4 rounded-xl bg-yellow-100 px-4 py-3 text-sm font-semibold text-yellow-900">
@@ -622,7 +649,7 @@ export default function TicketDetail() {
         {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="min-h-11 rounded-2xl bg-blue-950 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
         {canComplete && <button type="button" onClick={() => runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`complete-${ticketId}`]} className="min-h-11 rounded-2xl bg-green-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`complete-${ticketId}`] ? "Completing..." : "Complete Ticket"}</button>}
         {canCancel && <button type="button" onClick={() => runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`cancel-${ticketId}`]} className="min-h-11 rounded-2xl bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket"}</button>}
-        {hasLoadedAvailableActions && !hasVisibleWorkflowAction && (
+        {hasNoActions && !isCompletedNoActions && (
           <p className="text-sm text-gray-600">No workflow actions are currently available for this ticket.</p>
         )}
       </div>
@@ -646,12 +673,13 @@ export default function TicketDetail() {
         </div>
       )}
     </section>
-  );
+    );
+  };
 
   return (
-    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-6 sm:px-6 lg:px-8">
+    <main className="ke-page-main bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-4xl">
-        <button type="button" onClick={() => navigate(`/tickets${location.search}`)} className="flex items-center gap-2 font-semibold text-blue-950">
+        <button type="button" onClick={() => navigate(`/tickets${location.search}`)} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950">
           <ArrowLeft size={18} aria-hidden="true" /> Back to Tickets
         </button>
 
@@ -660,12 +688,13 @@ export default function TicketDetail() {
 
         {!isLoading && !error && ticket && (
           <div className="mt-4 min-w-0 space-y-4">
-            <header className="rounded-2xl bg-blue-950 p-5 text-white shadow-lg sm:rounded-3xl sm:p-7">
-              <p className="text-xs font-bold uppercase tracking-wide text-blue-200">Ticket Number</p>
-              <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+            <header className="rounded-2xl bg-blue-950 p-4 text-white shadow-lg sm:rounded-3xl sm:p-7">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <h1 className="min-w-0 break-words text-2xl font-extrabold sm:text-3xl">{ticket.ticketNumber ?? "Not available"}</h1>
                 <span className="max-w-full break-words rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{getTicketStatusLabel(ticket)}</span>
               </div>
+              <p className="mt-3 break-words text-sm font-bold text-blue-100">{ticket.category ?? "Category not available"}</p>
+              <p className="mt-1 break-words text-base font-semibold">{ticket.customerName ?? "Customer not available"}</p>
             </header>
 
             {statusMessage && (
@@ -678,10 +707,25 @@ export default function TicketDetail() {
 
             <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="text-lg font-bold text-blue-950">Customer Details</h2>
+              <h3 className="mt-1 text-sm font-semibold text-gray-500">Product &amp; Complaint</h3>
               <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <InfoItem label="Customer Name">{ticket.customerName}</InfoItem>
-                <InfoItem label="Mobile Number"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Phone size={15} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}</span></InfoItem>
+                <InfoItem label="Mobile Number">
+                  {ticket.mobileNumber ? (
+                    <span className="flex min-w-0 flex-wrap items-center gap-2">
+                      <a href={`tel:${String(ticket.mobileNumber).replace(/[^\d+]/g, "")}`} className="inline-flex min-w-0 items-center gap-2 break-words font-semibold text-blue-950 hover:underline">
+                        <Phone size={15} aria-hidden="true" /> {ticket.mobileNumber}
+                      </a>
+                      <a href={`tel:${String(ticket.mobileNumber).replace(/[^\d+]/g, "")}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-blue-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-900">
+                        <PhoneCall size={14} aria-hidden="true" /> Call
+                      </a>
+                    </span>
+                  ) : "Not available"}
+                </InfoItem>
                 <InfoItem label="Village / Area" className="sm:col-span-2"><span className="inline-flex min-w-0 items-center gap-2 break-words"><MapPin size={15} aria-hidden="true" /> {ticket.villageOrArea ?? "Not available"}</span></InfoItem>
+                <InfoItem label="Product Type">{ticket.productType}</InfoItem>
+                <InfoItem label="Category">{ticket.category}</InfoItem>
+                <InfoItem label="Complaint Description" className="sm:col-span-2">{ticket.complaintDescription}</InfoItem>
               </dl>
             </section>
 
@@ -727,33 +771,43 @@ export default function TicketDetail() {
             </section>}
 
             <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <h2 className="text-lg font-bold text-blue-950">Product &amp; Complaint</h2>
-              <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                <InfoItem label="Product Type">{ticket.productType}</InfoItem>
-                <InfoItem label="Category">{ticket.category}</InfoItem>
-                <InfoItem label="Complaint Description" className="sm:col-span-2">{ticket.complaintDescription}</InfoItem>
-              </dl>
+              <button type="button" onClick={() => setShowStatusDetails((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
+                <span>
+                  <span className="block text-lg font-bold text-blue-950">Status / Workflow Details</span>
+                  <span className="mt-1 block text-sm font-semibold text-gray-600">
+                    {getTicketStatusLabel(ticket)}
+                    {ticket.status === "COMPLETED" && ticket.completedByEmployeeId ? ` by ${ticket.completedByEmployeeId}` : ""}
+                  </span>
+                </span>
+                {showStatusDetails ? <ChevronDown className="shrink-0 text-blue-950" size={20} aria-hidden="true" /> : <ChevronRight className="shrink-0 text-blue-950" size={20} aria-hidden="true" />}
+              </button>
+              {showStatusDetails && (
+                <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-blue-100 pt-4 text-sm sm:grid-cols-2">
+                  <InfoItem label="Status">{getTicketStatusLabel(ticket)}</InfoItem>
+                  <InfoItem label="Picked By">{ticket.pickedByEmployeeId ?? "Not picked"}</InfoItem>
+                  <InfoItem label="Created Date"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
+                  {ticket.status === "COMPLETED" && <InfoItem label="Completed By">{ticket.completedByEmployeeId}</InfoItem>}
+                  {ticket.status === "COMPLETED" && <InfoItem label="Completed At">{formatDateTime(ticket.completedAt)}</InfoItem>}
+                  {ticket.status === "COMPLETED" && ticket.completionRemark && <InfoItem label="Completion Remark" className="sm:col-span-2">{ticket.completionRemark}</InfoItem>}
+                  {ticket.status === "CANCELLED" && <InfoItem label="Cancelled By">{ticket.cancelledByEmployeeId}</InfoItem>}
+                  {ticket.status === "CANCELLED" && <InfoItem label="Cancelled At">{formatDateTime(ticket.cancelledAt)}</InfoItem>}
+                  {ticket.status === "CANCELLED" && <InfoItem label="Cancellation Reason" className="sm:col-span-2">{ticket.cancellationReason}</InfoItem>}
+                </dl>
+              )}
             </section>
 
             <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <h2 className="text-lg font-bold text-blue-950">Status / Workflow Details</h2>
-              <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                <InfoItem label="Status">{getTicketStatusLabel(ticket)}</InfoItem>
-                <InfoItem label="Picked By">{ticket.pickedByEmployeeId ?? "Not picked"}</InfoItem>
-                <InfoItem label="Created Date"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
-                {ticket.status === "COMPLETED" && <InfoItem label="Completed By">{ticket.completedByEmployeeId}</InfoItem>}
-                {ticket.status === "COMPLETED" && <InfoItem label="Completed At">{formatDate(ticket.completedAt)}</InfoItem>}
-                {ticket.status === "COMPLETED" && ticket.completionRemark && <InfoItem label="Completion Remark" className="sm:col-span-2">{ticket.completionRemark}</InfoItem>}
-                {ticket.status === "CANCELLED" && <InfoItem label="Cancelled By">{ticket.cancelledByEmployeeId}</InfoItem>}
-                {ticket.status === "CANCELLED" && <InfoItem label="Cancelled At">{formatDate(ticket.cancelledAt)}</InfoItem>}
-                {ticket.status === "CANCELLED" && <InfoItem label="Cancellation Reason" className="sm:col-span-2">{ticket.cancellationReason}</InfoItem>}
-              </dl>
-            </section>
+              <button type="button" onClick={() => setShowWorkflowHistory((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
+                <span>
+                  <span className="block text-lg font-bold text-blue-950">Workflow History</span>
+                  <span className="mt-1 block text-sm font-semibold text-gray-600">
+                    {workflowHistory.length > 0 ? `${workflowHistory.length} event${workflowHistory.length === 1 ? "" : "s"} loaded` : "Tap to view timeline"}
+                  </span>
+                </span>
+                {showWorkflowHistory ? <ChevronDown className="shrink-0 text-blue-950" size={20} aria-hidden="true" /> : <ChevronRight className="shrink-0 text-blue-950" size={20} aria-hidden="true" />}
+              </button>
 
-            <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <h2 className="text-lg font-bold text-blue-950">Workflow History</h2>
-
-              <div className="mt-4 space-y-3">
+              {showWorkflowHistory && <div className="mt-4 space-y-3 border-t border-blue-100 pt-4">
                 {workflowHistoryLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow history...</p>}
                 {workflowHistoryError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{workflowHistoryError}</p>}
                 {!workflowHistoryLoading && !workflowHistoryError && workflowHistory.length === 0 && (
@@ -761,29 +815,39 @@ export default function TicketDetail() {
                 )}
                 {!workflowHistoryLoading && workflowHistory.length > 0 && (
                   <>
-                    <div className="space-y-3">
+                    <div className="space-y-0">
                       {workflowHistory.map((historyItem) => (
-                        <article key={historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div>
-                              <h3 className="font-extrabold text-blue-950">{historyItem.actionDisplayName || formatLabel(historyItem.actionKey)}</h3>
-                              <p className="mt-1 text-sm font-semibold text-slate-700">
-                                {(historyItem.fromStatusDisplayName || formatLabel(historyItem.fromStatus))} &rarr; {(historyItem.toStatusDisplayName || formatLabel(historyItem.toStatus))}
-                              </p>
+                        <article key={historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`} className="relative min-w-0 border-l-2 border-blue-100 pb-4 pl-4 last:pb-0">
+                          <span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-blue-950" aria-hidden="true" />
+                          <button
+                            type="button"
+                            onClick={() => setExpandedWorkflowHistoryId((current) => current === (historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`) ? null : (historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`))}
+                            className="w-full text-left"
+                          >
+                            <div className="flex min-w-0 items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <h3 className="break-words font-extrabold leading-tight text-blue-950">{historyItem.actionDisplayName || formatLabel(historyItem.actionKey)}</h3>
+                                <p className="mt-1 text-sm font-semibold text-slate-700">
+                                  {(historyItem.fromStatusDisplayName || formatLabel(historyItem.fromStatus))} to {(historyItem.toStatusDisplayName || formatLabel(historyItem.toStatus))}
+                                </p>
+                                <p className="mt-1 text-xs font-semibold text-slate-500">
+                                  {formatDateTime(historyItem.createdAt)} - {getHistoryActor(historyItem)}
+                                </p>
+                              </div>
+                              {expandedWorkflowHistoryId === (historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`) ? <ChevronDown className="shrink-0 text-blue-950" size={18} aria-hidden="true" /> : <ChevronRight className="shrink-0 text-blue-950" size={18} aria-hidden="true" />}
                             </div>
-                            <span className="max-w-full break-words rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-950">{formatDateTime(historyItem.createdAt)}</span>
-                          </div>
+                          </button>
 
-                          <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                          {expandedWorkflowHistoryId === (historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`) && <dl className="mt-3 grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-sm sm:grid-cols-2">
                             <InfoItem label="Executed By">{getHistoryActor(historyItem)}</InfoItem>
                             {hasOwnerChange(historyItem) && (
                               <InfoItem label="Owner Change">
-                                {(historyItem.previousOwnerEmployeeId || "Unassigned")} &rarr; {(historyItem.newOwnerEmployeeId || "Unassigned")}
+                                {(historyItem.previousOwnerEmployeeId || "Unassigned")} to {(historyItem.newOwnerEmployeeId || "Unassigned")}
                               </InfoItem>
                             )}
                             {historyItem.comment && <InfoItem label="Comment" className="sm:col-span-2">{historyItem.comment}</InfoItem>}
                             {historyItem.reason && <InfoItem label="Reason" className="sm:col-span-2">{historyItem.reason}</InfoItem>}
-                          </dl>
+                          </dl>}
                         </article>
                       ))}
                     </div>
@@ -800,7 +864,7 @@ export default function TicketDetail() {
                     )}
                   </>
                 )}
-              </div>
+              </div>}
             </section>
 
             {dynamicValues.length > 0 && (
@@ -897,7 +961,6 @@ export default function TicketDetail() {
               )}
             </section>}
 
-            {renderWorkflowActions(false)}
           </div>
         )}
       </div>

@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+:root {
+  --ke-primary: #101b4d;
+  --ke-accent: #ffcc00;
+  --ke-danger: #ef233c;
+  --ke-bg: #f6f8fc;
+  --ke-card: #ffffff;
+  --ke-border: #e1e7f0;
+  --ke-text: #172033;
+  --ke-muted: #667085;
+  --ke-shadow: 0 12px 32px rgba(16, 27, 77, 0.12);
+}
+
 html,
 body,
 #root {
@@ -15,6 +27,8 @@ body,
 }
 
 body {
+  background: var(--ke-bg);
+  color: var(--ke-text);
   margin: 0;
 }
 
@@ -42,7 +56,7 @@ textarea {
 
 .ke-login-page {
   align-items: flex-start;
-  background: linear-gradient(90deg, #172554, #1e40af);
+  background: var(--ke-bg);
   display: flex;
   justify-content: center;
   min-height: 100svh;
@@ -53,9 +67,10 @@ textarea {
 }
 
 .ke-login-card {
-  background: #ffffff;
+  background: var(--ke-card);
+  border: 1px solid var(--ke-border);
   border-radius: 1rem;
-  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.28);
+  box-shadow: var(--ke-shadow);
   margin: 0 auto;
   max-width: 26rem;
   padding: clamp(1rem, 4vw, 1.375rem);
@@ -63,21 +78,24 @@ textarea {
 }
 
 .ke-login-logo {
-  align-items: center;
-  border: 3px solid #facc15;
-  border-radius: 9999px;
-  color: #172554;
-  display: flex;
-  font-size: clamp(1.5rem, 7vw, 1.875rem);
-  font-style: italic;
-  font-weight: 700;
-  height: clamp(3.5rem, 15vw, 4rem);
-  justify-content: center;
-  width: clamp(3.5rem, 15vw, 4rem);
+  display: block;
+  height: clamp(4rem, 18vw, 5.5rem);
+  max-width: min(100%, 16rem);
+  object-fit: contain;
+  width: auto;
+}
+
+.ke-login-brand {
+  color: var(--ke-primary);
+  font-size: clamp(1.125rem, 5vw, 1.375rem);
+  font-weight: 800;
+  line-height: 1.15;
+  margin-top: 0.75rem;
+  text-align: center;
 }
 
 .ke-login-title {
-  color: #172554;
+  color: var(--ke-primary);
   font-size: clamp(1.375rem, 6vw, 1.625rem);
   font-weight: 800;
   line-height: 1.15;
@@ -86,7 +104,7 @@ textarea {
 }
 
 .ke-login-subtitle {
-  color: #6b7280;
+  color: var(--ke-muted);
   font-size: 0.875rem;
   margin-top: 0.375rem;
   text-align: center;
@@ -97,7 +115,7 @@ textarea {
 }
 
 .ke-login-label {
-  color: #374151;
+  color: #344054;
   display: block;
   font-size: 0.9375rem;
   font-weight: 600;
@@ -106,7 +124,7 @@ textarea {
 
 .ke-login-control {
   align-items: center;
-  border: 2px solid #e5e7eb;
+  border: 2px solid var(--ke-border);
   border-radius: 1rem;
   display: flex;
   min-height: 2.875rem;
@@ -114,7 +132,7 @@ textarea {
 }
 
 .ke-login-control:focus-within {
-  border-color: #172554;
+  border-color: var(--ke-primary);
 }
 
 .ke-login-input {
@@ -127,7 +145,7 @@ textarea {
 
 .ke-login-button {
   align-items: center;
-  background: #facc15;
+  background: var(--ke-accent);
   border-radius: 1rem;
   color: #000000;
   display: flex;
@@ -143,7 +161,7 @@ textarea {
 }
 
 .ke-login-button:hover {
-  background: #fde047;
+  background: #ffd633;
 }
 
 .ke-login-button:disabled {
@@ -152,6 +170,7 @@ textarea {
 }
 
 .ke-page-main {
+  background: var(--ke-bg);
   min-height: 100svh;
   overflow-x: hidden;
   padding: clamp(0.625rem, 2.5vw, 1rem);
@@ -171,6 +190,57 @@ textarea {
 
 .ticket-detail-page {
   padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+}
+
+.ke-app-header {
+  background: var(--ke-primary);
+}
+
+.ke-brand-logo {
+  display: block;
+  height: 2rem;
+  max-width: 11rem;
+  object-fit: contain;
+  width: auto;
+}
+
+.ke-nav-active {
+  background: var(--ke-accent);
+  color: #000000;
+}
+
+.ke-primary-action {
+  background: var(--ke-primary);
+  color: #ffffff;
+}
+
+.ke-primary-action:hover {
+  background: #162566;
+}
+
+.ke-accent-action {
+  background: var(--ke-accent);
+  color: #000000;
+}
+
+.ke-accent-action:hover {
+  background: #ffd633;
+}
+
+.ke-danger-action {
+  background: var(--ke-danger);
+  color: #ffffff;
+}
+
+.ke-danger-action:hover {
+  background: #d91f35;
+}
+
+.ke-card {
+  background: var(--ke-card);
+  border: 1px solid var(--ke-border);
+  border-radius: 1rem;
+  box-shadow: var(--ke-shadow);
 }
 
 @media (min-width: 640px) {

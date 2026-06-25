@@ -64,9 +64,11 @@ export default function EmployeeLogin() {
 
         <div className="flex flex-col items-center">
           
-          <div className="ke-login-logo">
-            ke
-          </div>
+          <img src="/ke-logo-256w.png" alt="Kumar Electronics & Electricals" className="ke-login-logo" />
+
+          <p className="ke-login-brand">
+            Kumar Electronics
+          </p>
 
           <h1 className="ke-login-title">
             Employee Login

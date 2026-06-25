@@ -106,23 +106,21 @@ function Navbar() {
   };
 
   const buttonClassName = (isActive) => `flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm font-semibold transition sm:min-h-11 sm:gap-2 sm:px-4 sm:py-2 sm:text-base ${
-    isActive ? "bg-yellow-400 text-black" : "bg-white/10 hover:bg-white/20"
+    isActive ? "ke-nav-active" : "bg-white/10 hover:bg-white/20"
   }`;
 
   return (
-    <nav className="w-full overflow-hidden bg-blue-950 text-white shadow-lg">
+    <nav className="ke-app-header w-full overflow-hidden text-white shadow-lg">
       <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3 lg:flex-row">
         <div className="flex min-w-0 items-center gap-2 text-center sm:gap-3 lg:text-left">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-yellow-400 text-base font-bold italic sm:h-11 sm:w-11 sm:border-[3px] sm:text-xl md:h-12 md:w-12 md:text-2xl">
-            ke
-          </div>
+          <img src="/ke-logo-256w.png" alt="Kumar Electronics & Electricals" className="ke-brand-logo shrink-0 sm:h-11 md:h-12" />
           <div className="min-w-0">
             <h1 className="break-words text-[clamp(0.75rem,3.3vw,0.875rem)] font-extrabold leading-tight sm:text-base md:text-xl">
               <span className="sm:hidden">Kumar Electronics</span>
-              <span className="hidden sm:inline">KUMAR ELECTRONICS & ELECTRICALS</span>
+              <span className="hidden sm:inline">Kumar Electronics &amp; Electricals</span>
             </h1>
             <p className="hidden text-xs font-semibold text-yellow-400 sm:block md:text-sm">
-              POWER BACKUP & SOLAR SOLUTIONS
+              Power Backup &amp; Solar Solutions
             </p>
           </div>
         </div>
@@ -178,7 +176,7 @@ function AuthenticatedBottomNav() {
   };
 
   const itemClassName = (isActive) => `flex min-h-16 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1.5 text-[0.72rem] font-bold transition ${
-    isActive ? "bg-yellow-400 text-black" : "text-blue-950"
+    isActive ? "ke-nav-active" : "text-blue-950"
   }`;
 
   return (

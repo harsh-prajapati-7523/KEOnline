@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
   <title id="title">RiseTicket app icon</title>
-  <rect width="512" height="512" rx="96" fill="#172554"/>
-  <circle cx="256" cy="238" r="128" fill="none" stroke="#facc15" stroke-width="28"/>
+  <rect width="512" height="512" rx="96" fill="#101B4D"/>
+  <circle cx="256" cy="238" r="128" fill="none" stroke="#FFCC00" stroke-width="28"/>
   <text x="256" y="284" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="136" font-style="italic" font-weight="800" text-anchor="middle">ke</text>
-  <rect x="104" y="390" width="304" height="34" rx="17" fill="#facc15"/>
+  <rect x="104" y="390" width="304" height="34" rx="17" fill="#FFCC00"/>
   <rect x="148" y="438" width="216" height="22" rx="11" fill="#ffffff"/>
 </svg>

@@ -675,8 +675,8 @@ export default function TicketDetail() {
       )}
       <div className={`mt-4 flex flex-col gap-2 ${prominent ? "sm:gap-3" : ""}`}>
         {availableActionsLoading && <p className="text-sm font-semibold text-gray-600">Loading available workflow actions...</p>}
-        {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="min-h-12 rounded-2xl bg-blue-950 px-4 py-3 font-bold text-white disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
-        {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className={`${canStartWork ? "min-h-11 border border-blue-950 bg-white text-blue-950" : "min-h-12 bg-yellow-400 text-black"} rounded-2xl px-4 py-2 font-semibold disabled:opacity-60`}>{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
+        {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="ke-primary-action min-h-12 rounded-2xl px-4 py-3 font-bold disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
+        {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className={`${canStartWork ? "min-h-11 border border-blue-950 bg-white text-blue-950" : "ke-accent-action min-h-12"} rounded-2xl px-4 py-2 font-semibold disabled:opacity-60`}>{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
         {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl border border-blue-950 bg-white px-4 py-2 font-semibold text-blue-950 disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take Ownership"}</button>}
         {canComplete && <button type="button" onClick={() => runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`complete-${ticketId}`]} className="min-h-11 rounded-2xl bg-green-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`complete-${ticketId}`] ? "Completing..." : "Complete Ticket"}</button>}
         {hasNoActions && !isCompletedNoActions && (
@@ -955,7 +955,7 @@ export default function TicketDetail() {
                               </label>
                             </div>
                             <div className="mobile-full-width-actions mt-3 flex flex-wrap gap-2">
-                              <button type="button" onClick={addCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="rounded-xl bg-yellow-400 px-3 py-2 text-sm font-semibold text-black disabled:opacity-60">
+                              <button type="button" onClick={addCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="ke-accent-action rounded-xl px-3 py-2 text-sm font-semibold disabled:opacity-60">
                                 {processingKeys[`add-charge-${ticketId}`] ? "Saving..." : "Save"}
                               </button>
                               <button type="button" onClick={cancelAddCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-300 disabled:opacity-60">
@@ -964,7 +964,7 @@ export default function TicketDetail() {
                             </div>
                           </div>
                         ) : (
-                          <button type="button" onClick={openAddCharge} className="inline-flex items-center gap-2 rounded-xl bg-yellow-400 px-3 py-2 text-sm font-semibold text-black hover:bg-yellow-300">
+                          <button type="button" onClick={openAddCharge} className="ke-accent-action inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold">
                             <Plus size={16} aria-hidden="true" /> Add Charge
                           </button>
                         )
@@ -1011,7 +1011,7 @@ export default function TicketDetail() {
                     <button type="button" onClick={() => setShowCancelConfirmation(false)} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50">
                       Keep Ticket
                     </button>
-                    <button type="button" onClick={confirmCancelTicket} disabled={processingKeys[`cancel-${ticketId}`]} className="min-h-11 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60">
+                    <button type="button" onClick={confirmCancelTicket} disabled={processingKeys[`cancel-${ticketId}`]} className="ke-danger-action min-h-11 rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60">
                       Cancel Ticket
                     </button>
                   </div>
@@ -1028,7 +1028,7 @@ export default function TicketDetail() {
                     <button type="button" onClick={() => setPendingDeleteChargeId(null)} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50">
                       Cancel
                     </button>
-                    <button type="button" onClick={confirmDeleteCharge} disabled={processingKeys[`delete-charge-${pendingDeleteChargeId}`]} className="min-h-11 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-60">
+                    <button type="button" onClick={confirmDeleteCharge} disabled={processingKeys[`delete-charge-${pendingDeleteChargeId}`]} className="ke-danger-action min-h-11 rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60">
                       Delete
                     </button>
                   </div>

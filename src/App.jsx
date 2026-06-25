@@ -39,13 +39,13 @@ function Navbar() {
 
   return (
     <nav className="w-full overflow-hidden bg-blue-950 text-white shadow-lg">
-      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-3 px-3 py-3 sm:px-4 sm:py-4 lg:flex-row">
-        <div className="flex min-w-0 items-center gap-3 text-center lg:text-left">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-4 border-yellow-400 text-xl font-bold italic sm:h-12 sm:w-12 sm:text-2xl md:h-14 md:w-14 md:text-3xl">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-4 lg:flex-row">
+        <div className="flex min-w-0 items-center gap-2 text-center sm:gap-3 lg:text-left">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-[3px] border-yellow-400 text-base font-bold italic sm:h-12 sm:w-12 sm:border-4 sm:text-2xl md:h-14 md:w-14 md:text-3xl">
             ke
           </div>
           <div className="min-w-0">
-            <h1 className="break-words text-sm font-extrabold leading-tight sm:text-lg md:text-2xl">
+            <h1 className="break-words text-xs font-extrabold leading-tight sm:text-lg md:text-2xl">
               KUMAR ELECTRONICS & ELECTRICALS
             </h1>
             <p className="hidden text-xs font-semibold text-yellow-400 sm:block md:text-sm">

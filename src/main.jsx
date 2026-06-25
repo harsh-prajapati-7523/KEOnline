@@ -17,11 +17,11 @@ function scheduleServiceWorkerRegistration() {
 
   const registerWhenIdle = () => {
     if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(register, { timeout: 3000 })
+      window.requestIdleCallback(register, { timeout: 8000 })
       return
     }
 
-    window.setTimeout(register, 2000)
+    window.setTimeout(register, 6000)
   }
 
   if (document.readyState === 'complete') {

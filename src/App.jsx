@@ -41,6 +41,23 @@ function preloadTicketDetail() {
 
 const TicketDetail = lazy(loadTicketDetail);
 
+function scheduleIdlePreload(callback, delay = 1200) {
+  let idleId;
+  const timeoutId = window.setTimeout(() => {
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(callback, { timeout: 2500 });
+      return;
+    }
+
+    callback();
+  }, delay);
+
+  return () => {
+    window.clearTimeout(timeoutId);
+    if (idleId) window.cancelIdleCallback?.(idleId);
+  };
+}
+
 if (window.location.pathname === "/tickets") {
   preloadTicketList();
 }
@@ -266,20 +283,15 @@ function AppRoutes() {
       return undefined;
     }
 
-    const preload = () => preloadTicketList();
-    const timeoutId = window.setTimeout(preload, 1200);
-
-    return () => window.clearTimeout(timeoutId);
+    return scheduleIdlePreload(preloadTicketList);
   }, [isAuthenticated, location.pathname]);
 
   useEffect(() => {
-    if (!isAuthenticated || location.pathname !== "/tickets" || !hasAnyAccess(["VIEW_TICKETS"])) {
+    if (!isAuthenticated || /^\/tickets\/[^/]+/.test(location.pathname) || !hasAnyAccess(["VIEW_TICKETS"])) {
       return undefined;
     }
 
-    const timeoutId = window.setTimeout(preloadTicketDetail, 1200);
-
-    return () => window.clearTimeout(timeoutId);
+    return scheduleIdlePreload(preloadTicketDetail, location.pathname === "/tickets" ? 900 : 1800);
   }, [isAuthenticated, location.pathname]);
 
   return (

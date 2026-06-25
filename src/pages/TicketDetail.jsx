@@ -158,7 +158,7 @@ function InfoItem({ label, children, className = "" }) {
 function TicketDetailSkeleton() {
   return (
     <div className="mt-4 min-w-0 space-y-4" aria-hidden="true">
-      <section className="min-h-36 rounded-2xl bg-blue-950 p-4 shadow-lg sm:rounded-3xl sm:p-7">
+      <section className="min-h-40 rounded-2xl bg-blue-950 p-4 shadow-lg sm:min-h-44 sm:rounded-3xl sm:p-7">
         <div className="flex items-start justify-between gap-3">
           <div className="h-8 w-40 rounded-full bg-white/20" />
           <div className="h-6 w-24 rounded-full bg-white/15" />
@@ -166,16 +166,18 @@ function TicketDetailSkeleton() {
         <div className="mt-5 h-4 w-32 rounded-full bg-white/15" />
         <div className="mt-3 h-5 w-48 rounded-full bg-white/20" />
       </section>
-      <section className="min-h-28 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+      <section className="min-h-32 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
         <div className="h-6 w-40 rounded-full bg-blue-100" />
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="h-12 rounded-xl bg-gray-100" />
-          <div className="h-12 rounded-xl bg-gray-100" />
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="h-11 rounded-xl bg-gray-100" />
+          <div className="h-11 rounded-xl bg-gray-100" />
         </div>
       </section>
-      <section className="min-h-48 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+      <section className="min-h-64 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
         <div className="h-6 w-44 rounded-full bg-blue-100" />
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="h-10 rounded-xl bg-gray-100" />
+          <div className="h-10 rounded-xl bg-gray-100" />
           <div className="h-10 rounded-xl bg-gray-100" />
           <div className="h-10 rounded-xl bg-gray-100" />
           <div className="h-10 rounded-xl bg-gray-100 sm:col-span-2" />
@@ -751,7 +753,7 @@ export default function TicketDetail() {
       : "rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5";
 
     return (
-    <section className={`min-w-0 ${actionSectionClassName}`}>
+    <section className={`min-h-32 min-w-0 ${actionSectionClassName}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 className="text-lg font-bold text-blue-950">{isCompletedNoActions ? "No Actions Available" : prominent ? "Available Actions" : "More Actions"}</h2>
@@ -769,8 +771,12 @@ export default function TicketDetail() {
           {availableActionsError}
         </p>
       )}
-      <div className={`mt-4 flex flex-col gap-2 ${prominent ? "sm:gap-3" : ""}`}>
-        {(availableActionsLoading || (!availableActions && !availableActionsError)) && <p className="text-sm font-semibold text-gray-600">Loading available workflow actions...</p>}
+      <div className={`mt-4 flex min-h-12 flex-col gap-2 ${prominent ? "sm:gap-3" : ""}`}>
+        {(availableActionsLoading || (!availableActions && !availableActionsError)) && (
+          <div className="rounded-xl bg-white/70 px-3 py-3 text-sm font-semibold text-gray-600">
+            Loading available workflow actions...
+          </div>
+        )}
         {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="ke-primary-action min-h-12 rounded-2xl px-4 py-3 font-bold disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
         {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className={`${canStartWork ? "min-h-11 border border-blue-950 bg-white text-blue-950" : "ke-accent-action min-h-12"} rounded-2xl px-4 py-2 font-semibold disabled:opacity-60`}>{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
         {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl border border-blue-950 bg-white px-4 py-2 font-semibold text-blue-950 disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take Ownership"}</button>}
@@ -856,6 +862,8 @@ export default function TicketDetail() {
                 <InfoItem label="Village / Area" className="sm:col-span-2"><span className="inline-flex min-w-0 items-center gap-2 break-words"><MapPin size={15} aria-hidden="true" /> {ticket.villageOrArea ?? "Not available"}</span></InfoItem>
                 <InfoItem label="Product Type">{ticket.productType}</InfoItem>
                 <InfoItem label="Category">{formatEnumDisplay(ticket.category)}</InfoItem>
+                <InfoItem label="Amount">{formatCurrency(ticket.totalCharge)}</InfoItem>
+                <InfoItem label="Created Date"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
                 <InfoItem label="Complaint Description" className="sm:col-span-2">{ticket.complaintDescription}</InfoItem>
               </dl>
             </section>
@@ -998,23 +1006,25 @@ export default function TicketDetail() {
               </div>}
             </section>
 
-            {dynamicValues.length > 0 && (
-              <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+            {(dynamicValuesLoading || dynamicValues.length > 0 || dynamicValuesError) && (
+              <section className="min-h-24 min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
                 <h2 className="text-lg font-bold text-blue-950">Additional Details</h2>
-                <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                  {dynamicValues.map((dynamicValue) => (
-                    <InfoItem key={dynamicValue.id ?? `${dynamicValue.fieldLabel}-${dynamicValue.displayValue}`} label={dynamicValue.fieldLabel || "Additional Detail"}>
-                      {dynamicValue.displayValue || "-"}
-                    </InfoItem>
-                  ))}
-                </dl>
+                {dynamicValuesLoading && <p className="mt-3 text-sm font-semibold text-gray-600">Loading additional details...</p>}
+                {!dynamicValuesLoading && dynamicValuesError && (
+                  <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                    {dynamicValuesError}
+                  </p>
+                )}
+                {dynamicValues.length > 0 && (
+                  <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+                    {dynamicValues.map((dynamicValue) => (
+                      <InfoItem key={dynamicValue.id ?? `${dynamicValue.fieldLabel}-${dynamicValue.displayValue}`} label={dynamicValue.fieldLabel || "Additional Detail"}>
+                        {dynamicValue.displayValue || "-"}
+                      </InfoItem>
+                    ))}
+                  </dl>
+                )}
               </section>
-            )}
-
-            {!dynamicValuesLoading && dynamicValuesError && (
-              <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                {dynamicValuesError}
-              </p>
             )}
 
             {canViewCharges && <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">

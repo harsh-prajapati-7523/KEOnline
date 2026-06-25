@@ -173,10 +173,11 @@ function AuthenticatedBottomNav() {
   const location = useLocation();
   const active = location.pathname;
   const isAuthenticated = Boolean(localStorage.getItem("token"));
-  const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
-  const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
 
   if (!isAuthenticated) return null;
+
+  const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
+  const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
 
   const logout = () => {
     localStorage.removeItem("token");

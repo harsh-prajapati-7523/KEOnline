@@ -1,6 +1,10 @@
-import React from 'react'
+import { Home } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 
 const Nav = () => {
+    const navigate = useNavigate();
+    const { pathname } = useLocation();
+
     return (
         <div>
             {/* Navbar */}
@@ -29,8 +33,9 @@ const Nav = () => {
                     <div className="flex flex-wrap justify-center gap-3 w-full lg:w-auto">
 
                         <button
+                            type="button"
                             onClick={() => navigate("/")}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${active === "Home"
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${pathname === "/"
                                 ? "bg-yellow-400 text-black"
                                 : "bg-white/10 hover:bg-white/20"
                                 }`}

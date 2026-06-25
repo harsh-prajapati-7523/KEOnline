@@ -1,14 +1,9 @@
 import { useEffect, useState } from "react";
 import {
-  Briefcase,
-  CalendarCheck,
-  CheckCircle2,
   ClipboardList,
-  Clock,
   KeyRound,
   GitBranch,
   ListPlus,
-  History,
   ListChecks,
   LogOut,
   PlusCircle,
@@ -16,52 +11,25 @@ import {
   ShieldCheck,
   Tags,
   Users,
-  Wrench,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { clearAccess, fetchCurrentAccess, hasAnyAccess } from "../utils/access";
 
-const dashboardStats = [
-  { label: "My Open Jobs", value: 8, icon: Briefcase },
-  { label: "In Progress", value: 3, icon: Clock },
-  { label: "Completed Today", value: 2, icon: CheckCircle2 },
-  { label: "Assigned Today", value: 5, icon: CalendarCheck },
-];
+function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
+  const iconClassName = tone === "yellow"
+    ? "rounded-xl bg-yellow-100 p-2 text-yellow-800"
+    : "rounded-xl bg-blue-50 p-2 text-blue-950";
 
-const quickActions = [
-  { label: "View Assigned Jobs", icon: ClipboardList },
-  { label: "Update Job Status", icon: Wrench },
-  { label: "Service History", icon: History },
-];
-
-function StatCard({ label, value, icon: Icon }) {
-  return (
-    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-gray-600">{label}</p>
-        <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-          <Icon size={20} aria-hidden="true" />
-        </div>
-      </div>
-      <p className="mt-3 text-3xl font-extrabold text-blue-950">{value}</p>
-    </article>
-  );
-}
-
-function QuickActionCard({ label, icon: Icon }) {
   return (
     <button
       type="button"
-      disabled
-      className="flex min-h-20 w-full cursor-not-allowed items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 text-left opacity-75 shadow-sm"
+      onClick={onClick}
+      className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
     >
-      <div className="rounded-xl bg-gray-100 p-2 text-gray-500">
+      <div className={iconClassName}>
         <Icon size={20} aria-hidden="true" />
       </div>
-      <span className="flex-1 font-semibold text-gray-700">{label}</span>
-      <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-500">
-        Coming Soon
-      </span>
+      <span className="font-semibold text-blue-950">{children}</span>
     </button>
   );
 }
@@ -124,166 +92,71 @@ export default function EmployeeDashboard() {
             Technician Dashboard
           </p>
           <h1 className="mt-2 text-2xl font-extrabold sm:text-3xl">
-            Welcome, {employeeName}
+            Welcome{employeeName ? `, ${employeeName}` : ""}
           </h1>
           <p className="mt-2 text-sm font-semibold text-blue-100">
             Role: {role}
           </p>
         </header>
 
-        <section className="mt-6" aria-labelledby="dashboard-overview">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <h2
-                id="dashboard-overview"
-                className="text-xl font-extrabold text-blue-950"
-              >
-                Job Overview
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                Preview counts for dashboard planning
-              </p>
-            </div>
-            <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-800">
-              Mock Data
-            </span>
-          </div>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 min-[390px]:grid-cols-2 lg:grid-cols-4">
-            {dashboardStats.map((stat) => (
-              <StatCard key={stat.label} {...stat} />
-            ))}
-          </div>
-        </section>
-
-        <section className="mt-8" aria-labelledby="ticket-actions">
+        <section className="mt-6" aria-labelledby="ticket-actions">
           <h2 id="ticket-actions" className="text-xl font-extrabold text-blue-950">
-            Ticket Actions
+            Available Work Areas
           </h2>
           <p className="mt-1 text-sm text-gray-500">
-            Create and review customer service tickets.
+            Open the tools available for your role.
           </p>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
             {canCreateTicket && (
-              <button
-                type="button"
-                onClick={() => navigate("/tickets/new")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-yellow-100 p-2 text-yellow-800">
-                  <PlusCircle size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">Create Ticket</span>
-              </button>
+              <DashboardAction icon={PlusCircle} tone="yellow" onClick={() => navigate("/tickets/new")}>
+                Create Ticket
+              </DashboardAction>
             )}
             {canViewTickets && (
-              <button
-                type="button"
-                onClick={() => navigate("/tickets")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                  <ListChecks size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">View Tickets</span>
-              </button>
+              <DashboardAction icon={ListChecks} onClick={() => navigate("/tickets")}>
+                View Tickets
+              </DashboardAction>
             )}
             {canManageEmployees && (
-              <button
-                type="button"
-                onClick={() => navigate("/admin/employees")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                  <Users size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">Employee Management</span>
-              </button>
+              <DashboardAction icon={Users} onClick={() => navigate("/admin/employees")}>
+                Employee Management
+              </DashboardAction>
             )}
             {canManageRoles && (
-              <button
-                type="button"
-                onClick={() => navigate("/admin/roles")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                  <ShieldCheck size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">Role Management</span>
-              </button>
+              <DashboardAction icon={ShieldCheck} onClick={() => navigate("/admin/roles")}>
+                Role Management
+              </DashboardAction>
             )}
             {canManageRoleAccess && (
-              <button
-                type="button"
-                onClick={() => navigate("/admin/role-access")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                  <KeyRound size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">Role Access Management</span>
-              </button>
+              <DashboardAction icon={KeyRound} onClick={() => navigate("/admin/role-access")}>
+                Role Access &amp; Keys
+              </DashboardAction>
             )}
             {canManageWorkflow && (
-              <button
-                type="button"
-                onClick={() => navigate("/admin/workflow")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                  <GitBranch size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">Workflow Management</span>
-              </button>
+              <DashboardAction icon={GitBranch} onClick={() => navigate("/admin/workflow")}>
+                Workflow Management
+              </DashboardAction>
             )}
             {canManageTicketCategories && (
-              <button
-                type="button"
-                onClick={() => navigate("/admin/ticket-categories")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                  <Tags size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">Ticket Categories</span>
-              </button>
+              <DashboardAction icon={Tags} onClick={() => navigate("/admin/ticket-categories")}>
+                Ticket Categories
+              </DashboardAction>
             )}
             {canManageTicketFields && (
-              <button
-                type="button"
-                onClick={() => navigate("/admin/ticket-fields")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                  <ClipboardList size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">Ticket Fields</span>
-              </button>
+              <DashboardAction icon={ClipboardList} onClick={() => navigate("/admin/ticket-fields")}>
+                Ticket Fields
+              </DashboardAction>
             )}
             {canManageCategoryFieldConfiguration && (
-              <button
-                type="button"
-                onClick={() => navigate("/admin/ticket-category-fields")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                  <Settings2 size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">Category Field Configuration</span>
-              </button>
+              <DashboardAction icon={Settings2} onClick={() => navigate("/admin/ticket-category-fields")}>
+                Category Field Configuration
+              </DashboardAction>
             )}
             {canManageDropdownSources && (
-              <button
-                type="button"
-                onClick={() => navigate("/admin/dropdown-sources")}
-                className="flex min-h-20 w-full items-center gap-3 rounded-2xl border border-blue-100 bg-white p-4 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md"
-              >
-                <div className="rounded-xl bg-blue-50 p-2 text-blue-950">
-                  <ListPlus size={20} aria-hidden="true" />
-                </div>
-                <span className="font-semibold text-blue-950">Dropdown Sources</span>
-              </button>
+              <DashboardAction icon={ListPlus} onClick={() => navigate("/admin/dropdown-sources")}>
+                Dropdown Sources
+              </DashboardAction>
             )}
             {!hasDashboardActions && (
               <p className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600 sm:col-span-2">
@@ -296,21 +169,6 @@ export default function EmployeeDashboard() {
               {accessMessage}
             </p>
           )}
-        </section>
-
-        <section className="mt-8" aria-labelledby="quick-actions">
-          <h2 id="quick-actions" className="text-xl font-extrabold text-blue-950">
-            Quick Actions
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Technician workflow tools will be enabled in a future phase.
-          </p>
-
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-            {quickActions.map((action) => (
-              <QuickActionCard key={action.label} {...action} />
-            ))}
-          </div>
         </section>
 
         <section className="mt-8 border-t border-gray-200 pt-5">

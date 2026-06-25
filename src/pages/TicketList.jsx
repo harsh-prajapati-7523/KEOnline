@@ -19,6 +19,8 @@ const fallbackStatusFilterOptions = [
   { statusKey: "CANCELLED", displayName: "Cancelled" },
 ];
 
+const TICKET_PAGE_SIZE = 100;
+
 function filtersFromSearchParams(searchParams) {
   return {
     status: searchParams.get("status") ?? "",
@@ -40,6 +42,13 @@ function createUrlSearchParams(searchText, filters) {
     if (value) params.set(key, String(value));
   });
   return params;
+}
+
+function appendPagingParams(params, page) {
+  const nextParams = new URLSearchParams(params);
+  nextParams.set("page", String(page));
+  nextParams.set("size", String(TICKET_PAGE_SIZE));
+  return nextParams;
 }
 
 function formatCurrency(value) {
@@ -133,6 +142,9 @@ export default function TicketList() {
   const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [tickets, setTickets] = useState([]);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreTickets, setHasMoreTickets] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchText, setSearchText] = useState(() => searchParams.get("search") ?? "");
@@ -154,9 +166,11 @@ export default function TicketList() {
   const hasAppliedFilters = activeFilterCount > 0;
   const isSearchActive = effectiveSearchText.length >= 2;
   const requestParams = createUrlSearchParams(isSearchActive ? effectiveSearchText : "", effectiveFilters);
+  const requestKey = `${hasAppliedFilters || isSearchActive ? "query" : "list"}:${requestParams.toString()}`;
+  const pagedRequestParams = appendPagingParams(requestParams, currentPage);
   const requestUrl = hasAppliedFilters || isSearchActive
-    ? `/volt/tickets/query?${requestParams.toString()}`
-    : "/volt/tickets";
+    ? `/volt/tickets/query?${pagedRequestParams.toString()}`
+    : `/volt/tickets?${pagedRequestParams.toString()}`;
   const selectedStatus = draftFilters.status;
   const selectedStatusInOptions = !selectedStatus || statusFilterOptions.some((option) => option.statusKey === selectedStatus);
   const selectedCategory = draftFilters.category;
@@ -231,13 +245,22 @@ export default function TicketList() {
   }, [appliedFilters, canUseFilters, canUseSearch, searchParams, searchText, setSearchParams]);
 
   useEffect(() => {
+    setCurrentPage(0);
+    setHasMoreTickets(false);
+  }, [requestKey]);
+
+  useEffect(() => {
     loadStatusFilterOptions();
     loadCategories();
   }, [loadCategories, loadStatusFilterOptions]);
 
   useEffect(() => {
     const controller = new AbortController();
-    setIsLoading(true);
+    if (currentPage === 0) {
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
     setError("");
 
     const timeoutId = setTimeout(async () => {
@@ -252,15 +275,18 @@ export default function TicketList() {
         if (!response.ok) throw new Error("Ticket request failed");
 
         const data = await response.json();
-        setTickets(Array.isArray(data) ? data : []);
+        const nextTickets = Array.isArray(data) ? data : [];
+        setTickets((current) => currentPage === 0 ? nextTickets : [...current, ...nextTickets]);
+        setHasMoreTickets(nextTickets.length === TICKET_PAGE_SIZE);
       } catch (requestError) {
         if (requestError.name !== "AbortError") {
-          setTickets([]);
+          if (currentPage === 0) setTickets([]);
           setError("Unable to load tickets. Please try again.");
         }
       } finally {
         if (!controller.signal.aborted) {
           setIsLoading(false);
+          setIsLoadingMore(false);
         }
       }
     }, isSearchActive ? 275 : 0);
@@ -269,7 +295,7 @@ export default function TicketList() {
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [isSearchActive, requestUrl]);
+  }, [currentPage, isSearchActive, requestUrl]);
 
   const handleFilterInput = (event) => {
     const { checked, name, type, value } = event.target;
@@ -294,6 +320,11 @@ export default function TicketList() {
   const clearFilters = () => {
     setDraftFilters({ ...emptyFilters });
     setAppliedFilters({ ...emptyFilters });
+  };
+
+  const loadMoreTickets = () => {
+    if (isLoading || isLoadingMore || !hasMoreTickets) return;
+    setCurrentPage((page) => page + 1);
   };
 
   const loadingMessage = isSearchActive ? "Searching tickets..." : hasAppliedFilters ? "Applying filters..." : "Loading tickets...";
@@ -422,6 +453,27 @@ export default function TicketList() {
             />
           ))}
         </section>
+        {!isLoading && !error && tickets.length > 0 && (
+          <section className="mt-5 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm" aria-live="polite">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-sm font-semibold text-gray-600">
+                Showing {tickets.length} ticket{tickets.length === 1 ? "" : "s"} in pages of up to {TICKET_PAGE_SIZE}. Newest matching tickets appear first.
+              </p>
+              {hasMoreTickets ? (
+                <button
+                  type="button"
+                  onClick={loadMoreTickets}
+                  disabled={isLoadingMore}
+                  className="rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
+                >
+                  {isLoadingMore ? "Loading..." : "Load More Tickets"}
+                </button>
+              ) : (
+                <p className="text-sm font-semibold text-gray-500">End of results.</p>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );

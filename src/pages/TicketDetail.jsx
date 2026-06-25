@@ -597,6 +597,56 @@ export default function TicketDetail() {
   const dynamicActions = Array.isArray(availableActions?.dynamicActions) ? availableActions.dynamicActions : [];
   const hasDynamicActions = dynamicActions.length > 0;
   const hasLoadedAvailableActions = Boolean(availableActions) && !availableActionsLoading && !availableActionsError;
+  const renderWorkflowActions = (prominent = false) => (
+    <section className={`${prominent ? "rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-5 shadow-sm" : "rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"}`}>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold text-blue-950">{prominent ? "Available Actions" : "Actions"}</h2>
+          {prominent && (
+            <p className="mt-1 text-sm font-semibold text-yellow-800">
+              Use these workflow actions for this ticket.
+            </p>
+          )}
+        </div>
+        {prominent && <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-yellow-900">Workflow</span>}
+      </div>
+      {availableActionsError && (
+        <p className="mt-4 rounded-xl bg-yellow-100 px-4 py-3 text-sm font-semibold text-yellow-900">
+          {availableActionsError}
+        </p>
+      )}
+      <div className={`mt-4 flex flex-wrap items-center gap-2 ${prominent ? "sm:gap-3" : ""}`}>
+        {availableActionsLoading && <p className="text-sm font-semibold text-gray-600">Loading available workflow actions...</p>}
+        {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
+        {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
+        {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="min-h-11 rounded-2xl bg-blue-950 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
+        {canComplete && <button type="button" onClick={() => runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`complete-${ticketId}`]} className="min-h-11 rounded-2xl bg-green-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`complete-${ticketId}`] ? "Completing..." : "Complete Ticket"}</button>}
+        {canCancel && <button type="button" onClick={() => runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`cancel-${ticketId}`]} className="min-h-11 rounded-2xl bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket"}</button>}
+        {hasLoadedAvailableActions && !hasVisibleWorkflowAction && (
+          <p className="text-sm text-gray-600">No workflow actions are currently available for this ticket.</p>
+        )}
+      </div>
+      {hasDynamicActions && (
+        <div className="mt-5 border-t border-slate-200 pt-4">
+          <h3 className="text-sm font-bold text-slate-700">Additional Workflow Actions</h3>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {dynamicActions.map((action) => (
+              <button
+                key={`${action.transitionId}-${action.actionKey}-${prominent ? "top" : "bottom"}`}
+                type="button"
+                data-transition-id={action.transitionId}
+                onClick={() => runDynamicWorkflowAction(action)}
+                disabled={processingKeys[`dynamic-${action.transitionId}`]}
+                className="min-h-11 rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 hover:bg-slate-50 disabled:opacity-60"
+              >
+                {processingKeys[`dynamic-${action.transitionId}`] ? "Processing..." : action.displayName}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
 
   return (
     <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
@@ -623,6 +673,8 @@ export default function TicketDetail() {
                 {statusMessage}
               </p>
             )}
+
+            {renderWorkflowActions(true)}
 
             <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold text-blue-950">Customer Details</h2>
@@ -845,44 +897,7 @@ export default function TicketDetail() {
               )}
             </section>}
 
-            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-bold text-blue-950">Actions</h2>
-              {availableActionsError && (
-                <p className="mt-4 rounded-xl bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
-                  {availableActionsError}
-                </p>
-              )}
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {availableActionsLoading && <p className="text-sm font-semibold text-gray-600">Loading available workflow actions...</p>}
-                {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
-                {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
-                {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="rounded-2xl bg-blue-950 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
-                {canComplete && <button type="button" onClick={() => runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`complete-${ticketId}`]} className="rounded-2xl bg-green-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`complete-${ticketId}`] ? "Completing..." : "Complete Ticket"}</button>}
-                {canCancel && <button type="button" onClick={() => runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`cancel-${ticketId}`]} className="rounded-2xl bg-red-500 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket"}</button>}
-                {hasLoadedAvailableActions && !hasVisibleWorkflowAction && (
-                  <p className="text-sm text-gray-600">No workflow actions are currently available for this ticket.</p>
-                )}
-              </div>
-              {hasDynamicActions && (
-                <div className="mt-5 border-t border-slate-200 pt-4">
-                  <h3 className="text-sm font-bold text-slate-700">Additional Workflow Actions</h3>
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {dynamicActions.map((action) => (
-                      <button
-                        key={`${action.transitionId}-${action.actionKey}`}
-                        type="button"
-                        data-transition-id={action.transitionId}
-                        onClick={() => runDynamicWorkflowAction(action)}
-                        disabled={processingKeys[`dynamic-${action.transitionId}`]}
-                        className="rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 hover:bg-slate-50 disabled:opacity-60"
-                      >
-                        {processingKeys[`dynamic-${action.transitionId}`] ? "Processing..." : action.displayName}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </section>
+            {renderWorkflowActions(false)}
           </div>
         )}
       </div>

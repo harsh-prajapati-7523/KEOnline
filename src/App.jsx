@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { Home } from "lucide-react";
+import { Home, LayoutDashboard, ListChecks, LogIn } from "lucide-react";
 import HomePage from "./pages/Home";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import EmployeeDashboard from "./pages/EmployeeDashboard";
@@ -15,11 +15,27 @@ import CreateTicket from "./pages/CreateTicket";
 import TicketList from "./pages/TicketList";
 import TicketDetail from "./pages/TicketDetail";
 import ProtectedRoute from "./components/ProtectedRoute";
+import { clearAccess } from "./utils/access";
 
 function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const active = location.pathname;
+  const isAuthenticated = Boolean(localStorage.getItem("token"));
+  const employeeName = localStorage.getItem("employeeName") ?? "";
+
+  const logout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("employeeName");
+    localStorage.removeItem("role");
+    localStorage.removeItem("employeeId");
+    clearAccess();
+    navigate("/employee-login", { replace: true });
+  };
+
+  const buttonClassName = (isActive) => `flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 font-semibold transition ${
+    isActive ? "bg-yellow-400 text-black" : "bg-white/10 hover:bg-white/20"
+  }`;
 
   return (
     <nav className="bg-blue-950 text-white shadow-lg">
@@ -38,23 +54,31 @@ function Navbar() {
           </div>
         </div>
         <div className="flex flex-wrap justify-center gap-3 w-full lg:w-auto">
-          <button
-            onClick={() => navigate("/")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${
-              active === "Home" ? "bg-yellow-400 text-black" : "bg-white/10 hover:bg-white/20"
-            }`}
-          >
-            <Home size={18} /> Home
-          </button>
-          <button onClick={() => navigate("/employee-login")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-semibold transition ${
-              active === "/employee-login"
-                ? "bg-yellow-400 text-black"
-                : "bg-white/10 hover:bg-white/20"
-            }`}
-          >
-            Employee Login
-          </button>
+          {isAuthenticated ? (
+            <>
+              <span className="flex min-h-11 items-center rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-blue-100">
+                {employeeName || "Employee"}
+              </span>
+              <button type="button" onClick={() => navigate("/employee-dashboard")} className={buttonClassName(active === "/employee-dashboard")}>
+                <LayoutDashboard size={18} aria-hidden="true" /> Dashboard
+              </button>
+              <button type="button" onClick={() => navigate("/tickets")} className={buttonClassName(active.startsWith("/tickets"))}>
+                <ListChecks size={18} aria-hidden="true" /> Tickets
+              </button>
+              <button type="button" onClick={logout} className="flex min-h-11 items-center justify-center rounded-xl bg-white/10 px-4 py-2 font-semibold transition hover:bg-white/20">
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={() => navigate("/")} className={buttonClassName(active === "/")}>
+                <Home size={18} aria-hidden="true" /> Home
+              </button>
+              <button type="button" onClick={() => navigate("/employee-login")} className={buttonClassName(active === "/employee-login")}>
+                <LogIn size={18} aria-hidden="true" /> Employee Login
+              </button>
+            </>
+          )}
         </div>
       </div>
     </nav>

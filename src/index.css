@@ -194,18 +194,47 @@ textarea {
 
 .ke-app-header {
   background: var(--ke-primary);
+  border-bottom: 1px solid rgba(255, 204, 0, 0.22);
+  box-shadow: 0 10px 28px rgba(16, 27, 77, 0.18);
+}
+
+.ke-app-header-inner {
+  padding-top: calc(0.5rem + env(safe-area-inset-top));
 }
 
 .ke-brand-logo {
   display: block;
-  height: 2rem;
-  max-width: 11rem;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.22));
+  height: 2.25rem;
+  max-width: 2.25rem;
   object-fit: contain;
   width: auto;
 }
 
+.ke-brand-title {
+  font-size: clamp(0.95rem, 4.1vw, 1.12rem);
+  letter-spacing: 0;
+}
+
+.ke-brand-subtitle {
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.15;
+  margin-top: 0.125rem;
+}
+
+.ke-bottom-nav {
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid var(--ke-border);
+  box-shadow: 0 -10px 26px rgba(16, 27, 77, 0.12);
+}
+
+.ke-bottom-nav-inner {
+  min-height: 4.25rem;
+}
+
 .ke-nav-active {
   background: var(--ke-accent);
+  box-shadow: 0 6px 16px rgba(255, 204, 0, 0.28);
   color: #000000;
 }
 
@@ -243,6 +272,35 @@ textarea {
   box-shadow: var(--ke-shadow);
 }
 
+.ke-ticket-toolbar {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid var(--ke-border);
+  border-radius: 0.875rem;
+  box-shadow: 0 8px 22px rgba(16, 27, 77, 0.08);
+}
+
+.ke-ticket-search-input {
+  border-color: var(--ke-border);
+  box-shadow: inset 0 1px 0 rgba(16, 27, 77, 0.03);
+}
+
+.ke-ticket-search-input:focus {
+  border-color: var(--ke-primary);
+  box-shadow: 0 0 0 3px rgba(16, 27, 77, 0.1);
+}
+
+.ke-ticket-card {
+  background: var(--ke-card);
+  border: 1px solid var(--ke-border);
+  border-radius: 0.875rem;
+  box-shadow: 0 8px 20px rgba(16, 27, 77, 0.08);
+}
+
+.ke-status-pill {
+  background: rgba(16, 27, 77, 0.08);
+  color: var(--ke-primary);
+}
+
 @media (min-width: 640px) {
   .ke-login-page {
     align-items: center;
@@ -267,6 +325,15 @@ textarea {
 
   .ke-page-title {
     font-size: 1.625rem;
+  }
+
+  .ke-brand-logo {
+    height: 2.75rem;
+    max-width: 2.75rem;
+  }
+
+  .ke-brand-title {
+    font-size: 1.125rem;
   }
 
   .ticket-detail-page {

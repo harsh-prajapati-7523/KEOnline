@@ -110,21 +110,22 @@ function Navbar() {
   }`;
 
   return (
-    <nav className="ke-app-header w-full overflow-hidden text-white shadow-lg">
-      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-2 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3 lg:flex-row">
+    <nav className="ke-app-header w-full overflow-hidden text-white">
+      <div className="ke-app-header-inner mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
         <div className="flex min-w-0 items-center gap-2 text-center sm:gap-3 lg:text-left">
-          <img src="/ke-logo-256w.png" alt="Kumar Electronics & Electricals" className="ke-brand-logo shrink-0 sm:h-11 md:h-12" />
+          <img src="/ke-logo-256w.png" alt="Kumar Electronics & Electricals" className="ke-brand-logo shrink-0" />
           <div className="min-w-0">
-            <h1 className="break-words text-[clamp(0.75rem,3.3vw,0.875rem)] font-extrabold leading-tight sm:text-base md:text-xl">
+            <h1 className="ke-brand-title break-words font-extrabold leading-tight">
               <span className="sm:hidden">Kumar Electronics</span>
               <span className="hidden sm:inline">Kumar Electronics &amp; Electricals</span>
             </h1>
-            <p className="hidden text-xs font-semibold text-yellow-400 sm:block md:text-sm">
-              Power Backup &amp; Solar Solutions
+            <p className="ke-brand-subtitle text-xs font-semibold">
+              <span className="sm:hidden">KE Ticket System</span>
+              <span className="hidden sm:inline">Service &amp; Repair</span>
             </p>
           </div>
         </div>
-        <div className={`${isAuthenticated ? "hidden sm:flex" : "flex"} w-full min-w-0 flex-wrap justify-center gap-2 sm:gap-3 lg:w-auto`}>
+        <div className={`${isAuthenticated ? "hidden sm:flex" : "flex"} ml-auto min-w-0 flex-wrap justify-end gap-2 sm:gap-3`}>
           {isAuthenticated ? (
             <>
               <span className="flex min-h-11 min-w-0 max-w-full items-center overflow-hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-blue-100">
@@ -180,8 +181,8 @@ function AuthenticatedBottomNav() {
   }`;
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-blue-100 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.12)] backdrop-blur sm:hidden" aria-label="Employee mobile navigation">
-      <div className="mx-auto flex max-w-md gap-1">
+    <nav className="ke-bottom-nav fixed inset-x-0 bottom-0 z-40 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur sm:hidden" aria-label="Employee mobile navigation">
+      <div className="ke-bottom-nav-inner mx-auto flex max-w-md gap-1">
         <button type="button" onClick={() => navigate("/employee-dashboard")} className={itemClassName(active === "/employee-dashboard")}>
           <LayoutDashboard size={17} aria-hidden="true" />
           Dashboard

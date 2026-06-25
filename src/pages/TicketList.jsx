@@ -121,26 +121,26 @@ function getMonthStartDate() {
 
 function TicketCard({ ticket, onViewDetails }) {
   return (
-    <article className="min-w-0 overflow-hidden rounded-xl border border-blue-100 bg-white p-3 shadow-sm sm:p-4">
+    <article className="ke-ticket-card min-w-0 overflow-hidden p-3.5 sm:p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
-        <h2 className="min-w-0 overflow-wrap-anywhere text-lg font-extrabold leading-tight text-blue-950">{ticket.ticketNumber ?? "Not available"}</h2>
-        <span className="max-w-[45%] shrink-0 overflow-wrap-anywhere rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold leading-tight text-blue-950">
+        <h2 className="min-w-0 overflow-wrap-anywhere text-[1.05rem] font-extrabold leading-tight text-blue-950 sm:text-lg">{ticket.ticketNumber ?? "Not available"}</h2>
+        <span className="ke-status-pill max-w-[45%] shrink-0 overflow-wrap-anywhere rounded-full px-2.5 py-1 text-xs font-bold leading-tight">
           {getTicketStatusLabel(ticket)}
         </span>
       </div>
 
-      <p className="mt-2 overflow-wrap-anywhere text-sm font-semibold leading-snug text-gray-800">{ticket.customerName ?? "Not available"}</p>
-      <div className="mt-2 flex min-w-0 items-center justify-between gap-3 text-sm text-gray-700">
+      <p className="mt-2.5 overflow-wrap-anywhere text-sm font-semibold leading-snug text-gray-800">{ticket.customerName ?? "Not available"}</p>
+      <div className="mt-2.5 flex min-w-0 items-center justify-between gap-3 text-sm text-gray-700">
         <span className="flex min-w-0 items-center gap-1.5 overflow-wrap-anywhere">
           <Phone className="shrink-0" size={14} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
         </span>
-        <span className="shrink-0 font-bold text-blue-950">{formatCurrency(ticket.totalCharge ?? 0)}</span>
+        <span className="shrink-0 text-base font-extrabold text-blue-950">{formatCurrency(ticket.totalCharge ?? 0)}</span>
       </div>
 
       <button
         type="button"
         onClick={() => onViewDetails(ticket.id)}
-        className="mt-3 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-900 sm:w-auto"
+        className="ke-primary-action mt-3.5 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold sm:w-auto"
       >
         <Eye size={16} aria-hidden="true" /> View Details
       </button>
@@ -378,17 +378,20 @@ export default function TicketList() {
   };
 
   return (
-    <main className="ke-page-main bg-gray-50 lg:px-8">
+    <main className="ke-page-main lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
-        <div className="mb-3 flex min-w-0 items-center gap-2 sm:mb-4">
+        <div className="mb-3 flex min-w-0 items-center gap-2 sm:mb-5">
           <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2">
             <ArrowLeft size={18} aria-hidden="true" />
             <span className="sr-only sm:not-sr-only">Dashboard</span>
           </button>
-          <h1 className="min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Tickets</h1>
+          <div className="min-w-0 flex-1">
+            <h1 className="break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Tickets</h1>
+            <p className="mt-0.5 text-xs font-semibold text-gray-500 sm:text-sm">Search, filter, and open service tickets.</p>
+          </div>
         </div>
 
-        {(canUseSearch || canUseFilters) && <section className="min-w-0 rounded-xl border border-blue-100 bg-white p-2.5 shadow-sm sm:rounded-2xl sm:p-4">
+        {(canUseSearch || canUseFilters) && <section className="ke-ticket-toolbar min-w-0 p-2.5 sm:p-4">
           <div className="flex items-center gap-2">
             {canUseSearch && (
               <>
@@ -399,7 +402,7 @@ export default function TicketList() {
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
                   placeholder="Search tickets"
-                  className="min-h-11 min-w-0 flex-1 rounded-xl border border-gray-300 px-3.5 py-2.5 text-base text-gray-900 outline-none focus:border-blue-950 focus:ring-2 focus:ring-blue-100 sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
+                  className="ke-ticket-search-input min-h-11 min-w-0 flex-1 rounded-xl border px-3.5 py-2.5 text-base text-gray-900 outline-none sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
                 />
               </>
             )}
@@ -407,7 +410,7 @@ export default function TicketList() {
               <button
                 type="button"
                 onClick={() => setSearchText("")}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 text-blue-950 hover:bg-blue-50 sm:h-12 sm:w-12"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-white text-blue-950 hover:bg-blue-50 sm:h-12 sm:w-12"
                 aria-label="Clear search"
               >
                 <X size={17} aria-hidden="true" />
@@ -418,7 +421,7 @@ export default function TicketList() {
                 type="button"
                 onClick={toggleFilters}
                 aria-expanded={showFilters}
-                className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-blue-950 px-3 text-sm font-bold text-blue-950 hover:bg-blue-50 sm:h-12 sm:px-4"
+                className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-blue-950 bg-white px-3 text-sm font-bold text-blue-950 hover:bg-blue-50 sm:h-12 sm:px-4"
                 aria-label={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ""}`}
               >
                 <Filter size={16} aria-hidden="true" />
@@ -517,7 +520,7 @@ export default function TicketList() {
           )}
         </section>}
 
-        <section className="mt-3 grid min-w-0 grid-cols-1 gap-3 sm:mt-5 sm:gap-4 lg:grid-cols-2" aria-live="polite">
+        <section className="mt-3.5 grid min-w-0 grid-cols-1 gap-3 sm:mt-5 sm:gap-4 lg:grid-cols-2" aria-live="polite">
           {isLoading && <p className="text-sm font-semibold text-gray-600">{loadingMessage}</p>}
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
           {!isLoading && !error && tickets.length === 0 && <p className="text-sm font-semibold text-gray-600">{emptyMessage}</p>}

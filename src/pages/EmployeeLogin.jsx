@@ -58,13 +58,13 @@ export default function EmployeeLogin() {
   };
 
   return (
-    <div className="ke-login-page">
+    <main id="main-content" className="ke-login-page">
       
       <div className="ke-login-card">
 
-        <div className="flex flex-col items-center">
+        <header className="flex flex-col items-center">
           
-          <img src="/ke-logo-256w.png" alt="Kumar Electronics & Electricals" className="ke-login-logo" />
+          <img src="/ke-logo-256w.png" alt="" aria-hidden="true" className="ke-login-logo" />
 
           <p className="ke-login-brand">
             Kumar Electronics
@@ -78,11 +78,11 @@ export default function EmployeeLogin() {
             Secure Staff Access
           </p>
 
-        </div>
+        </header>
 
         <form onSubmit={handleLogin} className="ke-login-form">
 
-          <label className="ke-login-label">
+          <label htmlFor="employee-id" className="ke-login-label">
             Employee ID
           </label>
 
@@ -91,6 +91,7 @@ export default function EmployeeLogin() {
             <User className="text-blue-950 mr-3" size={22} />
 
             <input
+              id="employee-id"
               type="text"
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value)}
@@ -102,7 +103,7 @@ export default function EmployeeLogin() {
 
           </div>
 
-          <label className="ke-login-label">
+          <label htmlFor="employee-password" className="ke-login-label">
             Password
           </label>
 
@@ -111,6 +112,7 @@ export default function EmployeeLogin() {
             <Lock className="text-blue-950 mr-3" size={22} />
 
             <input
+              id="employee-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -141,6 +143,6 @@ export default function EmployeeLogin() {
         </form>
 
       </div>
-    </div>
+    </main>
   );
 }

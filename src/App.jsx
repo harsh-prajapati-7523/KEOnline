@@ -369,6 +369,9 @@ function AppRoutes() {
 function App() {
   return (
     <BrowserRouter>
+      <a href="#main-content" className="ke-skip-link">
+        Skip to main content
+      </a>
       <Navbar />
       <AppRoutes />
       <InstallAppPrompt />

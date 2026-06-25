@@ -50,6 +50,30 @@ textarea {
   font-size: 16px;
 }
 
+.ke-skip-link {
+  background: var(--ke-accent);
+  border-radius: 0 0 0.75rem 0;
+  color: #000000;
+  font-weight: 800;
+  left: 0;
+  padding: 0.75rem 1rem;
+  position: fixed;
+  top: 0;
+  transform: translateY(-120%);
+  transition: transform 150ms ease;
+  z-index: 1000;
+}
+
+.ke-skip-link:focus,
+.ke-skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+:where(a, button, input, select, textarea, [role="button"]):focus-visible {
+  outline: 3px solid var(--ke-accent);
+  outline-offset: 3px;
+}
+
 .overflow-wrap-anywhere {
   overflow-wrap: anywhere;
 }
@@ -122,7 +146,7 @@ textarea {
 }
 
 .ke-login-label {
-  color: #344054;
+  color: #1f2937;
   display: block;
   font-size: 0.9375rem;
   font-weight: 600;
@@ -150,6 +174,11 @@ textarea {
   width: 100%;
 }
 
+.ke-login-input::placeholder {
+  color: #667085;
+  opacity: 1;
+}
+
 .ke-login-button {
   align-items: center;
   background: var(--ke-accent);
@@ -173,7 +202,7 @@ textarea {
 
 .ke-login-button:disabled {
   cursor: wait;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
 .ke-page-main {

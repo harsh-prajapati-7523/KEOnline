@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { ArrowLeft, Calendar, ChevronDown, ChevronRight, Eye, MapPin, Phone, PhoneCall, Plus } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import SuggestionInput from "../components/SuggestionInput";
 import { hasAccess } from "../utils/access";
+
+const SuggestionInput = lazy(() => import("../components/SuggestionInput"));
 
 function formatDate(value) {
   if (!value) return "Not available";
@@ -70,6 +71,34 @@ function hasOwnerChange(historyItem) {
 
 const workflowActionKeys = ["PICK_TICKET", "START_WORK", "COMPLETE_TICKET", "CANCEL_TICKET"];
 
+function scheduleSecondaryWork(callback) {
+  let idleId;
+  let timeoutId;
+  let frameId;
+  let cancelled = false;
+
+  const run = () => {
+    if (cancelled) return;
+    callback();
+  };
+
+  frameId = window.requestAnimationFrame(() => {
+    if ("requestIdleCallback" in window) {
+      idleId = window.requestIdleCallback(run, { timeout: 1200 });
+      return;
+    }
+
+    timeoutId = window.setTimeout(run, 350);
+  });
+
+  return () => {
+    cancelled = true;
+    window.cancelAnimationFrame(frameId);
+    if (idleId) window.cancelIdleCallback?.(idleId);
+    if (timeoutId) window.clearTimeout(timeoutId);
+  };
+}
+
 function normalizeDynamicActions(data) {
   return Array.isArray(data?.dynamicActions)
     ? data.dynamicActions
@@ -126,6 +155,40 @@ function InfoItem({ label, children, className = "" }) {
   );
 }
 
+function TicketDetailSkeleton() {
+  return (
+    <div className="mt-4 min-w-0 space-y-4" aria-hidden="true">
+      <section className="min-h-36 rounded-2xl bg-blue-950 p-4 shadow-lg sm:rounded-3xl sm:p-7">
+        <div className="flex items-start justify-between gap-3">
+          <div className="h-8 w-40 rounded-full bg-white/20" />
+          <div className="h-6 w-24 rounded-full bg-white/15" />
+        </div>
+        <div className="mt-5 h-4 w-32 rounded-full bg-white/15" />
+        <div className="mt-3 h-5 w-48 rounded-full bg-white/20" />
+      </section>
+      <section className="min-h-28 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="h-6 w-40 rounded-full bg-blue-100" />
+        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="h-12 rounded-xl bg-gray-100" />
+          <div className="h-12 rounded-xl bg-gray-100" />
+        </div>
+      </section>
+      <section className="min-h-48 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="h-6 w-44 rounded-full bg-blue-100" />
+        <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="h-10 rounded-xl bg-gray-100" />
+          <div className="h-10 rounded-xl bg-gray-100" />
+          <div className="h-10 rounded-xl bg-gray-100 sm:col-span-2" />
+        </div>
+      </section>
+      <section className="min-h-20 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+        <div className="h-6 w-48 rounded-full bg-blue-100" />
+        <div className="mt-3 h-4 w-56 rounded-full bg-gray-100" />
+      </section>
+    </div>
+  );
+}
+
 export default function TicketDetail() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -159,6 +222,7 @@ export default function TicketDetail() {
   const [workflowHistory, setWorkflowHistory] = useState([]);
   const [workflowHistoryPage, setWorkflowHistoryPage] = useState(0);
   const [workflowHistoryLast, setWorkflowHistoryLast] = useState(true);
+  const [hasLoadedWorkflowHistory, setHasLoadedWorkflowHistory] = useState(false);
   const [workflowHistoryLoading, setWorkflowHistoryLoading] = useState(false);
   const [workflowHistoryLoadingMore, setWorkflowHistoryLoadingMore] = useState(false);
   const [workflowHistoryError, setWorkflowHistoryError] = useState("");
@@ -167,12 +231,16 @@ export default function TicketDetail() {
   const [expandedWorkflowHistoryId, setExpandedWorkflowHistoryId] = useState(null);
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
   const [pendingDeleteChargeId, setPendingDeleteChargeId] = useState(null);
+  const availableActionsTicketIdRef = useRef(ticketId);
   const customerHistoryTicketIdRef = useRef(ticketId);
+  const dynamicValuesTicketIdRef = useRef(ticketId);
+  const ticketDetailTicketIdRef = useRef(ticketId);
   const workflowHistoryTicketIdRef = useRef(ticketId);
   const currentRole = localStorage.getItem("role") ?? "";
   const currentEmployeeId = localStorage.getItem("employeeId") ?? "";
 
   const loadTicket = async () => {
+    const requestedTicketId = ticketId;
     setIsLoading(true);
     setError("");
     try {
@@ -185,6 +253,7 @@ export default function TicketDetail() {
       if (!response.ok) throw new Error("Ticket details failed");
 
       const data = await response.json();
+      if (String(ticketDetailTicketIdRef.current) !== String(requestedTicketId)) return;
       if (!data || String(data.id) !== String(ticketId)) {
         setTicket(null);
         setError("Ticket not found.");
@@ -193,10 +262,13 @@ export default function TicketDetail() {
 
       setTicket(data);
     } catch {
+      if (String(ticketDetailTicketIdRef.current) !== String(requestedTicketId)) return;
       setTicket(null);
       setError("Unable to load ticket details. Please try again.");
     } finally {
-      setIsLoading(false);
+      if (String(ticketDetailTicketIdRef.current) === String(requestedTicketId)) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -229,6 +301,7 @@ export default function TicketDetail() {
   const loadAvailableActions = async () => {
     if (!ticketId) return;
 
+    const requestedTicketId = ticketId;
     setAvailableActionsLoading(true);
     setAvailableActionsError("");
     try {
@@ -241,12 +314,16 @@ export default function TicketDetail() {
       if (!response.ok) throw new Error("Unable to load available actions");
 
       const data = await response.json();
+      if (String(availableActionsTicketIdRef.current) !== String(requestedTicketId)) return;
       setAvailableActions(normalizeAvailableActions(data));
     } catch {
+      if (String(availableActionsTicketIdRef.current) !== String(requestedTicketId)) return;
       setAvailableActions(null);
       setAvailableActionsError("Unable to load available workflow actions. Please refresh the ticket.");
     } finally {
-      setAvailableActionsLoading(false);
+      if (String(availableActionsTicketIdRef.current) === String(requestedTicketId)) {
+        setAvailableActionsLoading(false);
+      }
     }
   };
 
@@ -277,6 +354,7 @@ export default function TicketDetail() {
       setWorkflowHistory((current) => replace ? rows : [...current, ...rows]);
       setWorkflowHistoryPage(Number.isInteger(data.page) ? data.page : page);
       setWorkflowHistoryLast(data.last !== false);
+      setHasLoadedWorkflowHistory(true);
     } catch {
       if (String(workflowHistoryTicketIdRef.current) !== String(requestedTicketId)) return;
       if (replace) {
@@ -285,6 +363,7 @@ export default function TicketDetail() {
         setWorkflowHistoryLast(true);
       }
       setWorkflowHistoryError("Unable to load workflow history.");
+      setHasLoadedWorkflowHistory(true);
     } finally {
       if (String(workflowHistoryTicketIdRef.current) === String(requestedTicketId)) {
         setWorkflowHistoryLoading(false);
@@ -294,10 +373,14 @@ export default function TicketDetail() {
   };
 
   useEffect(() => {
+    availableActionsTicketIdRef.current = ticketId;
+    dynamicValuesTicketIdRef.current = ticketId;
+    ticketDetailTicketIdRef.current = ticketId;
     workflowHistoryTicketIdRef.current = ticketId;
     setWorkflowHistory([]);
     setWorkflowHistoryPage(0);
     setWorkflowHistoryLast(true);
+    setHasLoadedWorkflowHistory(false);
     setWorkflowHistoryLoading(false);
     setWorkflowHistoryLoadingMore(false);
     setWorkflowHistoryError("");
@@ -306,9 +389,13 @@ export default function TicketDetail() {
     setExpandedWorkflowHistoryId(null);
     setShowCancelConfirmation(false);
     setPendingDeleteChargeId(null);
+    setAvailableActions(null);
+    setAvailableActionsLoading(false);
+    setAvailableActionsError("");
+    setDynamicValues([]);
+    setDynamicValuesLoading(false);
+    setDynamicValuesError("");
     loadTicket();
-    loadAvailableActions();
-    loadWorkflowHistory(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
 
@@ -332,45 +419,46 @@ export default function TicketDetail() {
     setHasLoadedCustomerHistory(false);
   }, [ticketId]);
 
-  useEffect(() => {
-    let isCurrent = true;
+  const loadDynamicValues = async () => {
+    if (!ticketId) return;
 
-    async function loadDynamicValues() {
+    const requestedTicketId = ticketId;
+    setDynamicValues([]);
+    setDynamicValuesError("");
+    setDynamicValuesLoading(true);
+
+    try {
+      const response = await fetch(`/volt/tickets/${ticketId}/dynamic-values`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Unable to load dynamic values");
+
+      const data = await response.json();
+      if (String(dynamicValuesTicketIdRef.current) !== String(requestedTicketId)) return;
+      setDynamicValues(Array.isArray(data.dynamicValues) ? data.dynamicValues : []);
+    } catch {
+      if (String(dynamicValuesTicketIdRef.current) !== String(requestedTicketId)) return;
       setDynamicValues([]);
-      setDynamicValuesError("");
-      setDynamicValuesLoading(true);
-
-      try {
-        const response = await fetch(`/volt/tickets/${ticketId}/dynamic-values`, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        });
-
-        if (!response.ok) throw new Error("Unable to load dynamic values");
-
-        const data = await response.json();
-        if (!isCurrent) return;
-        setDynamicValues(Array.isArray(data.dynamicValues) ? data.dynamicValues : []);
-      } catch {
-        if (!isCurrent) return;
-        setDynamicValues([]);
-        setDynamicValuesError("Unable to load additional details.");
-      } finally {
-        if (isCurrent) {
-          setDynamicValuesLoading(false);
-        }
+      setDynamicValuesError("Unable to load additional details.");
+    } finally {
+      if (String(dynamicValuesTicketIdRef.current) === String(requestedTicketId)) {
+        setDynamicValuesLoading(false);
       }
     }
+  };
 
-    if (ticketId) {
+  useEffect(() => {
+    if (!ticket?.id || String(ticket.id) !== String(ticketId)) return undefined;
+
+    return scheduleSecondaryWork(() => {
+      loadAvailableActions();
       loadDynamicValues();
-    }
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [ticketId]);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ticket?.id, ticketId]);
 
   const loadCustomerHistory = async () => {
     const requestedTicketId = ticketId;
@@ -414,6 +502,14 @@ export default function TicketDetail() {
     setShowCustomerHistory(true);
     if (!hasLoadedCustomerHistory) {
       await loadCustomerHistory();
+    }
+  };
+
+  const toggleWorkflowHistory = () => {
+    const nextShowWorkflowHistory = !showWorkflowHistory;
+    setShowWorkflowHistory(nextShowWorkflowHistory);
+    if (nextShowWorkflowHistory && !hasLoadedWorkflowHistory && !workflowHistoryLoading) {
+      loadWorkflowHistory(0, true);
     }
   };
 
@@ -674,7 +770,7 @@ export default function TicketDetail() {
         </p>
       )}
       <div className={`mt-4 flex flex-col gap-2 ${prominent ? "sm:gap-3" : ""}`}>
-        {availableActionsLoading && <p className="text-sm font-semibold text-gray-600">Loading available workflow actions...</p>}
+        {(availableActionsLoading || (!availableActions && !availableActionsError)) && <p className="text-sm font-semibold text-gray-600">Loading available workflow actions...</p>}
         {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="ke-primary-action min-h-12 rounded-2xl px-4 py-3 font-bold disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
         {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className={`${canStartWork ? "min-h-11 border border-blue-950 bg-white text-blue-950" : "ke-accent-action min-h-12"} rounded-2xl px-4 py-2 font-semibold disabled:opacity-60`}>{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
         {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl border border-blue-950 bg-white px-4 py-2 font-semibold text-blue-950 disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take Ownership"}</button>}
@@ -719,7 +815,7 @@ export default function TicketDetail() {
           <ArrowLeft size={18} aria-hidden="true" /> Back to Tickets
         </button>
 
-        {isLoading && <p className="mt-6 text-sm font-semibold text-gray-600">Loading ticket details...</p>}
+        {isLoading && <TicketDetailSkeleton />}
         {error && <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
 
         {!isLoading && !error && ticket && (
@@ -832,7 +928,7 @@ export default function TicketDetail() {
             </section>
 
             <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <button type="button" onClick={() => setShowWorkflowHistory((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
+              <button type="button" onClick={toggleWorkflowHistory} className="flex w-full items-center justify-between gap-3 text-left">
                 <span>
                   <span className="block text-lg font-bold text-blue-950">Workflow History</span>
                   <span className="mt-1 block text-sm font-semibold text-gray-600">
@@ -945,7 +1041,9 @@ export default function TicketDetail() {
                             <div className="mt-3 grid gap-3 sm:grid-cols-2">
                               <label className="block text-sm font-semibold text-slate-700">
                                 Description
-                                <SuggestionInput endpoint="/volt/suggestions/charge-descriptions" name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
+                                <Suspense fallback={<input name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" autoComplete="off" />}>
+                                  <SuggestionInput endpoint="/volt/suggestions/charge-descriptions" name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
+                                </Suspense>
                                 {chargeFormErrors.description && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.description}</span>}
                               </label>
                               <label className="block text-sm font-semibold text-slate-700">

@@ -5,6 +5,12 @@ import { hasAccess } from "../utils/access";
 
 const TicketFilterPanel = lazy(() => import("../components/TicketFilterPanel"));
 
+let ticketDetailImportPromise;
+function preloadTicketDetail() {
+  ticketDetailImportPromise ??= import("./TicketDetail");
+  return ticketDetailImportPromise;
+}
+
 const emptyFilters = {
   status: "",
   category: "",
@@ -164,7 +170,7 @@ function getMonthStartDate() {
   return formatLocalDate(date);
 }
 
-const TicketCard = memo(function TicketCard({ ticket, onViewDetails }) {
+const TicketCard = memo(function TicketCard({ ticket, onPreloadDetails, onViewDetails }) {
   const productType = formatOptionalLabel(ticket.productType);
   const complaintPreview = ticket.complaintDescription?.trim() ?? "";
   const villageOrArea = ticket.villageOrArea?.trim() ?? "";
@@ -205,6 +211,8 @@ const TicketCard = memo(function TicketCard({ ticket, onViewDetails }) {
 
       <button
         type="button"
+        onFocus={onPreloadDetails}
+        onPointerEnter={onPreloadDetails}
         onClick={() => onViewDetails(ticket.id)}
         className="ke-primary-action mt-3.5 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold sm:w-auto"
       >
@@ -509,6 +517,10 @@ export default function TicketList() {
     navigate(`/tickets/${ticketId}${locationSearchRef.current}`);
   }, [navigate]);
 
+  const handlePreloadTicketDetail = useCallback(() => {
+    void preloadTicketDetail();
+  }, []);
+
   return (
     <main className="ke-page-main lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
@@ -627,6 +639,7 @@ export default function TicketList() {
             <TicketCard
               key={ticket.id ?? ticket.ticketNumber}
               ticket={ticket}
+              onPreloadDetails={handlePreloadTicketDetail}
               onViewDetails={handleViewDetails}
             />
           ))}

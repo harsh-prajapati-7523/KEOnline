@@ -16,7 +16,6 @@ const TicketCategoryFieldManagement = lazy(() => import("./pages/TicketCategoryF
 const TicketFieldManagement = lazy(() => import("./pages/TicketFieldManagement"));
 const DropdownSourceManagement = lazy(() => import("./pages/DropdownSourceManagement"));
 const CreateTicket = lazy(() => import("./pages/CreateTicket"));
-const TicketDetail = lazy(() => import("./pages/TicketDetail"));
 
 let ticketListImportPromise;
 function loadTicketList() {
@@ -30,8 +29,24 @@ function preloadTicketList() {
 
 const TicketList = lazy(loadTicketList);
 
+let ticketDetailImportPromise;
+function loadTicketDetail() {
+  ticketDetailImportPromise ??= import("./pages/TicketDetail");
+  return ticketDetailImportPromise;
+}
+
+function preloadTicketDetail() {
+  void loadTicketDetail();
+}
+
+const TicketDetail = lazy(loadTicketDetail);
+
 if (window.location.pathname === "/tickets") {
   preloadTicketList();
+}
+
+if (/^\/tickets\/[^/]+/.test(window.location.pathname)) {
+  preloadTicketDetail();
 }
 
 function isStandaloneDisplay() {
@@ -246,6 +261,16 @@ function AppRoutes() {
 
     const preload = () => preloadTicketList();
     const timeoutId = window.setTimeout(preload, 1200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isAuthenticated, location.pathname]);
+
+  useEffect(() => {
+    if (!isAuthenticated || location.pathname !== "/tickets" || !hasAnyAccess(["VIEW_TICKETS"])) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(preloadTicketDetail, 1200);
 
     return () => window.clearTimeout(timeoutId);
   }, [isAuthenticated, location.pathname]);

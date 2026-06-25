@@ -180,13 +180,12 @@ function Navbar() {
             />
           </span>
           <div className="min-w-0">
-            <h1 className="ke-brand-title break-words font-extrabold leading-tight">
+            <p className="ke-brand-title break-words font-extrabold leading-tight">
               <span className="sm:hidden">Kumar Electronics</span>
               <span className="hidden sm:inline">Kumar Electronics &amp; Electricals</span>
-            </h1>
+            </p>
             <p className="ke-brand-subtitle text-xs font-semibold">
-              <span className="sm:hidden">KE Ticket System</span>
-              <span className="hidden sm:inline">Service &amp; Repair</span>
+              <span>Service Ticket Management</span>
             </p>
           </div>
         </div>
@@ -196,13 +195,13 @@ function Navbar() {
               <span className="flex min-h-11 min-w-0 max-w-full items-center overflow-hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-blue-100">
                 {employeeName || "Employee"}
               </span>
-              <button type="button" onClick={() => navigate("/employee-dashboard")} className={buttonClassName(active === "/employee-dashboard")}>
+              <button type="button" onClick={() => navigate("/employee-dashboard")} className={buttonClassName(active === "/employee-dashboard")} aria-label="Dashboard">
                 <LayoutDashboard size={18} aria-hidden="true" /> Dashboard
               </button>
-              <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets")} className={buttonClassName(active.startsWith("/tickets"))}>
+              <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets")} className={buttonClassName(active.startsWith("/tickets"))} aria-label="View Tickets">
                 <ListChecks size={18} aria-hidden="true" /> Tickets
               </button>
-              <button type="button" onClick={logout} className="flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold transition hover:bg-white/20 sm:px-4 sm:text-base">
+              <button type="button" onClick={logout} className="flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold transition hover:bg-white/20 sm:px-4 sm:text-base" aria-label="Logout">
                 Logout
               </button>
             </>
@@ -249,23 +248,23 @@ function AuthenticatedBottomNav() {
   return (
     <nav className="ke-bottom-nav fixed inset-x-0 bottom-0 z-40 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur sm:hidden" aria-label="Employee mobile navigation">
       <div className="ke-bottom-nav-inner mx-auto flex max-w-md gap-1">
-        <button type="button" onClick={() => navigate("/employee-dashboard")} className={itemClassName(active === "/employee-dashboard")}>
+        <button type="button" onClick={() => navigate("/employee-dashboard")} className={itemClassName(active === "/employee-dashboard")} aria-label="Dashboard">
           <LayoutDashboard size={17} aria-hidden="true" />
           Dashboard
         </button>
         {canCreateTicket && (
-          <button type="button" onClick={() => navigate("/tickets/new")} className={itemClassName(active === "/tickets/new")}>
+          <button type="button" onClick={() => navigate("/tickets/new")} className={itemClassName(active === "/tickets/new")} aria-label="Create Ticket">
             <PlusCircle size={17} aria-hidden="true" />
             Create
           </button>
         )}
         {canViewTickets && (
-          <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets")} className={itemClassName(active.startsWith("/tickets") && active !== "/tickets/new")}>
+          <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets")} className={itemClassName(active.startsWith("/tickets") && active !== "/tickets/new")} aria-label="View Tickets">
             <ListChecks size={17} aria-hidden="true" />
             Tickets
           </button>
         )}
-        <button type="button" onClick={logout} className={itemClassName(false)}>
+        <button type="button" onClick={logout} className={itemClassName(false)} aria-label="Logout">
           <LogOut size={17} aria-hidden="true" />
           Logout
         </button>

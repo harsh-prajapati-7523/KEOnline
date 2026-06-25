@@ -5,7 +5,6 @@ import {
   GitBranch,
   ListPlus,
   ListChecks,
-  LogOut,
   PlusCircle,
   Settings2,
   ShieldCheck,
@@ -16,20 +15,26 @@ import { useNavigate } from "react-router-dom";
 import { clearAccess, fetchCurrentAccess, hasAnyAccess } from "../utils/access";
 
 function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
+  const [isOpening, setIsOpening] = useState(false);
   const iconClassName = tone === "yellow"
     ? "rounded-xl bg-yellow-100 p-2 text-yellow-800"
     : "rounded-xl bg-blue-50 p-2 text-blue-950";
+  const label = isOpening ? "Opening..." : children;
 
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        setIsOpening(true);
+        onClick();
+      }}
+      aria-label={typeof children === "string" ? children : undefined}
       className="flex min-h-16 w-full min-w-0 items-center gap-3 rounded-2xl border border-blue-100 bg-white p-3.5 text-left shadow-sm transition hover:border-blue-300 hover:shadow-md sm:min-h-[4.5rem] sm:p-4"
     >
       <div className={`${iconClassName} shrink-0`}>
         <Icon size={20} aria-hidden="true" />
       </div>
-      <span className="min-w-0 break-words font-semibold text-blue-950">{children}</span>
+      <span className="min-w-0 break-words font-semibold text-blue-950">{label}</span>
     </button>
   );
 }
@@ -78,17 +83,8 @@ export default function EmployeeDashboard() {
     };
   }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("employeeName");
-    localStorage.removeItem("role");
-    localStorage.removeItem("employeeId");
-    clearAccess();
-    navigate("/employee-login", { replace: true });
-  };
-
   return (
-    <main className="ke-page-main bg-gray-50 lg:px-8">
+    <main id="main-content" className="ke-page-main bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
         <header className="ke-page-header bg-blue-950 text-white shadow-lg">
           <p className="break-words text-xs font-semibold uppercase text-yellow-400 sm:text-sm">
@@ -106,9 +102,6 @@ export default function EmployeeDashboard() {
           <h2 id="ticket-actions" className="text-lg font-extrabold text-blue-950 sm:text-xl">
             Available Work Areas
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Open the tools available for your role.
-          </p>
 
           {hasPrimaryActions && (
             <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -187,17 +180,6 @@ export default function EmployeeDashboard() {
               {accessMessage}
             </p>
           )}
-        </section>
-
-        <section className="mt-6 border-t border-gray-200 pt-4 sm:mt-8 sm:pt-5">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-blue-950 px-5 py-3 font-bold text-white transition hover:bg-blue-900 sm:w-auto"
-          >
-            <LogOut size={20} aria-hidden="true" />
-            Logout
-          </button>
         </section>
       </div>
     </main>

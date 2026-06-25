@@ -10,6 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: null,
       includeAssets: [
         'ke-icon-16.png',
         'ke-icon-32.png',

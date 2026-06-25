@@ -21,7 +21,8 @@ const fallbackStatusFilterOptions = [
   { statusKey: "CANCELLED", displayName: "Cancelled" },
 ];
 
-const TICKET_PAGE_SIZE = 100;
+const TICKET_PAGE_SIZE = 30;
+const loadingCardPlaceholders = [0, 1, 2];
 
 function filtersFromSearchParams(searchParams) {
   return {
@@ -213,6 +214,25 @@ const TicketCard = memo(function TicketCard({ ticket, onViewDetails }) {
   );
 });
 
+function TicketCardSkeleton() {
+  return (
+    <article className="ke-ticket-card min-w-0 overflow-hidden p-3.5 sm:p-4" aria-hidden="true">
+      <div className="flex items-start justify-between gap-3">
+        <div className="h-5 w-32 rounded-full bg-blue-100" />
+        <div className="h-6 w-20 rounded-full bg-blue-50" />
+      </div>
+      <div className="mt-3 h-4 w-40 rounded-full bg-gray-100" />
+      <div className="mt-2 h-4 w-full rounded-full bg-gray-100" />
+      <div className="mt-2 h-4 w-3/4 rounded-full bg-gray-100" />
+      <div className="mt-4 flex items-center justify-between gap-3 border-t border-blue-50 pt-3">
+        <div className="h-3.5 w-28 rounded-full bg-gray-100" />
+        <div className="h-5 w-20 rounded-full bg-blue-100" />
+      </div>
+      <div className="mt-4 h-10 w-full rounded-xl bg-blue-100 sm:w-36" />
+    </article>
+  );
+}
+
 export default function TicketList() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -229,10 +249,12 @@ export default function TicketList() {
   const [draftFilters, setDraftFilters] = useState(() => filtersFromSearchParams(searchParams));
   const [showFilters, setShowFilters] = useState(false);
   const [statusFilterOptions, setStatusFilterOptions] = useState(fallbackStatusFilterOptions);
-  const [isLoadingStatusOptions, setIsLoadingStatusOptions] = useState(true);
+  const [hasLoadedStatusOptions, setHasLoadedStatusOptions] = useState(false);
+  const [isLoadingStatusOptions, setIsLoadingStatusOptions] = useState(false);
   const [statusOptionsError, setStatusOptionsError] = useState("");
   const [categories, setCategories] = useState([]);
-  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [hasLoadedCategories, setHasLoadedCategories] = useState(false);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(false);
   const [categoryError, setCategoryError] = useState("");
   const canUseSearch = hasAccess("USE_TICKET_SEARCH");
   const canUseFilters = hasAccess("USE_TICKET_FILTERS");
@@ -272,9 +294,12 @@ export default function TicketList() {
   );
 
   const loadStatusFilterOptions = useCallback(async () => {
+    if (hasLoadedStatusOptions || isLoadingStatusOptions) return;
+
     if (!canUseFilters) {
       setStatusFilterOptions(fallbackStatusFilterOptions);
       setStatusOptionsError("");
+      setHasLoadedStatusOptions(true);
       setIsLoadingStatusOptions(false);
       return;
     }
@@ -298,14 +323,18 @@ export default function TicketList() {
       setStatusFilterOptions(fallbackStatusFilterOptions);
       setStatusOptionsError("Unable to load status filter options. Showing default statuses.");
     } finally {
+      setHasLoadedStatusOptions(true);
       setIsLoadingStatusOptions(false);
     }
-  }, [canUseFilters]);
+  }, [canUseFilters, hasLoadedStatusOptions, isLoadingStatusOptions]);
 
   const loadCategories = useCallback(async () => {
+    if (hasLoadedCategories || isLoadingCategories) return;
+
     if (!canUseFilters) {
       setCategories([]);
       setCategoryError("");
+      setHasLoadedCategories(true);
       setIsLoadingCategories(false);
       return;
     }
@@ -328,9 +357,10 @@ export default function TicketList() {
       setCategories([]);
       setCategoryError("Unable to load categories.");
     } finally {
+      setHasLoadedCategories(true);
       setIsLoadingCategories(false);
     }
-  }, [canUseFilters]);
+  }, [canUseFilters, hasLoadedCategories, isLoadingCategories]);
 
   useEffect(() => {
     if (syncedSearchParams.toString() !== searchParams.toString()) {
@@ -346,11 +376,6 @@ export default function TicketList() {
     setCurrentPage(0);
     setHasMoreTickets(false);
   }, [requestKey]);
-
-  useEffect(() => {
-    loadStatusFilterOptions();
-    loadCategories();
-  }, [loadCategories, loadStatusFilterOptions]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -405,9 +430,13 @@ export default function TicketList() {
 
   const toggleFilters = useCallback(() => {
     if (!canUseFilters) return;
-    if (!showFilters) setDraftFilters(appliedFilters);
+    if (!showFilters) {
+      setDraftFilters(appliedFilters);
+      loadStatusFilterOptions();
+      loadCategories();
+    }
     setShowFilters((current) => !current);
-  }, [appliedFilters, canUseFilters, showFilters]);
+  }, [appliedFilters, canUseFilters, loadCategories, loadStatusFilterOptions, showFilters]);
 
   const applyFilters = useCallback(() => {
     if (!canUseFilters) return;
@@ -579,7 +608,14 @@ export default function TicketList() {
         </section>}
 
         <section className="mt-3.5 grid min-w-0 grid-cols-1 gap-3 sm:mt-5 sm:gap-4 lg:grid-cols-2" aria-live="polite">
-          {isLoading && <p className="text-sm font-semibold text-gray-600">{loadingMessage}</p>}
+          {isLoading && (
+            <>
+              <p className="text-sm font-semibold text-gray-600 lg:col-span-2">{loadingMessage}</p>
+              {loadingCardPlaceholders.map((placeholder) => (
+                <TicketCardSkeleton key={placeholder} />
+              ))}
+            </>
+          )}
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
           {!isLoading && !error && tickets.length === 0 && (
             <div className="rounded-2xl border border-blue-100 bg-white px-4 py-5 shadow-sm">

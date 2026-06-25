@@ -52,7 +52,10 @@ function appendPagingParams(params, page) {
 }
 
 function formatCurrency(value) {
-  const amount = Number(value);
+  const normalizedValue = typeof value === "string"
+    ? (value.replace(/[₹,\s]/g, "").match(/^-?\d+(?:\.\d+)?/)?.[0] ?? "")
+    : value;
+  const amount = Number(normalizedValue);
   if (!Number.isFinite(amount)) {
     return "₹0.00";
   }
@@ -66,11 +69,50 @@ function formatCurrency(value) {
 }
 
 function formatLabel(value) {
-  return value ? value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
+  return value ? value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
+}
+
+function formatOptionalLabel(value) {
+  if (!value) return "";
+  return /_/.test(value) ? formatLabel(value) : value;
 }
 
 function getTicketStatusLabel(ticket) {
   return ticket?.statusDisplayName || formatLabel(ticket?.status);
+}
+
+function formatTicketDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+  const time = new Intl.DateTimeFormat("en-IN", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+
+  if (isToday) return `Today ${time}`;
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+}
+
+function getTicketOwner(ticket) {
+  return ticket?.pickedByEmployeeName
+    || ticket?.pickedByEmployeeNameSnapshot
+    || ticket?.assignedEmployeeName
+    || ticket?.ownerEmployeeName
+    || ticket?.technicianName
+    || ticket?.pickedByEmployeeId
+    || "";
 }
 
 function normalizeStatusFilterOptions(data) {
@@ -120,6 +162,13 @@ function getMonthStartDate() {
 }
 
 function TicketCard({ ticket, onViewDetails }) {
+  const productType = formatOptionalLabel(ticket.productType);
+  const complaintPreview = ticket.complaintDescription?.trim() ?? "";
+  const villageOrArea = ticket.villageOrArea?.trim() ?? "";
+  const createdLabel = formatTicketDate(ticket.createdAt ?? ticket.createdDate);
+  const ownerLabel = getTicketOwner(ticket);
+  const hasIssueLine = productType || complaintPreview;
+
   return (
     <article className="ke-ticket-card min-w-0 overflow-hidden p-3.5 sm:p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
@@ -130,11 +179,25 @@ function TicketCard({ ticket, onViewDetails }) {
       </div>
 
       <p className="mt-2.5 overflow-wrap-anywhere text-sm font-semibold leading-snug text-gray-800">{ticket.customerName ?? "Not available"}</p>
-      <div className="mt-2.5 flex min-w-0 items-center justify-between gap-3 text-sm text-gray-700">
+      {hasIssueLine && (
+        <p className="mt-1.5 line-clamp-2 min-w-0 overflow-hidden text-sm leading-snug text-gray-700">
+          {productType && <span className="font-bold text-blue-950">{productType}</span>}
+          {productType && complaintPreview && <span className="text-gray-400"> - </span>}
+          {complaintPreview && <span>{complaintPreview}</span>}
+        </p>
+      )}
+      <div className="mt-2.5 grid min-w-0 grid-cols-1 gap-1.5 text-xs font-semibold text-gray-500 min-[380px]:grid-cols-2">
         <span className="flex min-w-0 items-center gap-1.5 overflow-wrap-anywhere">
-          <Phone className="shrink-0" size={14} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
+          <Phone className="shrink-0" size={13} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
         </span>
-        <span className="shrink-0 text-base font-extrabold text-blue-950">{formatCurrency(ticket.totalCharge ?? 0)}</span>
+        {villageOrArea && <span className="min-w-0 overflow-wrap-anywhere min-[380px]:text-right">Area: {villageOrArea}</span>}
+        {ownerLabel && <span className="min-w-0 overflow-wrap-anywhere min-[380px]:col-span-2">Owner: {ownerLabel}</span>}
+      </div>
+      <div className="mt-2.5 flex min-w-0 items-center justify-between gap-3 border-t border-blue-50 pt-2.5">
+        <span className="min-w-0 overflow-wrap-anywhere text-xs font-semibold text-gray-500">
+          {createdLabel ? `Created: ${createdLabel}` : "Newest first"}
+        </span>
+        <span className="shrink-0 text-base font-extrabold text-blue-950">{formatCurrency(ticket.totalCharge)}</span>
       </div>
 
       <button
@@ -340,12 +403,22 @@ export default function TicketList() {
 
   const loadingMessage = isSearchActive ? "Searching tickets..." : hasAppliedFilters ? "Applying filters..." : "Loading tickets...";
   const emptyMessage = isSearchActive && hasAppliedFilters
-    ? "No tickets match your search and selected filters."
+    ? `No tickets found for "${effectiveSearchText}"`
     : hasAppliedFilters
       ? "No tickets match the selected filters."
       : isSearchActive
-        ? "No matching tickets found."
-        : "No tickets found.";
+        ? `No tickets found for "${effectiveSearchText}"`
+        : "No tickets yet";
+  const emptyHint = isSearchActive
+    ? "Try searching by ticket number, customer name, mobile number, or area."
+    : hasAppliedFilters
+      ? "Try clearing filters or changing the selected options."
+      : "Create a ticket to get started.";
+  const resultSummary = isSearchActive
+    ? `Showing ${tickets.length} result${tickets.length === 1 ? "" : "s"} for "${effectiveSearchText}"`
+    : hasAppliedFilters
+      ? `Showing ${tickets.length} filtered ticket${tickets.length === 1 ? "" : "s"}`
+      : "Showing newest tickets first";
   const appliedFilterChips = [
     effectiveFilters.mine ? { key: "mine", label: "My Tickets" } : null,
     effectiveFilters.status ? { key: "status", label: formatLabel(effectiveFilters.status) } : null,
@@ -401,7 +474,7 @@ export default function TicketList() {
                   type="search"
                   value={searchText}
                   onChange={(event) => setSearchText(event.target.value)}
-                  placeholder="Search tickets"
+                  placeholder="Search by ticket no, name, mobile, area"
                   className="ke-ticket-search-input min-h-11 min-w-0 flex-1 rounded-xl border px-3.5 py-2.5 text-base text-gray-900 outline-none sm:min-h-12 sm:px-4 sm:py-3 sm:text-sm"
                 />
               </>
@@ -421,11 +494,12 @@ export default function TicketList() {
                 type="button"
                 onClick={toggleFilters}
                 aria-expanded={showFilters}
-                className="inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-blue-950 bg-white px-3 text-sm font-bold text-blue-950 hover:bg-blue-50 sm:h-12 sm:px-4"
+                className="relative inline-flex h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-blue-950 bg-white px-3 text-sm font-bold text-blue-950 hover:bg-blue-50 sm:h-12 sm:px-4"
                 aria-label={`Filters${activeFilterCount > 0 ? `, ${activeFilterCount} active` : ""}`}
               >
                 <Filter size={16} aria-hidden="true" />
                 <span className={activeFilterCount > 0 ? "hidden min-[380px]:inline" : "hidden sm:inline"}>Filters</span>{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+                {activeFilterCount > 0 && <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-yellow-400 px-1 text-[0.65rem] font-extrabold text-black">{activeFilterCount}</span>}
               </button>
             )}
           </div>
@@ -523,7 +597,12 @@ export default function TicketList() {
         <section className="mt-3.5 grid min-w-0 grid-cols-1 gap-3 sm:mt-5 sm:gap-4 lg:grid-cols-2" aria-live="polite">
           {isLoading && <p className="text-sm font-semibold text-gray-600">{loadingMessage}</p>}
           {error && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
-          {!isLoading && !error && tickets.length === 0 && <p className="text-sm font-semibold text-gray-600">{emptyMessage}</p>}
+          {!isLoading && !error && tickets.length === 0 && (
+            <div className="rounded-2xl border border-blue-100 bg-white px-4 py-5 shadow-sm">
+              <p className="text-sm font-extrabold text-blue-950">{emptyMessage}</p>
+              <p className="mt-1 text-sm font-semibold text-gray-500">{emptyHint}</p>
+            </div>
+          )}
           {!isLoading && !error && tickets.map((ticket) => (
             <TicketCard
               key={ticket.id ?? ticket.ticketNumber}
@@ -533,10 +612,10 @@ export default function TicketList() {
           ))}
         </section>
         {!isLoading && !error && tickets.length > 0 && (
-          <section className="mt-5 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm" aria-live="polite">
+          <section className="mt-4 rounded-2xl border border-blue-100 bg-white px-4 py-3 shadow-sm" aria-live="polite">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm font-semibold text-gray-600">
-                Showing {tickets.length} ticket{tickets.length === 1 ? "" : "s"} in pages of up to {TICKET_PAGE_SIZE}. Newest matching tickets appear first.
+                {resultSummary}
               </p>
               {hasMoreTickets ? (
                 <button

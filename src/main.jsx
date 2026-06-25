@@ -1,14 +1,18 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.jsx'
 
 function scheduleServiceWorkerRegistration() {
   if (!('serviceWorker' in navigator)) return
 
-  const register = () => {
-    registerSW({ immediate: true })
+  const register = async () => {
+    try {
+      const { registerSW } = await import('virtual:pwa-register')
+      registerSW({ immediate: true })
+    } catch {
+      // Service worker registration is non-critical and should never block app startup.
+    }
   }
 
   const registerWhenIdle = () => {

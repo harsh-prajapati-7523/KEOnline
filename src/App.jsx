@@ -16,8 +16,23 @@ const TicketCategoryFieldManagement = lazy(() => import("./pages/TicketCategoryF
 const TicketFieldManagement = lazy(() => import("./pages/TicketFieldManagement"));
 const DropdownSourceManagement = lazy(() => import("./pages/DropdownSourceManagement"));
 const CreateTicket = lazy(() => import("./pages/CreateTicket"));
-const TicketList = lazy(() => import("./pages/TicketList"));
 const TicketDetail = lazy(() => import("./pages/TicketDetail"));
+
+let ticketListImportPromise;
+function loadTicketList() {
+  ticketListImportPromise ??= import("./pages/TicketList");
+  return ticketListImportPromise;
+}
+
+function preloadTicketList() {
+  void loadTicketList();
+}
+
+const TicketList = lazy(loadTicketList);
+
+if (window.location.pathname === "/tickets") {
+  preloadTicketList();
+}
 
 function isStandaloneDisplay() {
   return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
@@ -145,7 +160,7 @@ function Navbar() {
               <button type="button" onClick={() => navigate("/employee-dashboard")} className={buttonClassName(active === "/employee-dashboard")}>
                 <LayoutDashboard size={18} aria-hidden="true" /> Dashboard
               </button>
-              <button type="button" onClick={() => navigate("/tickets")} className={buttonClassName(active.startsWith("/tickets"))}>
+              <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets")} className={buttonClassName(active.startsWith("/tickets"))}>
                 <ListChecks size={18} aria-hidden="true" /> Tickets
               </button>
               <button type="button" onClick={logout} className="flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold transition hover:bg-white/20 sm:px-4 sm:text-base">
@@ -206,7 +221,7 @@ function AuthenticatedBottomNav() {
           </button>
         )}
         {canViewTickets && (
-          <button type="button" onClick={() => navigate("/tickets")} className={itemClassName(active.startsWith("/tickets") && active !== "/tickets/new")}>
+          <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets")} className={itemClassName(active.startsWith("/tickets") && active !== "/tickets/new")}>
             <ListChecks size={17} aria-hidden="true" />
             Tickets
           </button>
@@ -221,8 +236,19 @@ function AuthenticatedBottomNav() {
 }
 
 function AppRoutes() {
-  useLocation();
+  const location = useLocation();
   const isAuthenticated = Boolean(localStorage.getItem("token"));
+
+  useEffect(() => {
+    if (!isAuthenticated || location.pathname.startsWith("/tickets") || !hasAnyAccess(["VIEW_TICKETS"])) {
+      return undefined;
+    }
+
+    const preload = () => preloadTicketList();
+    const timeoutId = window.setTimeout(preload, 1200);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isAuthenticated, location.pathname]);
 
   return (
     <div className={isAuthenticated ? "sm:pb-0" : ""}>

@@ -1,1 +1,34 @@
 @import "tailwindcss";
+
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+@media (max-width: 420px) {
+  .mobile-full-width-actions > button,
+  .mobile-full-width-actions > a {
+    width: 100%;
+    justify-content: center;
+  }
+}

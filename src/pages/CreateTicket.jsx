@@ -244,24 +244,24 @@ export default function CreateTicket() {
   };
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-3xl">
+    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-3xl">
         <div className="mb-4 flex flex-wrap gap-3">
           <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex items-center gap-2 font-semibold text-blue-950">
             <ArrowLeft size={18} aria-hidden="true" /> Dashboard
           </button>
-          <button type="button" onClick={() => navigate("/tickets")} className="ml-auto flex items-center gap-2 font-semibold text-blue-950">
+          <button type="button" onClick={() => navigate("/tickets")} className="flex items-center gap-2 font-semibold text-blue-950 sm:ml-auto">
             <ListChecks size={18} aria-hidden="true" /> View Tickets
           </button>
         </div>
 
-        <section className="overflow-hidden rounded-3xl bg-white shadow-lg">
+        <section className="min-w-0 overflow-hidden rounded-2xl bg-white shadow-lg sm:rounded-3xl">
           <header className="bg-blue-950 px-5 py-6 text-white sm:px-7">
-            <h1 className="text-2xl font-extrabold sm:text-3xl">Create Ticket</h1>
+            <h1 className="break-words text-2xl font-extrabold sm:text-3xl">Create Ticket</h1>
             <p className="mt-2 text-sm text-blue-100">Record a customer service request.</p>
           </header>
 
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 p-5 sm:grid-cols-2 sm:p-7">
+          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-5 p-4 sm:grid-cols-2 sm:p-7">
             <label className="font-semibold text-gray-700">
               Customer Name
               <input name="customerName" value={formData.customerName} onChange={handleChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />

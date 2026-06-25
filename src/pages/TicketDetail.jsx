@@ -101,9 +101,9 @@ function hasMaxTwoDecimals(value) {
 
 function InfoItem({ label, children, className = "" }) {
   return (
-    <div className={className}>
+    <div className={`min-w-0 ${className}`}>
       <dt className="font-bold text-gray-500">{label}</dt>
-      <dd className="mt-1 text-gray-800">{children ?? "Not available"}</dd>
+      <dd className="mt-1 break-words text-gray-800">{children ?? "Not available"}</dd>
     </div>
   );
 }
@@ -598,9 +598,9 @@ export default function TicketDetail() {
   const hasDynamicActions = dynamicActions.length > 0;
   const hasLoadedAvailableActions = Boolean(availableActions) && !availableActionsLoading && !availableActionsError;
   const renderWorkflowActions = (prominent = false) => (
-    <section className={`${prominent ? "rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-5 shadow-sm" : "rounded-2xl border border-blue-100 bg-white p-5 shadow-sm"}`}>
+    <section className={`min-w-0 ${prominent ? "rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-4 shadow-sm sm:p-5" : "rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5"}`}>
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-lg font-bold text-blue-950">{prominent ? "Available Actions" : "Actions"}</h2>
           {prominent && (
             <p className="mt-1 text-sm font-semibold text-yellow-800">
@@ -615,7 +615,7 @@ export default function TicketDetail() {
           {availableActionsError}
         </p>
       )}
-      <div className={`mt-4 flex flex-wrap items-center gap-2 ${prominent ? "sm:gap-3" : ""}`}>
+      <div className={`mobile-full-width-actions mt-4 flex flex-wrap items-center gap-2 ${prominent ? "sm:gap-3" : ""}`}>
         {availableActionsLoading && <p className="text-sm font-semibold text-gray-600">Loading available workflow actions...</p>}
         {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
         {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl bg-yellow-400 px-4 py-2 font-semibold text-black disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
@@ -629,7 +629,7 @@ export default function TicketDetail() {
       {hasDynamicActions && (
         <div className="mt-5 border-t border-slate-200 pt-4">
           <h3 className="text-sm font-bold text-slate-700">Additional Workflow Actions</h3>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mobile-full-width-actions mt-3 flex flex-wrap items-center gap-2">
             {dynamicActions.map((action) => (
               <button
                 key={`${action.transitionId}-${action.actionKey}-${prominent ? "top" : "bottom"}`}
@@ -649,8 +649,8 @@ export default function TicketDetail() {
   );
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl">
+    <main className="min-h-screen w-full overflow-x-hidden bg-gray-50 px-3 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-4xl">
         <button type="button" onClick={() => navigate(`/tickets${location.search}`)} className="flex items-center gap-2 font-semibold text-blue-950">
           <ArrowLeft size={18} aria-hidden="true" /> Back to Tickets
         </button>
@@ -659,12 +659,12 @@ export default function TicketDetail() {
         {error && <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
 
         {!isLoading && !error && ticket && (
-          <div className="mt-4 space-y-4">
-            <header className="rounded-3xl bg-blue-950 p-5 text-white shadow-lg sm:p-7">
+          <div className="mt-4 min-w-0 space-y-4">
+            <header className="rounded-2xl bg-blue-950 p-5 text-white shadow-lg sm:rounded-3xl sm:p-7">
               <p className="text-xs font-bold uppercase tracking-wide text-blue-200">Ticket Number</p>
               <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
-                <h1 className="text-2xl font-extrabold sm:text-3xl">{ticket.ticketNumber ?? "Not available"}</h1>
-                <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{getTicketStatusLabel(ticket)}</span>
+                <h1 className="min-w-0 break-words text-2xl font-extrabold sm:text-3xl">{ticket.ticketNumber ?? "Not available"}</h1>
+                <span className="max-w-full break-words rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{getTicketStatusLabel(ticket)}</span>
               </div>
             </header>
 
@@ -676,16 +676,16 @@ export default function TicketDetail() {
 
             {renderWorkflowActions(true)}
 
-            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="text-lg font-bold text-blue-950">Customer Details</h2>
               <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <InfoItem label="Customer Name">{ticket.customerName}</InfoItem>
-                <InfoItem label="Mobile Number"><span className="inline-flex items-center gap-2"><Phone size={15} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}</span></InfoItem>
-                <InfoItem label="Village / Area" className="sm:col-span-2"><span className="inline-flex items-center gap-2"><MapPin size={15} aria-hidden="true" /> {ticket.villageOrArea ?? "Not available"}</span></InfoItem>
+                <InfoItem label="Mobile Number"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Phone size={15} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}</span></InfoItem>
+                <InfoItem label="Village / Area" className="sm:col-span-2"><span className="inline-flex min-w-0 items-center gap-2 break-words"><MapPin size={15} aria-hidden="true" /> {ticket.villageOrArea ?? "Not available"}</span></InfoItem>
               </dl>
             </section>
 
-            {canViewCustomerHistory && <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            {canViewCustomerHistory && <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-bold text-blue-950">
                   Customer History{hasLoadedCustomerHistory ? ` (${customerHistoryCount})` : ""}
@@ -703,7 +703,7 @@ export default function TicketDetail() {
                     <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">No previous tickets found.</p>
                   )}
                   {!customerHistoryLoading && !customerHistoryError && customerHistory.map((historyTicket) => (
-                    <article key={historyTicket.id ?? historyTicket.ticketNumber} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <article key={historyTicket.id ?? historyTicket.ticketNumber} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div>
                           <h3 className="font-extrabold text-blue-950">{historyTicket.ticketNumber ?? "Not available"}</h3>
@@ -726,7 +726,7 @@ export default function TicketDetail() {
               )}
             </section>}
 
-            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="text-lg font-bold text-blue-950">Product &amp; Complaint</h2>
               <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <InfoItem label="Product Type">{ticket.productType}</InfoItem>
@@ -735,12 +735,12 @@ export default function TicketDetail() {
               </dl>
             </section>
 
-            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="text-lg font-bold text-blue-950">Status / Workflow Details</h2>
               <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                 <InfoItem label="Status">{getTicketStatusLabel(ticket)}</InfoItem>
                 <InfoItem label="Picked By">{ticket.pickedByEmployeeId ?? "Not picked"}</InfoItem>
-                <InfoItem label="Created Date"><span className="inline-flex items-center gap-2"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
+                <InfoItem label="Created Date"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
                 {ticket.status === "COMPLETED" && <InfoItem label="Completed By">{ticket.completedByEmployeeId}</InfoItem>}
                 {ticket.status === "COMPLETED" && <InfoItem label="Completed At">{formatDate(ticket.completedAt)}</InfoItem>}
                 {ticket.status === "COMPLETED" && ticket.completionRemark && <InfoItem label="Completion Remark" className="sm:col-span-2">{ticket.completionRemark}</InfoItem>}
@@ -750,7 +750,7 @@ export default function TicketDetail() {
               </dl>
             </section>
 
-            <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="text-lg font-bold text-blue-950">Workflow History</h2>
 
               <div className="mt-4 space-y-3">
@@ -763,7 +763,7 @@ export default function TicketDetail() {
                   <>
                     <div className="space-y-3">
                       {workflowHistory.map((historyItem) => (
-                        <article key={historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <article key={historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-4">
                           <div className="flex flex-wrap items-start justify-between gap-2">
                             <div>
                               <h3 className="font-extrabold text-blue-950">{historyItem.actionDisplayName || formatLabel(historyItem.actionKey)}</h3>
@@ -771,7 +771,7 @@ export default function TicketDetail() {
                                 {(historyItem.fromStatusDisplayName || formatLabel(historyItem.fromStatus))} &rarr; {(historyItem.toStatusDisplayName || formatLabel(historyItem.toStatus))}
                               </p>
                             </div>
-                            <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-950">{formatDateTime(historyItem.createdAt)}</span>
+                            <span className="max-w-full break-words rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-950">{formatDateTime(historyItem.createdAt)}</span>
                           </div>
 
                           <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -804,7 +804,7 @@ export default function TicketDetail() {
             </section>
 
             {dynamicValues.length > 0 && (
-              <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+              <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
                 <h2 className="text-lg font-bold text-blue-950">Additional Details</h2>
                 <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
                   {dynamicValues.map((dynamicValue) => (
@@ -822,7 +822,7 @@ export default function TicketDetail() {
               </p>
             )}
 
-            {canViewCharges && <section className="rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+            {canViewCharges && <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-bold text-blue-950">Charges</h2>
@@ -855,7 +855,7 @@ export default function TicketDetail() {
                                 {chargeFormErrors.amount && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.amount}</span>}
                               </label>
                             </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
+                            <div className="mobile-full-width-actions mt-3 flex flex-wrap gap-2">
                               <button type="button" onClick={addCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="rounded-xl bg-yellow-400 px-3 py-2 text-sm font-semibold text-black disabled:opacity-60">
                                 {processingKeys[`add-charge-${ticketId}`] ? "Saving..." : "Save"}
                               </button>

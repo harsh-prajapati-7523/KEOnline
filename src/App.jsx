@@ -33,30 +33,30 @@ function Navbar() {
     navigate("/employee-login", { replace: true });
   };
 
-  const buttonClassName = (isActive) => `flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 font-semibold transition ${
+  const buttonClassName = (isActive) => `flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition sm:px-4 sm:text-base ${
     isActive ? "bg-yellow-400 text-black" : "bg-white/10 hover:bg-white/20"
   }`;
 
   return (
-    <nav className="bg-blue-950 text-white shadow-lg">
-      <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col lg:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3 text-center lg:text-left">
-          <div className="w-12 h-12 md:w-14 md:h-14 rounded-full border-4 border-yellow-400 flex items-center justify-center text-2xl md:text-3xl font-bold italic">
+    <nav className="w-full overflow-hidden bg-blue-950 text-white shadow-lg">
+      <div className="mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-4 px-3 py-4 sm:px-4 lg:flex-row">
+        <div className="flex min-w-0 items-center gap-3 text-center lg:text-left">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-4 border-yellow-400 text-2xl font-bold italic md:h-14 md:w-14 md:text-3xl">
             ke
           </div>
-          <div>
-            <h1 className="text-lg md:text-2xl font-extrabold tracking-wide leading-tight">
+          <div className="min-w-0">
+            <h1 className="break-words text-base font-extrabold leading-tight tracking-wide sm:text-lg md:text-2xl">
               KUMAR ELECTRONICS & ELECTRICALS
             </h1>
-            <p className="text-yellow-400 text-xs md:text-sm font-semibold">
+            <p className="text-xs font-semibold text-yellow-400 md:text-sm">
               POWER BACKUP & SOLAR SOLUTIONS
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap justify-center gap-3 w-full lg:w-auto">
+        <div className="flex w-full min-w-0 flex-wrap justify-center gap-2 sm:gap-3 lg:w-auto">
           {isAuthenticated ? (
             <>
-              <span className="flex min-h-11 items-center rounded-xl bg-white/10 px-4 py-2 text-sm font-semibold text-blue-100">
+              <span className="flex min-h-11 min-w-0 max-w-full items-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-blue-100">
                 {employeeName || "Employee"}
               </span>
               <button type="button" onClick={() => navigate("/employee-dashboard")} className={buttonClassName(active === "/employee-dashboard")}>
@@ -65,7 +65,7 @@ function Navbar() {
               <button type="button" onClick={() => navigate("/tickets")} className={buttonClassName(active.startsWith("/tickets"))}>
                 <ListChecks size={18} aria-hidden="true" /> Tickets
               </button>
-              <button type="button" onClick={logout} className="flex min-h-11 items-center justify-center rounded-xl bg-white/10 px-4 py-2 font-semibold transition hover:bg-white/20">
+              <button type="button" onClick={logout} className="flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold transition hover:bg-white/20 sm:px-4 sm:text-base">
                 Logout
               </button>
             </>

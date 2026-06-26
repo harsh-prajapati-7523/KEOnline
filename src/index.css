@@ -21,6 +21,11 @@ body,
   overflow-x: hidden;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 *,
 *::before,
 *::after {
@@ -253,28 +258,29 @@ textarea {
   border-radius: 0.75rem;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   display: flex;
-  height: 2.5rem;
+  height: clamp(2.25rem, 9.5vw, 2.5rem);
   justify-content: center;
   padding: 0.32rem;
-  width: 2.5rem;
+  width: clamp(2.25rem, 9.5vw, 2.5rem);
 }
 
 .ke-brand-logo {
   display: block;
   height: 100%;
-  max-height: 1.86rem;
-  max-width: 1.86rem;
+  max-height: clamp(1.65rem, 7vw, 1.86rem);
+  max-width: clamp(1.65rem, 7vw, 1.86rem);
   object-fit: contain;
   width: auto;
 }
 
 .ke-brand-title {
-  font-size: clamp(0.92rem, 4vw, 1.08rem);
+  font-size: clamp(0.95rem, 3.6vw, 1.06rem);
   letter-spacing: 0;
 }
 
 .ke-brand-subtitle {
   color: rgba(255, 255, 255, 0.82);
+  font-size: clamp(0.72rem, 2.7vw, 0.8rem);
   line-height: 1.15;
   margin-top: 0.125rem;
 }
@@ -370,9 +376,18 @@ textarea {
   box-shadow: 0 8px 20px rgba(16, 27, 77, 0.08);
 }
 
+.ke-create-title {
+  font-size: clamp(1.25rem, 5vw, 1.5rem);
+}
+
+.ke-create-form {
+  gap: clamp(0.625rem, 2.5vw, 0.875rem);
+  padding: clamp(0.75rem, 3vw, 1rem);
+}
+
 .ke-form-label {
   color: #344054;
-  font-size: 0.9375rem;
+  font-size: clamp(0.92rem, 3.4vw, 0.98rem);
   font-weight: 600;
 }
 
@@ -380,9 +395,11 @@ textarea {
   border: 1px solid var(--ke-border);
   border-radius: 0.875rem;
   color: var(--ke-text);
+  font-size: 16px;
   font-weight: 600;
-  min-height: 2.75rem;
-  padding: 0.5625rem 0.8125rem;
+  line-height: 1.35;
+  min-height: clamp(2.75rem, 12vw, 3rem);
+  padding: 0.625rem 0.8125rem;
   width: 100%;
 }
 
@@ -394,6 +411,7 @@ textarea {
 
 .ke-form-control::placeholder {
   color: #9ca3af;
+  font-size: 16px;
   font-weight: 500;
   opacity: 1;
 }
@@ -469,12 +487,34 @@ textarea {
     font-size: 1.125rem;
   }
 
+  .ke-brand-subtitle {
+    font-size: 0.75rem;
+  }
+
   .ticket-detail-page {
     padding-bottom: 1.5rem;
   }
 
   .ke-create-card {
     border-radius: 1.25rem;
+  }
+
+  .ke-create-title {
+    font-size: 1.5rem;
+  }
+
+  .ke-create-form {
+    gap: 1rem;
+    padding: 1.5rem;
+  }
+
+  .ke-form-label {
+    font-size: 0.9375rem;
+  }
+
+  .ke-form-control {
+    min-height: 2.75rem;
+    padding: 0.5625rem 0.8125rem;
   }
 }
 

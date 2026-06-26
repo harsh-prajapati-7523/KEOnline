@@ -262,11 +262,11 @@ export default function CreateTicket() {
             <ArrowLeft size={18} aria-hidden="true" />
             <span className="sr-only sm:not-sr-only">Dashboard</span>
           </button>
-          <h1 className="min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Create Ticket</h1>
+          <h1 className="ke-create-title min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Create Ticket</h1>
         </div>
 
         <section className="ke-create-card min-w-0 overflow-hidden">
-          <form onSubmit={handleSubmit} className="grid min-w-0 grid-cols-1 gap-2.5 p-3 sm:grid-cols-2 sm:gap-4 sm:p-6">
+          <form onSubmit={handleSubmit} className="ke-create-form grid min-w-0 grid-cols-1 gap-2.5 p-3 sm:grid-cols-2 sm:gap-4 sm:p-6">
             <label htmlFor="customer-name" className="ke-form-label">
               Customer Name
               <input id="customer-name" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="Enter customer name" className={getFieldClassName("customerName")} aria-invalid={Boolean(errors.customerName)} aria-describedby={errors.customerName ? "customer-name-error" : undefined} />

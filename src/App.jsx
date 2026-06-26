@@ -294,7 +294,7 @@ function AppRoutes() {
   }, [isAuthenticated, location.pathname]);
 
   return (
-    <div className={isAuthenticated ? "sm:pb-0" : ""}>
+    <div className={isAuthenticated ? "ke-content-with-bottom-nav sm:pb-0" : ""}>
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
           <Route path="/" element={<HomePage />} />

@@ -21,11 +21,9 @@ function validate(formData) {
   } else if (!/^\d{10}$/.test(formData.mobileNumber)) {
     errors.mobileNumber = "Please enter a valid 10-digit mobile number.";
   }
+  if (!formData.villageOrArea.trim()) errors.villageOrArea = "Village / Area is required.";
   if (!formData.productType.trim()) errors.productType = "Product type is required.";
   if (!formData.categoryId) errors.categoryId = "Ticket category is required.";
-  if (!formData.complaintDescription.trim()) {
-    errors.complaintDescription = "Complaint description is required.";
-  }
 
   return errors;
 }
@@ -95,10 +93,19 @@ async function readErrorMessage(response, fallback) {
   }
 }
 
+function formatEnumLabel(value) {
+  return value
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 function formatCategoryLabel(category) {
   if (!category) return "Not available";
   const categoryKey = category.categoryKey ?? "";
-  return category.displayName ? `${category.displayName} (${categoryKey})` : categoryKey || "Not available";
+  return category.displayName || (categoryKey ? formatEnumLabel(categoryKey) : "Not available");
 }
 
 export default function CreateTicket() {
@@ -276,8 +283,9 @@ export default function CreateTicket() {
             </label>
 
             <label htmlFor="village-or-area" className="ke-form-label">
-              Village / Area <span className="text-sm font-normal text-gray-500">(Optional)</span>
-              <SuggestionInput id="village-or-area" endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} placeholder="Enter village or area" className="ke-form-control mt-1" />
+              Village / Area
+              <SuggestionInput id="village-or-area" endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} placeholder="Enter village or area" className={getFieldClassName("villageOrArea")} aria-invalid={Boolean(errors.villageOrArea)} aria-describedby={errors.villageOrArea ? "village-or-area-error" : undefined} />
+              <FieldError id="village-or-area-error" message={errors.villageOrArea} />
             </label>
 
             <label htmlFor="product-type" className="ke-form-label">
@@ -300,21 +308,17 @@ export default function CreateTicket() {
             </label>
 
             <label htmlFor="complaint-description" className="ke-form-label sm:col-span-2">
-              Complaint Description
-              <textarea id="complaint-description" name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} placeholder="Describe the issue, e.g., inverter not charging" className={getFieldClassName("complaintDescription", "min-h-24 resize-y sm:min-h-28")} aria-invalid={Boolean(errors.complaintDescription)} aria-describedby={errors.complaintDescription ? "complaint-description-error" : undefined} />
-              <FieldError id="complaint-description-error" message={errors.complaintDescription} />
+              Complaint Description <span className="text-sm font-normal text-gray-500">(Optional)</span>
+              <textarea id="complaint-description" name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} placeholder="Describe the customer complaint" className={getFieldClassName("complaintDescription", "min-h-24 resize-y sm:min-h-28")} />
             </label>
 
-            {formData.categoryId && (
+            {formData.categoryId && (isLoadingDynamicFields || dynamicConfigError) && (
               <div className="sm:col-span-2">
                 {isLoadingDynamicFields && (
                   <p className="text-sm font-semibold text-gray-600">Loading category fields...</p>
                 )}
                 {dynamicConfigError && (
                   <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{dynamicConfigError}</p>
-                )}
-                {!isLoadingDynamicFields && !dynamicConfigError && dynamicFields.length === 0 && (
-                  <p className="rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">No additional fields for this category.</p>
                 )}
               </div>
             )}

@@ -10,6 +10,7 @@
   --ke-text: #172033;
   --ke-muted: #667085;
   --ke-shadow: 0 12px 32px rgba(16, 27, 77, 0.12);
+  --ke-bottom-nav-height: 88px;
 }
 
 html,
@@ -209,8 +210,16 @@ textarea {
   min-height: 100svh;
   overflow-x: hidden;
   padding: clamp(0.625rem, 2.5vw, 1rem);
-  padding-bottom: calc(6.875rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 24px);
   width: 100%;
+}
+
+.ke-content-with-bottom-nav {
+  background: var(--ke-bg);
+}
+
+.ke-content-with-bottom-nav > main:not(.ke-page-main) {
+  padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 24px);
 }
 
 .ke-page-header {
@@ -224,7 +233,7 @@ textarea {
 }
 
 .ticket-detail-page {
-  padding-bottom: calc(7.5rem + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 24px);
 }
 
 .ke-app-header {
@@ -424,6 +433,14 @@ textarea {
 
   .ke-page-main {
     padding: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
+
+  .ke-content-with-bottom-nav {
+    padding-bottom: 0;
+  }
+
+  .ke-content-with-bottom-nav > main:not(.ke-page-main) {
     padding-bottom: 1.5rem;
   }
 

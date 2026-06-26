@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, ListChecks, Send } from "lucide-react";
+import { ArrowLeft, Send } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SuggestionInput from "../components/SuggestionInput";
 
@@ -263,9 +263,6 @@ export default function CreateTicket() {
             <span className="sr-only sm:not-sr-only">Dashboard</span>
           </button>
           <h1 className="min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Create Ticket</h1>
-          <button type="button" onClick={() => navigate("/tickets")} className="ke-secondary-link-button flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-bold sm:min-h-11 sm:px-3 sm:py-2 sm:text-sm" aria-label="View Tickets">
-            <ListChecks size={15} aria-hidden="true" /> <span className="sm:hidden">Tickets</span><span className="hidden sm:inline">View Tickets</span>
-          </button>
         </div>
 
         <section className="ke-create-card min-w-0 overflow-hidden">

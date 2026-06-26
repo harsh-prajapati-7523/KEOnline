@@ -390,6 +390,7 @@ export default function TicketDetail() {
     setAvailableActionsLoading(false);
     setAvailableActionsError("");
     loadTicket();
+    loadAvailableActions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
 
@@ -412,15 +413,6 @@ export default function TicketDetail() {
     setCustomerHistoryError("");
     setHasLoadedCustomerHistory(false);
   }, [ticketId]);
-
-  useEffect(() => {
-    if (!ticket?.id || String(ticket.id) !== String(ticketId)) return undefined;
-
-    return scheduleSecondaryWork(() => {
-      loadAvailableActions();
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticket?.id, ticketId]);
 
   const loadCustomerHistory = async () => {
     const requestedTicketId = ticketId;

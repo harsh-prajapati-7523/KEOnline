@@ -708,12 +708,13 @@ export default function TicketDetail() {
   const renderWorkflowActions = (prominent = false) => {
     const hasNoActions = hasLoadedAvailableActions && !hasVisibleWorkflowAction && !hasDynamicActions;
     const isCompletedNoActions = hasNoActions && ticket?.status === "COMPLETED";
+    const actionsPending = availableActionsLoading || (!availableActions && !availableActionsError);
     const actionSectionClassName = prominent && !isCompletedNoActions
       ? "rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-4 shadow-sm sm:p-5"
       : "rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5";
 
     return (
-    <section className={`min-h-32 min-w-0 ${actionSectionClassName}`}>
+    <section className={`min-h-32 min-w-0 ${actionSectionClassName}`} aria-busy={actionsPending}>
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <h2 className="text-lg font-bold text-blue-950">{isCompletedNoActions ? "No Actions Available" : prominent ? "Available Actions" : "More Actions"}</h2>
@@ -732,9 +733,9 @@ export default function TicketDetail() {
         </p>
       )}
       <div className={`mt-4 flex min-h-12 flex-col gap-2 ${prominent ? "sm:gap-3" : ""}`}>
-        {(availableActionsLoading || (!availableActions && !availableActionsError)) && (
+        {actionsPending && (
           <div className="rounded-xl bg-white/70 px-3 py-3 text-sm font-semibold text-gray-600">
-            Loading available workflow actions...
+            Loading actions...
           </div>
         )}
         {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="ke-primary-action min-h-12 rounded-2xl px-4 py-3 font-bold disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
@@ -801,8 +802,6 @@ export default function TicketDetail() {
               </p>
             )}
 
-            {renderWorkflowActions(true)}
-
             <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <h2 className="text-lg font-bold text-blue-950">Ticket Information</h2>
               <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
@@ -827,6 +826,8 @@ export default function TicketDetail() {
                 <InfoItem label="Complaint Description" className="sm:col-span-2">{ticket.complaintDescription}</InfoItem>
               </dl>
             </section>
+
+            {renderWorkflowActions(true)}
 
             {canViewCustomerHistory && <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">

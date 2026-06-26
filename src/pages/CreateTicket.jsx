@@ -267,16 +267,29 @@ export default function CreateTicket() {
 
         <section className="ke-create-card min-w-0 overflow-hidden">
           <form onSubmit={handleSubmit} className="ke-create-form grid min-w-0 grid-cols-1 gap-2.5 p-3 sm:grid-cols-2 sm:gap-4 sm:p-6">
-            <label htmlFor="customer-name" className="ke-form-label">
-              Customer Name
-              <input id="customer-name" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="Enter customer name" className={getFieldClassName("customerName")} aria-invalid={Boolean(errors.customerName)} aria-describedby={errors.customerName ? "customer-name-error" : undefined} />
-              <FieldError id="customer-name-error" message={errors.customerName} />
+            <label htmlFor="ticket-category" className="ke-form-label sm:col-span-2">
+              Ticket Category
+              <select id="ticket-category" name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className={getFieldClassName("categoryId", "bg-white")} aria-invalid={Boolean(errors.categoryId)} aria-describedby={errors.categoryId ? "ticket-category-error" : undefined}>
+                <option value="">{isLoadingCategories ? "Loading ticket categories..." : "Select ticket category"}</option>
+                {categories.map((category) => <option key={category.id} value={category.id}>{formatCategoryLabel(category)}</option>)}
+              </select>
+              <FieldError id="ticket-category-error" message={errors.categoryId} />
+              {categoryError && <p className="mt-1 text-sm font-semibold text-red-600">{categoryError}</p>}
+              {!isLoadingCategories && !categoryError && categories.length === 0 && (
+                <p className="mt-1 text-sm font-semibold text-yellow-700">No active ticket categories are available.</p>
+              )}
             </label>
 
             <label htmlFor="mobile-number" className="ke-form-label">
               Mobile Number
               <input id="mobile-number" name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} placeholder="Enter 10-digit mobile number" className={getFieldClassName("mobileNumber")} aria-invalid={Boolean(errors.mobileNumber)} aria-describedby={errors.mobileNumber ? "mobile-number-error" : undefined} />
               <FieldError id="mobile-number-error" message={errors.mobileNumber} />
+            </label>
+
+            <label htmlFor="customer-name" className="ke-form-label">
+              Customer Name
+              <input id="customer-name" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="Enter customer name" className={getFieldClassName("customerName")} aria-invalid={Boolean(errors.customerName)} aria-describedby={errors.customerName ? "customer-name-error" : undefined} />
+              <FieldError id="customer-name-error" message={errors.customerName} />
             </label>
 
             <label htmlFor="village-or-area" className="ke-form-label">
@@ -289,19 +302,6 @@ export default function CreateTicket() {
               Product Type
               <SuggestionInput id="product-type" endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} placeholder="e.g., Battery, Inverter, UPS, Stabilizer" className={getFieldClassName("productType")} aria-invalid={Boolean(errors.productType)} aria-describedby={errors.productType ? "product-type-error" : undefined} />
               <FieldError id="product-type-error" message={errors.productType} />
-            </label>
-
-            <label htmlFor="ticket-category" className="ke-form-label sm:col-span-2">
-              Ticket Category
-              <select id="ticket-category" name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className={getFieldClassName("categoryId", "bg-white")} aria-invalid={Boolean(errors.categoryId)} aria-describedby={errors.categoryId ? "ticket-category-error" : undefined}>
-                <option value="">{isLoadingCategories ? "Loading ticket categories..." : "Select ticket category"}</option>
-                {categories.map((category) => <option key={category.id} value={category.id}>{formatCategoryLabel(category)}</option>)}
-              </select>
-              <FieldError id="ticket-category-error" message={errors.categoryId} />
-              {categoryError && <p className="mt-1 text-sm font-semibold text-red-600">{categoryError}</p>}
-              {!isLoadingCategories && !categoryError && categories.length === 0 && (
-                <p className="mt-1 text-sm font-semibold text-yellow-700">No active ticket categories are available.</p>
-              )}
             </label>
 
             <label htmlFor="complaint-description" className="ke-form-label sm:col-span-2">

@@ -218,9 +218,6 @@ export default function TicketDetail() {
   const [customerHistoryLoading, setCustomerHistoryLoading] = useState(false);
   const [customerHistoryError, setCustomerHistoryError] = useState("");
   const [hasLoadedCustomerHistory, setHasLoadedCustomerHistory] = useState(false);
-  const [dynamicValues, setDynamicValues] = useState([]);
-  const [dynamicValuesLoading, setDynamicValuesLoading] = useState(false);
-  const [dynamicValuesError, setDynamicValuesError] = useState("");
   const [workflowHistory, setWorkflowHistory] = useState([]);
   const [workflowHistoryPage, setWorkflowHistoryPage] = useState(0);
   const [workflowHistoryLast, setWorkflowHistoryLast] = useState(true);
@@ -235,7 +232,6 @@ export default function TicketDetail() {
   const [pendingDeleteChargeId, setPendingDeleteChargeId] = useState(null);
   const availableActionsTicketIdRef = useRef(ticketId);
   const customerHistoryTicketIdRef = useRef(ticketId);
-  const dynamicValuesTicketIdRef = useRef(ticketId);
   const ticketDetailTicketIdRef = useRef(ticketId);
   const workflowHistoryTicketIdRef = useRef(ticketId);
   const currentRole = localStorage.getItem("role") ?? "";
@@ -376,7 +372,6 @@ export default function TicketDetail() {
 
   useEffect(() => {
     availableActionsTicketIdRef.current = ticketId;
-    dynamicValuesTicketIdRef.current = ticketId;
     ticketDetailTicketIdRef.current = ticketId;
     workflowHistoryTicketIdRef.current = ticketId;
     setWorkflowHistory([]);
@@ -394,9 +389,6 @@ export default function TicketDetail() {
     setAvailableActions(null);
     setAvailableActionsLoading(false);
     setAvailableActionsError("");
-    setDynamicValues([]);
-    setDynamicValuesLoading(false);
-    setDynamicValuesError("");
     loadTicket();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
@@ -421,43 +413,11 @@ export default function TicketDetail() {
     setHasLoadedCustomerHistory(false);
   }, [ticketId]);
 
-  const loadDynamicValues = async () => {
-    if (!ticketId) return;
-
-    const requestedTicketId = ticketId;
-    setDynamicValues([]);
-    setDynamicValuesError("");
-    setDynamicValuesLoading(true);
-
-    try {
-      const response = await fetch(`/volt/tickets/${ticketId}/dynamic-values`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      });
-
-      if (!response.ok) throw new Error("Unable to load dynamic values");
-
-      const data = await response.json();
-      if (String(dynamicValuesTicketIdRef.current) !== String(requestedTicketId)) return;
-      setDynamicValues(Array.isArray(data.dynamicValues) ? data.dynamicValues : []);
-    } catch {
-      if (String(dynamicValuesTicketIdRef.current) !== String(requestedTicketId)) return;
-      setDynamicValues([]);
-      setDynamicValuesError("Unable to load additional details.");
-    } finally {
-      if (String(dynamicValuesTicketIdRef.current) === String(requestedTicketId)) {
-        setDynamicValuesLoading(false);
-      }
-    }
-  };
-
   useEffect(() => {
     if (!ticket?.id || String(ticket.id) !== String(ticketId)) return undefined;
 
     return scheduleSecondaryWork(() => {
       loadAvailableActions();
-      loadDynamicValues();
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticket?.id, ticketId]);
@@ -1005,27 +965,6 @@ export default function TicketDetail() {
                 )}
               </div>}
             </section>
-
-            {(dynamicValuesLoading || dynamicValues.length > 0 || dynamicValuesError) && (
-              <section className="min-h-24 min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-                <h2 className="text-lg font-bold text-blue-950">Additional Details</h2>
-                {dynamicValuesLoading && <p className="mt-3 text-sm font-semibold text-gray-600">Loading additional details...</p>}
-                {!dynamicValuesLoading && dynamicValuesError && (
-                  <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-                    {dynamicValuesError}
-                  </p>
-                )}
-                {dynamicValues.length > 0 && (
-                  <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                    {dynamicValues.map((dynamicValue) => (
-                      <InfoItem key={dynamicValue.id ?? `${dynamicValue.fieldLabel}-${dynamicValue.displayValue}`} label={dynamicValue.fieldLabel || "Additional Detail"}>
-                        {dynamicValue.displayValue || "-"}
-                      </InfoItem>
-                    ))}
-                  </dl>
-                )}
-              </section>
-            )}
 
             {canViewCharges && <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">

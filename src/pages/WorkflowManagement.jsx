@@ -581,6 +581,56 @@ function ConfirmTransitionChangeDialog({ pendingChange, onCancel, onConfirm, isS
   );
 }
 
+function ConfirmWorkflowModeChangeDialog({ pendingChange, onCancel, onConfirm, isSaving }) {
+  if (!pendingChange) return null;
+
+  const isActivation = pendingChange.targetConfig.workflowMode === "DB_CONFIGURED";
+  const category = pendingChange.category;
+  const currentConfig = pendingChange.currentConfig;
+  const targetConfig = pendingChange.targetConfig;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 px-4" role="dialog" aria-modal="true" aria-label="Confirm category workflow mode change">
+      <div className="w-full max-w-xl rounded-lg border border-slate-200 bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-xs font-extrabold uppercase text-slate-500">Strong Confirmation</p>
+          <h2 className="mt-1 text-lg font-extrabold text-blue-950">
+            {isActivation ? "Activate DB Configured Workflow" : "Rollback to Legacy Fixed Workflow"}
+          </h2>
+        </div>
+        <div className="space-y-3 px-5 py-4 text-sm font-semibold text-slate-700">
+          <BusinessKeyLabel label={category?.displayName} technicalKey={category?.categoryKey} subtle />
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-xs font-extrabold uppercase text-slate-500">Current Mode</p>
+              <p className="mt-1 text-blue-950">{currentConfig?.workflowMode || "Not loaded"}</p>
+              <p className="mt-1 text-xs text-slate-600">DB: {currentConfig?.dbWorkflowEnabled ? "Enabled" : "Disabled"} / Fixed: {currentConfig?.fixedActionsEnabled ? "Enabled" : "Disabled"}</p>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+              <p className="text-xs font-extrabold uppercase text-blue-950">Target Mode</p>
+              <p className="mt-1 text-blue-950">{targetConfig.workflowMode}</p>
+              <p className="mt-1 text-xs text-blue-950">DB: {targetConfig.dbWorkflowEnabled ? "Enabled" : "Disabled"} / Fixed: {targetConfig.fixedActionsEnabled ? "Enabled" : "Disabled"}</p>
+            </div>
+          </div>
+          {isActivation ? (
+            <p>Only the selected category changes. Normal categories are not affected. Validation will run again after activation.</p>
+          ) : (
+            <p>Rollback only affects the selected category. Workflow metadata, transitions, rules, statuses, actions, workflow history, and ticket data are preserved.</p>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onCancel} disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60">
+            {isSaving ? "Saving..." : "Confirm"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DetailDrawer({
   item,
   onClose,
@@ -752,6 +802,7 @@ export default function WorkflowManagement() {
   const [isSavingRule, setIsSavingRule] = useState(false);
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const [isSavingTransition, setIsSavingTransition] = useState(false);
+  const [isSavingWorkflowMode, setIsSavingWorkflowMode] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [drawerItem, setDrawerItem] = useState(null);
@@ -760,6 +811,7 @@ export default function WorkflowManagement() {
   const [pendingMetadataChange, setPendingMetadataChange] = useState(null);
   const [transitionForm, setTransitionForm] = useState(null);
   const [pendingTransitionChange, setPendingTransitionChange] = useState(null);
+  const [pendingWorkflowModeChange, setPendingWorkflowModeChange] = useState(null);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => String(category.id) === String(selectedCategoryId)),
@@ -807,6 +859,13 @@ export default function WorkflowManagement() {
       ? "Ready"
       : "Not Ready"
     : "Not run";
+
+  const validationForSelectedCategory = validationResult && String(validationResult.categoryId) === String(selectedCategoryId);
+  const blockingIssueCount = validationForSelectedCategory ? (validationResult.blockingIssues || validationResult.issues || []).length : 0;
+  const warningCount = validationForSelectedCategory ? (validationResult.warnings || []).length : 0;
+  const readyToActivate = Boolean(validationForSelectedCategory && validationResult.readyToActivate && blockingIssueCount === 0);
+  const activationTargetConfig = { workflowMode: "DB_CONFIGURED", dbWorkflowEnabled: true, fixedActionsEnabled: false };
+  const rollbackTargetConfig = { workflowMode: "LEGACY_FIXED", dbWorkflowEnabled: false, fixedActionsEnabled: true };
 
   const loadTransitionRules = useCallback(async (nextTransitions) => {
     const categoryRuleEntries = await Promise.all(
@@ -1011,6 +1070,7 @@ export default function WorkflowManagement() {
     const timeoutId = window.setTimeout(() => {
       loadCategoryConfig(selectedCategoryId);
       setValidationResult(null);
+      setPendingWorkflowModeChange(null);
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
@@ -1237,6 +1297,69 @@ export default function WorkflowManagement() {
 
   const confirmTransitionChange = () => {
     pendingTransitionChange?.action?.();
+  };
+
+  const requestWorkflowModeChange = (targetConfig) => {
+    if (!selectedCategoryId || !selectedCategory || !categoryWorkflowConfig) {
+      setError("Select a category and load its workflow config before changing workflow mode.");
+      return;
+    }
+
+    if (targetConfig.workflowMode === "DB_CONFIGURED" && !readyToActivate) {
+      setError("Run validation before activation. Activation requires readyToActivate=true with no blocking issues.");
+      return;
+    }
+
+    setError("");
+    setStatusMessage("");
+    setPendingWorkflowModeChange({
+      categoryId: selectedCategoryId,
+      category: selectedCategory,
+      currentConfig: categoryWorkflowConfig,
+      targetConfig,
+    });
+  };
+
+  const confirmWorkflowModeChange = async () => {
+    if (!pendingWorkflowModeChange) return;
+    if (String(pendingWorkflowModeChange.categoryId) !== String(selectedCategoryId)) {
+      setError("Selected category changed before confirmation. Please review and try again.");
+      setPendingWorkflowModeChange(null);
+      return;
+    }
+
+    const { categoryId, targetConfig } = pendingWorkflowModeChange;
+    const activating = targetConfig.workflowMode === "DB_CONFIGURED";
+    if (activating && !readyToActivate) {
+      setError("Activation stopped because validation is no longer ready.");
+      setPendingWorkflowModeChange(null);
+      return;
+    }
+
+    setIsSavingWorkflowMode(true);
+    setError("");
+    setStatusMessage("");
+    try {
+      const response = await fetch(`/volt/ticket-categories/${categoryId}/workflow-config`, {
+        method: "PATCH",
+        headers: authHeaders(true),
+        body: JSON.stringify(targetConfig),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Unable to update category workflow mode."));
+      }
+
+      setCategoryWorkflowConfig(await response.json());
+      await Promise.all([loadBaseData(), loadCategoryConfig(categoryId), loadTransitionsAndRules()]);
+      await runValidation(categoryId);
+      setPendingWorkflowModeChange(null);
+      setStatusMessage(activating ? "Selected category activated for DB configured workflow." : "Selected category rolled back to legacy fixed workflow.");
+    } catch (modeError) {
+      setError(modeError.message || "Unable to update category workflow mode.");
+    } finally {
+      setIsSavingWorkflowMode(false);
+    }
   };
 
   const openStatusForm = (status = null) => {
@@ -1539,6 +1662,48 @@ export default function WorkflowManagement() {
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
             <Search size={16} aria-hidden="true" />
             {isLoadingCategory ? "Loading category config..." : "Rule changes apply only to the selected category"}
+          </div>
+        </section>
+
+        <section className="mt-4 border border-slate-200 bg-white px-4 py-3" aria-label="Activation readiness">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold uppercase text-slate-500">Activation Readiness</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Badge tone="blue">Category: {selectedCategory?.displayName || "Select category"}</Badge>
+                <Badge tone="slate">Key: {selectedCategory?.categoryKey || "Not selected"}</Badge>
+                <Badge tone="blue">Mode: {categoryWorkflowConfig?.workflowMode || "Not loaded"}</Badge>
+                <StateBadge enabled={Boolean(categoryWorkflowConfig?.dbWorkflowEnabled)} trueLabel="DB enabled" falseLabel="DB disabled" />
+                <StateBadge enabled={Boolean(categoryWorkflowConfig?.fixedActionsEnabled)} trueLabel="Fixed enabled" falseLabel="Fixed disabled" />
+                <Badge tone={readyToActivate ? "green" : "yellow"}>readyToActivate: {readyToActivate ? "true" : "false"}</Badge>
+                <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>Blockers: {blockingIssueCount}</Badge>
+                <Badge tone={warningCount > 0 ? "yellow" : "slate"}>Warnings: {warningCount}</Badge>
+              </div>
+              <p className="mt-2 text-xs font-semibold text-slate-600">
+                Updated: {formatDateTime(categoryWorkflowConfig?.workflowModeUpdatedAt)} / {categoryWorkflowConfig?.workflowModeUpdatedByEmployeeId || "Unknown"}
+              </p>
+              {!validationForSelectedCategory && (
+                <p className="mt-2 text-sm font-bold text-yellow-800">Run Validation before activation.</p>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
+              <button
+                type="button"
+                onClick={() => requestWorkflowModeChange(activationTargetConfig)}
+                disabled={!selectedCategoryId || !readyToActivate || categoryWorkflowConfig?.workflowMode === "DB_CONFIGURED" || isSavingWorkflowMode}
+                className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
+              >
+                Activate DB Workflow
+              </button>
+              <button
+                type="button"
+                onClick={() => requestWorkflowModeChange(rollbackTargetConfig)}
+                disabled={!selectedCategoryId || !categoryWorkflowConfig || categoryWorkflowConfig.workflowMode === "LEGACY_FIXED" || isSavingWorkflowMode}
+                className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+              >
+                Rollback to Legacy
+              </button>
+            </div>
           </div>
         </section>
 
@@ -2027,6 +2192,12 @@ export default function WorkflowManagement() {
         onCancel={() => setPendingTransitionChange(null)}
         onConfirm={confirmTransitionChange}
         isSaving={isSavingTransition}
+      />
+      <ConfirmWorkflowModeChangeDialog
+        pendingChange={pendingWorkflowModeChange}
+        onCancel={() => setPendingWorkflowModeChange(null)}
+        onConfirm={confirmWorkflowModeChange}
+        isSaving={isSavingWorkflowMode}
       />
     </main>
   );

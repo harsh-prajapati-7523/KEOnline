@@ -11,6 +11,8 @@ const tabs = [
   { id: "validation", label: "Validation" },
 ];
 
+const managedRoleKeys = ["SUPER_ADMIN", "ADMIN", "TECHNICIAN"];
+
 function authHeaders(includeContentType = false) {
   return {
     ...(includeContentType ? { "Content-Type": "application/json" } : {}),
@@ -150,11 +152,17 @@ function getStatusLabel(transition, direction) {
 
 function getCategoryRuleState(transitionId, selectedCategoryId, categoryRulesByTransitionId) {
   const rules = categoryRulesByTransitionId[transitionId] || [];
-  if (rules.length === 0) return { label: "All categories", tone: "green" };
+  if (!selectedCategoryId) return { label: "No category", tone: "slate" };
   const selectedRule = rules.find((rule) => String(rule.categoryId) === String(selectedCategoryId));
-  if (selectedRule?.active) return { label: "Included", tone: "green" };
-  if (selectedRule) return { label: "Inactive rule", tone: "yellow" };
-  return { label: "Excluded", tone: "red" };
+  if (selectedRule?.active) return { label: "Active", tone: "green" };
+  if (selectedRule) return { label: "Inactive", tone: "yellow" };
+  return { label: "Missing", tone: "slate" };
+}
+
+function getRuleVisualState(rule) {
+  if (rule?.active) return { label: "Active", tone: "green" };
+  if (rule) return { label: "Inactive", tone: "yellow" };
+  return { label: "Missing", tone: "slate" };
 }
 
 function roleRuleState(transitionId, roleId, roleRulesByTransitionId) {
@@ -181,12 +189,79 @@ function combinedTransitionRoleState(transition, role, roleAccessByRoleId, roleR
   return "none";
 }
 
-function DetailDrawer({ item, onClose, categoryRulesByTransitionId, roleRulesByTransitionId }) {
+function ConfirmRuleChangeDialog({ pendingChange, onCancel, onConfirm, isSaving }) {
+  if (!pendingChange) return null;
+
+  const isCategory = pendingChange.scope === "category";
+  const targetLabel = isCategory
+    ? pendingChange.category?.displayName || formatLabel(pendingChange.category?.categoryKey)
+    : pendingChange.role?.displayName || formatLabel(pendingChange.role?.roleKey);
+  const targetKey = isCategory ? pendingChange.category?.categoryKey : pendingChange.role?.roleKey;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 px-4" role="dialog" aria-modal="true" aria-label="Confirm workflow rule change">
+      <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-xs font-extrabold uppercase text-slate-500">Confirm Rule Change</p>
+          <h2 className="mt-1 text-lg font-extrabold text-blue-950">
+            {pendingChange.nextActive ? "Enable" : "Disable"} {isCategory ? "category" : "role"} rule
+          </h2>
+        </div>
+        <div className="space-y-3 px-5 py-4 text-sm font-semibold text-slate-700">
+          <p>
+            {isCategory
+              ? "You are changing workflow rule availability for the selected category only. This does not activate or deactivate the category workflow mode."
+              : "You are changing which role can use this transition. This does not change ticket category workflow mode."}
+          </p>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+            <BusinessKeyLabel label={pendingChange.transition?.displayName || formatLabel(pendingChange.transition?.actionKey)} technicalKey={pendingChange.transition?.actionKey} subtle />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge tone="blue">{isCategory ? "Category" : "Role"}: {targetLabel}</Badge>
+              <Badge tone="slate">Key: {targetKey || "UNKNOWN"}</Badge>
+              <Badge tone={pendingChange.nextActive ? "green" : "red"}>{pendingChange.nextActive ? "Enable" : "Disable"}</Badge>
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isSaving}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isSaving}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
+          >
+            {isSaving ? "Saving..." : "Confirm Change"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailDrawer({
+  item,
+  onClose,
+  selectedCategory,
+  managedRoles,
+  categoryRulesByTransitionId,
+  roleRulesByTransitionId,
+  onRequestRuleChange,
+  isSavingRule,
+}) {
   if (!item) return null;
 
   const isTransition = item.type === "transition";
   const rules = isTransition ? categoryRulesByTransitionId[item.data.id] || [] : [];
   const roleRules = isTransition ? roleRulesByTransitionId[item.data.id] || [] : [];
+  const selectedCategoryRule = rules.find((rule) => String(rule.categoryId) === String(selectedCategory?.id));
+  const selectedCategoryState = getRuleVisualState(selectedCategoryRule);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30" role="dialog" aria-modal="true" aria-label="Workflow details">
@@ -214,28 +289,101 @@ function DetailDrawer({ item, onClose, categoryRulesByTransitionId, roleRulesByT
           {isTransition && (
             <>
               <section className="mt-5">
-                <h3 className="text-sm font-extrabold text-blue-950">Category Rules</h3>
-                <div className="mt-2 space-y-2">
-                  {rules.length === 0 && <Badge tone="green">All categories</Badge>}
-                  {rules.map((rule) => (
-                    <div key={rule.id} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm">
-                      <BusinessKeyLabel label={rule.categoryDisplayName} technicalKey={rule.categoryKey} subtle />
-                      <StateBadge enabled={rule.active} trueLabel="Active" falseLabel="Inactive" />
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-extrabold text-blue-950">Selected Category Rule</h3>
+                  <Badge tone={selectedCategoryState.tone}>{selectedCategoryState.label}</Badge>
+                </div>
+                <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                  <BusinessKeyLabel label={selectedCategory?.displayName} technicalKey={selectedCategory?.categoryKey} subtle />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onRequestRuleChange({
+                        scope: "category",
+                        transition: item.data,
+                        category: selectedCategory,
+                        rule: selectedCategoryRule,
+                        nextActive: true,
+                      })}
+                      disabled={!selectedCategory || selectedCategoryRule?.active || isSavingRule}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg bg-blue-950 px-3 py-2 text-xs font-extrabold text-white hover:bg-blue-900 disabled:opacity-50"
+                    >
+                      Enable
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onRequestRuleChange({
+                        scope: "category",
+                        transition: item.data,
+                        category: selectedCategory,
+                        rule: selectedCategoryRule,
+                        nextActive: false,
+                      })}
+                      disabled={!selectedCategoryRule || !selectedCategoryRule.active || isSavingRule}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      Disable
+                    </button>
+                  </div>
+                  {!selectedCategoryRule && (
+                    <p className="mt-2 text-xs font-semibold text-slate-600">Missing rule can be created only by enabling this selected category.</p>
+                  )}
                 </div>
               </section>
 
               <section className="mt-5">
                 <h3 className="text-sm font-extrabold text-blue-950">Workflow Transition Role Rules</h3>
                 <div className="mt-2 space-y-2">
-                  {roleRules.length === 0 && <Badge tone="green">All roles</Badge>}
-                  {roleRules.map((rule) => (
-                    <div key={rule.id} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm">
-                      <BusinessKeyLabel label={rule.roleDisplayName} technicalKey={rule.roleKey} subtle />
-                      <StateBadge enabled={rule.active} trueLabel="Active" falseLabel="Inactive" />
+                  {managedRoles.map((role) => {
+                    const rule = roleRules.find((item) => String(item.roleId) === String(role.id));
+                    const state = getRuleVisualState(rule);
+                    return (
+                      <div key={role.id} className="border-b border-slate-100 py-3 text-sm">
+                        <div className="flex items-start justify-between gap-3">
+                          <BusinessKeyLabel label={role.displayName} technicalKey={role.roleKey} subtle />
+                          <Badge tone={state.tone}>{state.label}</Badge>
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onRequestRuleChange({
+                              scope: "role",
+                              transition: item.data,
+                              role,
+                              rule,
+                              nextActive: true,
+                            })}
+                            disabled={rule?.active || isSavingRule}
+                            className="inline-flex min-h-9 items-center justify-center rounded-lg bg-blue-950 px-3 py-2 text-xs font-extrabold text-white hover:bg-blue-900 disabled:opacity-50"
+                          >
+                            Enable
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRequestRuleChange({
+                              scope: "role",
+                              transition: item.data,
+                              role,
+                              rule,
+                              nextActive: false,
+                            })}
+                            disabled={!rule || !rule.active || isSavingRule}
+                            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            Disable
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {managedRoles.length === 0 && (
+                    <div className="py-2 text-sm font-semibold text-slate-600">No approved roles are available for rule management.</div>
+                  )}
+                  {roleRules.length > managedRoles.length && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600">
+                      Additional role rules are visible in matrices but outside Phase 2 management scope.
                     </div>
-                  ))}
+                  )}
                 </div>
               </section>
             </>
@@ -263,8 +411,11 @@ export default function WorkflowManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCategory, setIsLoadingCategory] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
+  const [isSavingRule, setIsSavingRule] = useState(false);
   const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
   const [drawerItem, setDrawerItem] = useState(null);
+  const [pendingRuleChange, setPendingRuleChange] = useState(null);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => String(category.id) === String(selectedCategoryId)),
@@ -286,6 +437,11 @@ export default function WorkflowManagement() {
 
   const enabledRoleCount = useMemo(
     () => roles.filter((role) => role.active).length,
+    [roles]
+  );
+
+  const managedRoles = useMemo(
+    () => roles.filter((role) => managedRoleKeys.includes(role.roleKey)),
     [roles]
   );
 
@@ -322,6 +478,31 @@ export default function WorkflowManagement() {
 
     setCategoryRulesByTransitionId(Object.fromEntries(categoryRuleEntries));
     setRoleRulesByTransitionId(Object.fromEntries(roleRuleEntries));
+  }, []);
+
+  const loadSingleTransitionRules = useCallback(async (transitionId) => {
+    const [categoryResponse, roleResponse] = await Promise.all([
+      fetch(`/volt/workflow/transitions/${transitionId}/category-rules`, { headers: authHeaders() }),
+      fetch(`/volt/workflow/transitions/${transitionId}/role-rules`, { headers: authHeaders() }),
+    ]);
+
+    if (!categoryResponse.ok || !roleResponse.ok) {
+      throw new Error("Rule was saved, but refreshed rule data could not be loaded.");
+    }
+
+    const [categoryRules, roleRules] = await Promise.all([
+      categoryResponse.json(),
+      roleResponse.json(),
+    ]);
+
+    setCategoryRulesByTransitionId((current) => ({
+      ...current,
+      [transitionId]: normalizeArray(categoryRules, "rules"),
+    }));
+    setRoleRulesByTransitionId((current) => ({
+      ...current,
+      [transitionId]: normalizeArray(roleRules, "rules"),
+    }));
   }, []);
 
   const loadRoleAccess = useCallback(async (nextRoles) => {
@@ -428,25 +609,79 @@ export default function WorkflowManagement() {
 
   const refreshData = async () => {
     setValidationResult(null);
+    setStatusMessage("");
     await loadBaseData();
   };
 
-  const runValidation = async () => {
-    if (!selectedCategoryId) return;
+  const runValidation = async (categoryId = selectedCategoryId) => {
+    if (!categoryId) return null;
     setIsValidating(true);
     setError("");
     try {
       const response = await fetch("/volt/workflow/validate-category-workflow", {
         method: "POST",
         headers: authHeaders(true),
-        body: JSON.stringify({ categoryId: Number(selectedCategoryId) }),
+        body: JSON.stringify({ categoryId: Number(categoryId) }),
       });
       if (!response.ok) throw new Error(await readApiError(response, "Unable to validate selected category workflow."));
-      setValidationResult(await response.json());
+      const result = await response.json();
+      setValidationResult(result);
+      return result;
     } catch (validationError) {
       setError(validationError.message || "Unable to validate selected category workflow.");
+      return null;
     } finally {
       setIsValidating(false);
+    }
+  };
+
+  const requestRuleChange = (change) => {
+    if (!change?.transition?.id || !change.nextActive && !change.rule) return;
+    if (change.scope === "category" && !change.category?.id) return;
+    if (change.scope === "role" && !managedRoleKeys.includes(change.role?.roleKey)) return;
+    setError("");
+    setStatusMessage("");
+    setPendingRuleChange(change);
+  };
+
+  const confirmRuleChange = async () => {
+    if (!pendingRuleChange) return;
+
+    const { scope, transition, rule, nextActive, category, role } = pendingRuleChange;
+    setIsSavingRule(true);
+    setError("");
+    setStatusMessage("");
+
+    try {
+      const endpoint = scope === "category"
+        ? `/volt/workflow/transitions/${transition.id}/category-rules`
+        : `/volt/workflow/transitions/${transition.id}/role-rules`;
+      const response = rule
+        ? await fetch(`${endpoint}/${rule.id}`, {
+            method: "PATCH",
+            headers: authHeaders(true),
+            body: JSON.stringify({ active: nextActive }),
+          })
+        : await fetch(endpoint, {
+            method: "POST",
+            headers: authHeaders(true),
+            body: JSON.stringify(scope === "category"
+              ? { categoryId: Number(category.id), active: true }
+              : { roleId: Number(role.id), active: true }),
+          });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Unable to save workflow rule change."));
+      }
+
+      await loadSingleTransitionRules(transition.id);
+      await runValidation(category?.id || selectedCategoryId);
+      setPendingRuleChange(null);
+      setStatusMessage(`${scope === "category" ? "Category" : "Role"} rule ${nextActive ? "enabled" : "disabled"} and validation refreshed.`);
+    } catch (saveError) {
+      setError(saveError.message || "Unable to save workflow rule change.");
+    } finally {
+      setIsSavingRule(false);
     }
   };
 
@@ -543,6 +778,7 @@ export default function WorkflowManagement() {
         </header>
 
         {error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+        {statusMessage && <p className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">{statusMessage}</p>}
 
         <section className="mt-4" aria-label="Workflow summary">
           <div className="flex flex-wrap gap-2">
@@ -575,7 +811,7 @@ export default function WorkflowManagement() {
           </label>
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
             <Search size={16} aria-hidden="true" />
-            {isLoadingCategory ? "Loading category config..." : "Read-only category view"}
+            {isLoadingCategory ? "Loading category config..." : "Rule changes apply only to the selected category"}
           </div>
         </section>
 
@@ -627,7 +863,7 @@ export default function WorkflowManagement() {
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Transitions</span></BodyCell>
                   <BodyCell>{transitions.length} total, {activeTransitions.length} active</BodyCell>
-                  <BodyCell><Badge tone="blue">Read-only</Badge></BodyCell>
+                  <BodyCell><Badge tone="blue">Rule management</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Statuses</span></BodyCell>
@@ -834,7 +1070,7 @@ export default function WorkflowManagement() {
                 </div>
                 <button
                   type="button"
-                  onClick={runValidation}
+                  onClick={() => runValidation()}
                   disabled={!selectedCategoryId || isValidating}
                   className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
                 >
@@ -890,8 +1126,18 @@ export default function WorkflowManagement() {
       <DetailDrawer
         item={drawerItem}
         onClose={() => setDrawerItem(null)}
+        selectedCategory={selectedCategory}
+        managedRoles={managedRoles}
         categoryRulesByTransitionId={categoryRulesByTransitionId}
         roleRulesByTransitionId={roleRulesByTransitionId}
+        onRequestRuleChange={requestRuleChange}
+        isSavingRule={isSavingRule}
+      />
+      <ConfirmRuleChangeDialog
+        pendingChange={pendingRuleChange}
+        onCancel={() => setPendingRuleChange(null)}
+        onConfirm={confirmRuleChange}
+        isSaving={isSavingRule}
       />
     </main>
   );

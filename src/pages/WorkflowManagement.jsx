@@ -661,6 +661,25 @@ function compactActionLabel(transition, actionByKey) {
   return transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey);
 }
 
+function findStatusByPriority(statuses, priorities) {
+  for (const priority of priorities) {
+    const exact = statuses.find((status) => String(status.statusKey || "").toUpperCase() === priority);
+    if (exact) return exact;
+  }
+
+  for (const priority of priorities) {
+    const fuzzy = statuses.find((status) => matchesStatus(status, [priority, priority.replaceAll("_", " ")]));
+    if (fuzzy) return fuzzy;
+  }
+
+  return null;
+}
+
+function findTransitionBetween(transitions, fromStatus, toStatus) {
+  if (!fromStatus || !toStatus) return null;
+  return transitions.find((transition) => String(transition.fromStatusId) === String(fromStatus.id) && String(transition.toStatusId) === String(toStatus.id));
+}
+
 function WorkflowMapView({
   statuses,
   transitions,
@@ -668,62 +687,135 @@ function WorkflowMapView({
   onSelectItem,
   actionByKey,
 }) {
+  const [showAllTransitionLabels, setShowAllTransitionLabels] = useState(false);
   const sortedStatuses = [...statuses].sort((first, second) => (first.sortOrder ?? 999) - (second.sortOrder ?? 999) || String(first.statusKey).localeCompare(String(second.statusKey)));
-  const nodeWidth = 176;
+  const nodeWidth = 150;
   const nodeHeight = 68;
-  const mainY = 260;
-  const upperY = 88;
-  const lowerY = 430;
+  const mapWidth = 900;
+  const mapHeight = 520;
 
-  const findStatus = (terms) => sortedStatuses.find((status) => matchesStatus(status, terms));
+  const repairCompleted = findStatusByPriority(sortedStatuses, ["REPAIR_COMPLETED", "READY_FOR_DELIVERY"]);
+  const genericCompleted = findStatusByPriority(sortedStatuses, ["COMPLETED"]);
+  const delivered = findStatusByPriority(sortedStatuses, ["DELIVERED_TO_CUSTOMER"]);
+  const terminalCompleted = sortedStatuses.find((status) => status.terminal && matchesStatus(status, ["COMPLETED", "DELIVERED"]));
   const preferredMainPath = [
-    findStatus(["NEW"]),
-    findStatus(["IN_PROGRESS", "IN PROGRESS"]),
-    findStatus(["REPAIR_COMPLETED", "REPAIR COMPLETED", "READY_FOR_DELIVERY", "READY FOR DELIVERY", "COMPLETED"]),
-    findStatus(["DELIVERED_TO_CUSTOMER", "DELIVERED TO CUSTOMER", "DELIVERED"]),
+    findStatusByPriority(sortedStatuses, ["NEW"]),
+    findStatusByPriority(sortedStatuses, ["IN_PROGRESS"]),
+    repairCompleted || genericCompleted,
+    delivered || terminalCompleted,
   ].filter(Boolean);
   const mainPath = preferredMainPath.length >= 2 ? [...new Map(preferredMainPath.map((status) => [String(status.id), status])).values()] : sortedStatuses.slice(0, 4);
-  const mainIds = new Set(mainPath.map((status) => String(status.id)));
-  const branches = sortedStatuses.filter((status) => !mainIds.has(String(status.id)));
-  const upperBranches = branches.filter((status) => !status.terminal && !matchesStatus(status, ["CANCEL", "DECLINED", "DELIVERED"]));
-  const lowerBranches = branches.filter((status) => !upperBranches.includes(status));
-  const laneCount = Math.max(mainPath.length, upperBranches.length + 1, lowerBranches.length + 1, 4);
-  const stepX = 238;
-  const mapWidth = Math.max(1040, 80 + (laneCount - 1) * stepX + nodeWidth + 80);
-  const mapHeight = 560;
+  const branchGroups = [
+    {
+      id: "parts",
+      title: "Parts",
+      x: 250,
+      y: 54,
+      statuses: [
+        findStatusByPriority(sortedStatuses, ["MISSING_PART"]),
+        findStatusByPriority(sortedStatuses, ["PART_AVAILABLE"]),
+      ].filter(Boolean),
+    },
+    {
+      id: "approval",
+      title: "Customer Approval",
+      x: 500,
+      y: 54,
+      statuses: [
+        findStatusByPriority(sortedStatuses, ["CUSTOMER_APPROVAL_PENDING"]),
+        findStatusByPriority(sortedStatuses, ["CUSTOMER_DECLINED", "CUSTOMER_DECLINED_REPAIR"]),
+      ].filter(Boolean),
+    },
+    {
+      id: "warranty",
+      title: "Warranty",
+      x: 500,
+      y: 380,
+      statuses: [
+        findStatusByPriority(sortedStatuses, ["IN_WARRANTY"]),
+        findStatusByPriority(sortedStatuses, ["WARRANTY_COMPLAINT_LOGGED"]),
+      ].filter(Boolean),
+    },
+    {
+      id: "cancel",
+      title: "Cancel / Return",
+      x: 250,
+      y: 380,
+      statuses: [
+        findStatusByPriority(sortedStatuses, ["CANCELLED_PENDING_DELIVERY"]),
+        findStatusByPriority(sortedStatuses, ["CANCELLED"]),
+      ].filter(Boolean),
+    },
+  ].filter((group) => group.statuses.length > 0);
+  const visibleBranchStatuses = branchGroups.flatMap((group) => group.statuses);
+  const visibleIds = new Set([...mainPath, ...visibleBranchStatuses].map((status) => String(status.id)));
   const statusPositions = {};
 
-  mainPath.forEach((status, index) => {
-    statusPositions[String(status.id)] = { x: 72 + index * stepX, y: mainY, lane: "main" };
+  [
+    { status: mainPath[0], x: 36, y: 228 },
+    { status: mainPath[1], x: 252, y: 228 },
+    { status: mainPath[2], x: 498, y: 228 },
+    { status: mainPath[3], x: 714, y: 228 },
+  ].forEach((item) => {
+    if (item.status) statusPositions[String(item.status.id)] = { x: item.x, y: item.y, lane: "main" };
   });
-  upperBranches.forEach((status, index) => {
-    statusPositions[String(status.id)] = { x: 188 + index * stepX, y: upperY, lane: "branch" };
-  });
-  lowerBranches.forEach((status, index) => {
-    statusPositions[String(status.id)] = { x: 188 + index * stepX, y: lowerY, lane: "branch" };
+  branchGroups.forEach((group) => {
+    group.statuses.forEach((status, index) => {
+      statusPositions[String(status.id)] = {
+        x: group.x + index * 112,
+        y: group.y + 46,
+        lane: "branch",
+        groupId: group.id,
+      };
+    });
   });
 
-  const visibleTransitions = transitions.filter((transition) => statusPositions[String(transition.fromStatusId)] && statusPositions[String(transition.toStatusId)]);
+  const visibleTransitions = transitions.filter((transition) => visibleIds.has(String(transition.fromStatusId)) && visibleIds.has(String(transition.toStatusId)));
   const mainEdges = new Set(mainPath.slice(0, -1).map((status, index) => `${status.id}:${mainPath[index + 1]?.id}`));
-  const actionLabelSlots = new Map();
+  const primaryTransitions = mainPath.slice(0, -1).map((status, index) => findTransitionBetween(transitions, status, mainPath[index + 1])).filter(Boolean);
+  const relatedTransitionIds = new Set();
+  if (selectedItem?.type === "status") {
+    transitions.forEach((transition) => {
+      if (String(transition.fromStatusId) === String(selectedItem.data.id) || String(transition.toStatusId) === String(selectedItem.data.id)) {
+        relatedTransitionIds.add(String(transition.id));
+      }
+    });
+  } else if (selectedItem?.type === "transition") {
+    relatedTransitionIds.add(String(selectedItem.data.id));
+  }
+
+  const shouldShowTransitionLabel = (transition) => {
+    if (mainEdges.has(`${transition.fromStatusId}:${transition.toStatusId}`)) return true;
+    if (showAllTransitionLabels) return true;
+    return relatedTransitionIds.has(String(transition.id));
+  };
 
   return (
-    <div className="overflow-auto rounded-lg border border-slate-200 bg-white">
-      <div
-        className="relative bg-[radial-gradient(circle,#e2e8f0_1px,transparent_1px)]"
-        style={{ width: mapWidth, minHeight: mapHeight, backgroundSize: "28px 28px" }}
-      >
-        <div className="absolute left-6 top-5 rounded-full border border-slate-200 bg-white/95 px-3 py-1 text-xs font-extrabold uppercase text-slate-500 shadow-sm">
-          Branches / Exceptions
+    <div className="rounded-lg border border-slate-200 bg-white">
+      <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p className="text-sm font-extrabold text-blue-950">Workflow Story</p>
+          <p className="text-xs font-semibold text-slate-500">Primary repair path first; branch details appear on selection or advanced view.</p>
         </div>
-        <div className="absolute left-6 top-[244px] rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-extrabold uppercase text-blue-950">
+        <label className="inline-flex items-center gap-2 text-xs font-extrabold text-slate-700">
+          <input
+            type="checkbox"
+            checked={showAllTransitionLabels}
+            onChange={(event) => setShowAllTransitionLabels(event.target.checked)}
+          />
+          Show all transition labels
+        </label>
+      </div>
+      <div className="overflow-hidden px-2 py-3">
+        <div
+          className="relative mx-auto w-full max-w-[900px] bg-[radial-gradient(circle,#e2e8f0_1px,transparent_1px)]"
+          style={{ aspectRatio: `${mapWidth} / ${mapHeight}`, minHeight: 430, backgroundSize: "28px 28px" }}
+        >
+        <div className="absolute left-[2%] top-[41%] rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-extrabold uppercase text-blue-950">
           Primary Flow
         </div>
-        <div className="absolute left-6 top-[386px] rounded-full border border-slate-200 bg-white/95 px-3 py-1 text-xs font-extrabold uppercase text-slate-500 shadow-sm">
-          Alternate Outcomes
-        </div>
 
-        <svg className="absolute inset-0" width={mapWidth} height={mapHeight} aria-hidden="true">
+        <svg className="absolute inset-0 h-full w-full" viewBox={`0 0 ${mapWidth} ${mapHeight}`} preserveAspectRatio="none" aria-hidden="true">
           <defs>
             <marker id="workflow-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
               <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
@@ -735,17 +827,35 @@ function WorkflowMapView({
               <path d="M0,0 L0,6 L9,3 z" fill="#0f172a" />
             </marker>
           </defs>
+          {branchGroups.map((group) => {
+            const anchor = statusPositions[String(mainPath[1]?.id)];
+            if (!anchor) return null;
+            const targetX = group.x + Math.min(group.statuses.length, 2) * 56;
+            const targetY = group.y + 80;
+            return (
+              <path
+                key={`group-${group.id}`}
+                d={`M ${anchor.x + nodeWidth / 2} ${anchor.y + (group.y < anchor.y ? 4 : nodeHeight - 4)} C ${anchor.x + nodeWidth / 2} ${(anchor.y + targetY) / 2}, ${targetX} ${(anchor.y + targetY) / 2}, ${targetX} ${targetY}`}
+                className="fill-none stroke-slate-300"
+                strokeWidth="1.4"
+                strokeDasharray="7 8"
+                opacity="0.55"
+              />
+            );
+          })}
           {visibleTransitions.map((transition) => {
             const from = statusPositions[String(transition.fromStatusId)];
             const to = statusPositions[String(transition.toStatusId)];
             const selected = selectedItem?.type === "transition" && String(selectedItem.data.id) === String(transition.id);
             const isMainEdge = mainEdges.has(`${transition.fromStatusId}:${transition.toStatusId}`);
+            const related = relatedTransitionIds.has(String(transition.id));
+            if (!isMainEdge && !related && !showAllTransitionLabels) return null;
             const startX = from.x + nodeWidth;
             const startY = from.y + nodeHeight / 2;
             const endX = to.x;
             const endY = to.y + nodeHeight / 2;
             const midX = (startX + endX) / 2;
-            const sweep = isMainEdge ? 0 : Math.max(48, Math.min(110, Math.abs(endY - startY) * 0.65));
+            const sweep = Math.max(32, Math.min(76, Math.abs(endY - startY) * 0.45));
             const path = isMainEdge
               ? `M ${startX} ${startY} L ${endX} ${endY}`
               : `M ${startX} ${startY} C ${midX} ${startY + (endY > startY ? sweep : -sweep)}, ${midX} ${endY - (endY > startY ? sweep : -sweep)}, ${endX} ${endY}`;
@@ -754,9 +864,9 @@ function WorkflowMapView({
                 key={transition.id}
                 d={path}
                 className={`${selected ? "stroke-blue-700" : isMainEdge ? "stroke-slate-900" : getEdgeTone(transition, selected)} fill-none`}
-                strokeWidth={selected ? 3.5 : isMainEdge ? 3 : 1.7}
+                strokeWidth={selected ? 3.5 : isMainEdge ? 3 : 1.3}
                 strokeDasharray={transition.active ? (isMainEdge ? "0" : "7 7") : "4 8"}
-                opacity={selected || isMainEdge ? 1 : 0.62}
+                opacity={selected || isMainEdge ? 1 : 0.42}
                 markerEnd={selected ? "url(#workflow-arrow-selected)" : isMainEdge ? "url(#workflow-arrow-main)" : "url(#workflow-arrow)"}
               />
             );
@@ -764,54 +874,71 @@ function WorkflowMapView({
         </svg>
 
         {visibleTransitions.map((transition) => {
+          if (!shouldShowTransitionLabel(transition)) return null;
           const from = statusPositions[String(transition.fromStatusId)];
           const to = statusPositions[String(transition.toStatusId)];
           const selected = selectedItem?.type === "transition" && String(selectedItem.data.id) === String(transition.id);
           const isMainEdge = mainEdges.has(`${transition.fromStatusId}:${transition.toStatusId}`);
-          const slotKey = `${Math.round((from.x + to.x) / 2)}:${Math.round((from.y + to.y) / 2)}`;
-          const slotOffset = actionLabelSlots.get(slotKey) || 0;
-          actionLabelSlots.set(slotKey, slotOffset + 1);
-          const left = (from.x + nodeWidth + to.x) / 2 - (isMainEdge ? 72 : 62);
-          const top = (from.y + to.y) / 2 + nodeHeight / 2 - 16 + slotOffset * 28;
+          const left = ((from.x + nodeWidth + to.x) / 2 - (isMainEdge ? 62 : 50)) / mapWidth * 100;
+          const top = ((from.y + to.y) / 2 + nodeHeight / 2 - (isMainEdge ? 16 : 13)) / mapHeight * 100;
           return (
             <button
               key={`label-${transition.id}`}
               type="button"
               title={`${compactActionLabel(transition, actionByKey)} (${transition.actionKey})`}
               onClick={() => onSelectItem({ type: "transition", data: transition })}
-              className={`absolute z-20 truncate rounded-full border bg-white px-3 py-1 text-center text-[0.68rem] font-extrabold shadow-sm transition hover:border-blue-400 hover:text-blue-950 ${selected ? "border-blue-500 text-blue-950 ring-2 ring-blue-200" : isMainEdge ? "border-slate-300 text-slate-800" : "border-slate-200 text-slate-500"} ${transition.active ? "" : "opacity-60"}`}
-              style={{ left, top, width: isMainEdge ? 144 : 124 }}
+              className={`absolute z-20 truncate rounded-full border bg-white px-2.5 py-1 text-center font-extrabold shadow-sm transition hover:border-blue-400 hover:text-blue-950 ${selected ? "border-blue-500 text-blue-950 ring-2 ring-blue-200" : isMainEdge ? "border-slate-300 text-slate-800" : "border-slate-200 text-slate-500"} ${isMainEdge ? "text-[0.68rem]" : "text-[0.62rem] opacity-80"} ${transition.active ? "" : "opacity-60"}`}
+              style={{ left: `${left}%`, top: `${top}%`, width: isMainEdge ? 124 : 104 }}
             >
               {compactActionLabel(transition, actionByKey)}
             </button>
           );
         })}
 
-        {sortedStatuses.map((status) => {
+        {branchGroups.map((group) => (
+          <section
+            key={group.id}
+            className="absolute z-20 rounded-lg border border-slate-200 bg-white/90 px-3 py-2 shadow-sm"
+            style={{ left: `${(group.x - 12) / mapWidth * 100}%`, top: `${(group.y - 4) / mapHeight * 100}%`, width: group.statuses.length > 1 ? 250 : 138 }}
+          >
+            <p className="mb-2 text-[0.62rem] font-extrabold uppercase text-slate-500">{group.title}</p>
+          </section>
+        ))}
+
+        {[...mainPath, ...visibleBranchStatuses].map((status) => {
           const position = statusPositions[String(status.id)];
           if (!position) return null;
           const selected = selectedItem?.type === "status" && String(selectedItem.data.id) === String(status.id);
           const protectedRecord = isProtectedStatus(status);
           const isMain = position.lane === "main";
+          const width = isMain ? nodeWidth : 106;
+          const height = isMain ? nodeHeight : 50;
           return (
             <button
               key={status.id ?? status.statusKey}
               type="button"
               title={`${status.displayName || formatLabel(status.statusKey)} (${status.statusKey})`}
               onClick={() => onSelectItem({ type: "status", data: status })}
-              className={`absolute z-30 rounded-lg border-2 px-3 py-3 text-left shadow-sm transition hover:shadow-md ${getStatusTone(status)} ${selected ? "ring-4 ring-blue-200" : ""} ${isMain ? "shadow-md" : "opacity-95"}`}
-              style={{ left: position.x, top: position.y, width: nodeWidth, minHeight: nodeHeight }}
+              className={`absolute z-30 rounded-lg border-2 text-left shadow-sm transition hover:shadow-md ${getStatusTone(status)} ${selected ? "ring-4 ring-blue-200" : ""} ${isMain ? "px-3 py-3 shadow-md" : "px-2 py-2 opacity-95"}`}
+              style={{ left: `${position.x / mapWidth * 100}%`, top: `${position.y / mapHeight * 100}%`, width, minHeight: height }}
             >
-              <span className="line-clamp-2 block text-sm font-extrabold leading-snug">{status.displayName || formatLabel(status.statusKey)}</span>
-              <span className="mt-2 flex items-center gap-1.5">
-                {status.terminal && <span className="h-2.5 w-2.5 rounded-full bg-green-500" aria-label="Terminal status" />}
-                {protectedRecord && <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" aria-label="Protected status" />}
-                {!protectedRecord && !status.terminal && <span className="h-2.5 w-2.5 rounded-full bg-blue-500" aria-label="Custom status" />}
+              <span className={`${isMain ? "text-sm" : "text-[0.7rem]"} line-clamp-2 block font-extrabold leading-snug`}>{status.displayName || formatLabel(status.statusKey)}</span>
+              <span className={`${isMain ? "mt-2" : "mt-1"} flex items-center gap-1.5`}>
+                {status.terminal && <span className={`${isMain ? "h-2.5 w-2.5" : "h-2 w-2"} rounded-full bg-green-500`} aria-label="Terminal status" />}
+                {protectedRecord && <span className={`${isMain ? "h-2.5 w-2.5" : "h-2 w-2"} rounded-full bg-yellow-500`} aria-label="Protected status" />}
+                {!protectedRecord && !status.terminal && <span className={`${isMain ? "h-2.5 w-2.5" : "h-2 w-2"} rounded-full bg-blue-500`} aria-label="Custom status" />}
                 {!status.active && <span className="text-[0.64rem] font-extrabold uppercase text-slate-500">Inactive</span>}
               </span>
             </button>
           );
         })}
+
+        {primaryTransitions.length === 0 && (
+          <p className="absolute bottom-3 left-4 right-4 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-bold text-yellow-900">
+            Primary path statuses are visible, but no direct primary transitions were found between every step.
+          </p>
+        )}
+        </div>
       </div>
     </div>
   );
@@ -2071,19 +2198,27 @@ export default function WorkflowManagement() {
           </div>
         </section>
 
-        <section className="mt-4 border border-slate-200 bg-white px-4 py-3" aria-label="Activation readiness">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-extrabold uppercase text-slate-500">Activation Readiness</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Badge tone="blue">Category: {selectedCategory?.displayName || "Select category"}</Badge>
-                <Badge tone="slate">Key: {selectedCategory?.categoryKey || "Not selected"}</Badge>
+        <details className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3" aria-label="Activation readiness">
+          <summary className="cursor-pointer list-none">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-extrabold uppercase text-slate-500">Activation Readiness</span>
                 <Badge tone="blue">Mode: {categoryWorkflowConfig?.workflowMode || "Not loaded"}</Badge>
                 {isLoadingCategory && <Badge tone="yellow">Loading config</Badge>}
                 <StateBadge enabled={Boolean(categoryWorkflowConfig?.dbWorkflowEnabled)} trueLabel="DB enabled" falseLabel="DB disabled" />
+                <Badge tone={readyToActivate ? "green" : "yellow"}>{readyToActivate ? "Ready" : "Validation Needed"}</Badge>
+                <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>{blockingIssueCount} Blockers</Badge>
+              </div>
+              <span className="text-xs font-bold text-slate-500">Open controls</span>
+            </div>
+          </summary>
+          <div className="mt-3 flex flex-col gap-3 border-t border-slate-200 pt-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap gap-2">
+                <Badge tone="blue">Category: {selectedCategory?.displayName || "Select category"}</Badge>
+                <Badge tone="slate">Key: {selectedCategory?.categoryKey || "Not selected"}</Badge>
                 <StateBadge enabled={Boolean(categoryWorkflowConfig?.fixedActionsEnabled)} trueLabel="Fixed enabled" falseLabel="Fixed disabled" />
                 <Badge tone={readyToActivate ? "green" : "yellow"}>readyToActivate: {readyToActivate ? "true" : "false"}</Badge>
-                <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>Blockers: {blockingIssueCount}</Badge>
                 <Badge tone={warningCount > 0 ? "yellow" : "slate"}>Warnings: {warningCount}</Badge>
               </div>
               <p className="mt-2 text-xs font-semibold text-slate-600">
@@ -2112,7 +2247,7 @@ export default function WorkflowManagement() {
               </button>
             </div>
           </div>
-        </section>
+        </details>
 
         <nav className="mt-4 overflow-x-auto border-b border-slate-200" aria-label="Workflow tabs">
           <div className="flex min-w-max gap-1">

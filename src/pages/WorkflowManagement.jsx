@@ -12,6 +12,29 @@ const tabs = [
 ];
 
 const managedRoleKeys = ["SUPER_ADMIN", "ADMIN", "TECHNICIAN"];
+const protectedStatusKeys = ["NEW", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+const protectedActionKeys = ["PICK_TICKET", "START_WORK", "COMPLETE_TICKET", "CANCEL_TICKET"];
+const behaviorBucketOptions = ["NEW", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
+
+const emptyStatusForm = {
+  statusKey: "",
+  displayName: "",
+  behaviorBucket: "",
+  terminal: false,
+  active: true,
+  sortOrder: "",
+};
+
+const emptyActionForm = {
+  actionKey: "",
+  displayName: "",
+  buttonLabel: "",
+  description: "",
+  active: true,
+  sortOrder: "",
+  requiresComment: false,
+  confirmationRequired: false,
+};
 
 function authHeaders(includeContentType = false) {
   return {
@@ -189,6 +212,134 @@ function combinedTransitionRoleState(transition, role, roleAccessByRoleId, roleR
   return "none";
 }
 
+function isProtectedStatus(status) {
+  return Boolean(status?.systemStatus || status?.protectedStatus || protectedStatusKeys.includes(status?.statusKey));
+}
+
+function isProtectedAction(action) {
+  return Boolean(action?.systemAction || action?.protectedAction || protectedActionKeys.includes(action?.actionKey));
+}
+
+function normalizeKey(value) {
+  return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+}
+
+function FormField({ label, children }) {
+  return (
+    <label className="block text-sm font-bold text-slate-700">
+      <span className="mb-1 block">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function textInputClass() {
+  return "min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950 disabled:bg-slate-100 disabled:text-slate-500";
+}
+
+function EntityFormModal({ formState, onCancel, onChange, onSubmit, isSaving }) {
+  if (!formState) return null;
+
+  const { entityType, mode, values, original } = formState;
+  const isStatus = entityType === "status";
+  const isCreate = mode === "create";
+  const title = `${isCreate ? "Create" : "Edit"} ${isStatus ? "Custom Status" : "Custom Action"}`;
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 px-4" role="dialog" aria-modal="true" aria-label={title}>
+      <form onSubmit={onSubmit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-xs font-extrabold uppercase text-slate-500">Workflow Metadata</p>
+          <h2 className="mt-1 text-lg font-extrabold text-blue-950">{title}</h2>
+        </div>
+
+        <div className="grid gap-4 px-5 py-4 sm:grid-cols-2">
+          {isStatus ? (
+            <>
+              <FormField label="Display Name">
+                <input className={textInputClass()} value={values.displayName} onChange={(event) => onChange("displayName", event.target.value)} maxLength={80} required />
+              </FormField>
+              <FormField label="Status Key">
+                <input className={textInputClass()} value={values.statusKey} onChange={(event) => onChange("statusKey", normalizeKey(event.target.value))} maxLength={50} disabled={!isCreate} required />
+              </FormField>
+              <FormField label="Behavior Bucket">
+                <select className={textInputClass()} value={values.behaviorBucket} onChange={(event) => onChange("behaviorBucket", event.target.value)}>
+                  <option value="">Not set</option>
+                  {behaviorBucketOptions.map((bucket) => (
+                    <option key={bucket} value={bucket}>{formatLabel(bucket)}</option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label="Sort Order">
+                <input className={textInputClass()} type="number" value={values.sortOrder} onChange={(event) => onChange("sortOrder", event.target.value)} />
+              </FormField>
+              <label className="flex min-h-10 items-center gap-2 text-sm font-bold text-slate-700">
+                <input type="checkbox" checked={values.terminal} onChange={(event) => onChange("terminal", event.target.checked)} />
+                Terminal status
+              </label>
+              {isCreate && (
+                <label className="flex min-h-10 items-center gap-2 text-sm font-bold text-slate-700">
+                  <input type="checkbox" checked={values.active} onChange={(event) => onChange("active", event.target.checked)} />
+                  Active on create
+                </label>
+              )}
+            </>
+          ) : (
+            <>
+              <FormField label="Display Name">
+                <input className={textInputClass()} value={values.displayName} onChange={(event) => onChange("displayName", event.target.value)} maxLength={80} required />
+              </FormField>
+              <FormField label="Action Key / Access Key">
+                <input className={textInputClass()} value={values.actionKey} onChange={(event) => onChange("actionKey", normalizeKey(event.target.value))} maxLength={60} disabled={!isCreate} required />
+              </FormField>
+              <FormField label="Button Label">
+                <input className={textInputClass()} value={values.buttonLabel} onChange={(event) => onChange("buttonLabel", event.target.value)} maxLength={80} />
+              </FormField>
+              <FormField label="Sort Order">
+                <input className={textInputClass()} type="number" value={values.sortOrder} onChange={(event) => onChange("sortOrder", event.target.value)} />
+              </FormField>
+              <FormField label="Description">
+                <textarea className={`${textInputClass()} min-h-24 sm:col-span-2`} value={values.description} onChange={(event) => onChange("description", event.target.value)} maxLength={255} />
+              </FormField>
+              <label className="flex min-h-10 items-center gap-2 text-sm font-bold text-slate-700">
+                <input type="checkbox" checked={values.requiresComment} onChange={(event) => onChange("requiresComment", event.target.checked)} />
+                Requires comment
+              </label>
+              <label className="flex min-h-10 items-center gap-2 text-sm font-bold text-slate-700">
+                <input type="checkbox" checked={values.confirmationRequired} onChange={(event) => onChange("confirmationRequired", event.target.checked)} />
+                Confirmation required
+              </label>
+              {isCreate && (
+                <label className="flex min-h-10 items-center gap-2 text-sm font-bold text-slate-700">
+                  <input type="checkbox" checked={values.active} onChange={(event) => onChange("active", event.target.checked)} />
+                  Active on create
+                </label>
+              )}
+              <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-950 sm:col-span-2">
+                Action key is the access key. Creating this action does not grant role access automatically.
+              </div>
+            </>
+          )}
+          {!isCreate && original && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-600 sm:col-span-2">
+              Immutable key locked after create: {isStatus ? original.statusKey : original.actionKey}
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onCancel} disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            Cancel
+          </button>
+          <button type="submit" disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60">
+            {isSaving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function ConfirmRuleChangeDialog({ pendingChange, onCancel, onConfirm, isSaving }) {
   if (!pendingChange) return null;
 
@@ -238,6 +389,52 @@ function ConfirmRuleChangeDialog({ pendingChange, onCancel, onConfirm, isSaving 
             className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
           >
             {isSaving ? "Saving..." : "Confirm Change"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmMetadataChangeDialog({ pendingChange, onCancel, onConfirm, isSaving }) {
+  if (!pendingChange) return null;
+
+  const isStatus = pendingChange.entityType === "status";
+  const isState = pendingChange.kind === "state";
+  const key = isStatus ? pendingChange.item?.statusKey : pendingChange.item?.actionKey;
+  const label = pendingChange.item?.displayName || formatLabel(key);
+  const actionText = isState
+    ? pendingChange.nextActive ? "Enable" : "Disable"
+    : pendingChange.mode === "create" ? "Create" : "Save";
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 px-4" role="dialog" aria-modal="true" aria-label="Confirm workflow metadata change">
+      <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-xs font-extrabold uppercase text-slate-500">Strong Confirmation</p>
+          <h2 className="mt-1 text-lg font-extrabold text-blue-950">
+            {actionText} {isStatus ? "workflow status" : "workflow action"}
+          </h2>
+        </div>
+        <div className="space-y-3 px-5 py-4 text-sm font-semibold text-slate-700">
+          <BusinessKeyLabel label={label} technicalKey={key} subtle />
+          {isStatus ? (
+            <p>This may affect transitions that use this status. Validation will run after the change.</p>
+          ) : (
+            <p>This may affect transitions that use this action. This does not grant or remove role access automatically. Validation will run after the change.</p>
+          )}
+          {pendingChange.reason && (
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-bold text-yellow-800">
+              {pendingChange.reason}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onCancel} disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60">
+            {isSaving ? "Saving..." : "Confirm"}
           </button>
         </div>
       </div>
@@ -403,6 +600,7 @@ export default function WorkflowManagement() {
   const [transitions, setTransitions] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [actions, setActions] = useState([]);
+  const [accessKeys, setAccessKeys] = useState([]);
   const [roles, setRoles] = useState([]);
   const [categoryRulesByTransitionId, setCategoryRulesByTransitionId] = useState({});
   const [roleRulesByTransitionId, setRoleRulesByTransitionId] = useState({});
@@ -412,10 +610,13 @@ export default function WorkflowManagement() {
   const [isLoadingCategory, setIsLoadingCategory] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isSavingRule, setIsSavingRule] = useState(false);
+  const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [drawerItem, setDrawerItem] = useState(null);
   const [pendingRuleChange, setPendingRuleChange] = useState(null);
+  const [metadataForm, setMetadataForm] = useState(null);
+  const [pendingMetadataChange, setPendingMetadataChange] = useState(null);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => String(category.id) === String(selectedCategoryId)),
@@ -434,6 +635,14 @@ export default function WorkflowManagement() {
     });
     return next;
   }, [actions]);
+
+  const accessKeyByKey = useMemo(() => {
+    const next = {};
+    accessKeys.forEach((accessKey) => {
+      if (accessKey.accessKey) next[accessKey.accessKey] = accessKey;
+    });
+    return next;
+  }, [accessKeys]);
 
   const enabledRoleCount = useMemo(
     () => roles.filter((role) => role.active).length,
@@ -505,6 +714,29 @@ export default function WorkflowManagement() {
     }));
   }, []);
 
+  const loadWorkflowMetadata = useCallback(async () => {
+    const [statusResponse, actionResponse, accessKeyResponse] = await Promise.all([
+      fetch("/volt/workflow/statuses", { headers: authHeaders() }),
+      fetch("/volt/workflow/actions", { headers: authHeaders() }),
+      fetch("/volt/access/keys", { headers: authHeaders() }),
+    ]);
+
+    if (!statusResponse.ok || !actionResponse.ok) {
+      throw new Error("Unable to refresh workflow metadata.");
+    }
+
+    const [statusData, actionData] = await Promise.all([
+      statusResponse.json(),
+      actionResponse.json(),
+    ]);
+    setStatuses(normalizeArray(statusData, "statuses"));
+    setActions(normalizeArray(actionData, "actions"));
+
+    if (accessKeyResponse.ok) {
+      setAccessKeys(normalizeArray(await accessKeyResponse.json(), "accessKeys"));
+    }
+  }, []);
+
   const loadRoleAccess = useCallback(async (nextRoles) => {
     const entries = await Promise.all(
       nextRoles.map(async (role) => {
@@ -537,12 +769,13 @@ export default function WorkflowManagement() {
     setIsLoading(true);
     setError("");
     try {
-      const [categoryResponse, transitionResponse, statusResponse, actionResponse, roleResponse] = await Promise.all([
+      const [categoryResponse, transitionResponse, statusResponse, actionResponse, roleResponse, accessKeyResponse] = await Promise.all([
         fetch("/volt/ticket-categories", { headers: authHeaders() }),
         fetch("/volt/workflow/transitions", { headers: authHeaders() }),
         fetch("/volt/workflow/statuses", { headers: authHeaders() }),
         fetch("/volt/workflow/actions", { headers: authHeaders() }),
         fetch("/volt/roles", { headers: authHeaders() }),
+        fetch("/volt/access/keys", { headers: authHeaders() }),
       ]);
 
       const responses = [categoryResponse, transitionResponse, statusResponse, actionResponse, roleResponse];
@@ -561,6 +794,9 @@ export default function WorkflowManagement() {
       setTransitions(nextTransitions);
       setStatuses(nextStatuses);
       setActions(nextActions);
+      if (accessKeyResponse.ok) {
+        setAccessKeys(normalizeArray(await accessKeyResponse.json(), "accessKeys"));
+      }
       setRoles(nextRoles);
       setSelectedCategoryId((current) => current || nextCategories[0]?.id || "");
 
@@ -683,6 +919,185 @@ export default function WorkflowManagement() {
     } finally {
       setIsSavingRule(false);
     }
+  };
+
+  const refreshMetadataAndValidate = async (message) => {
+    await loadWorkflowMetadata();
+    await runValidation();
+    setStatusMessage(message);
+  };
+
+  const openStatusForm = (status = null) => {
+    if (status && isProtectedStatus(status)) return;
+    setError("");
+    setStatusMessage("");
+    setMetadataForm({
+      entityType: "status",
+      mode: status ? "edit" : "create",
+      original: status,
+      values: status
+        ? {
+            statusKey: status.statusKey || "",
+            displayName: status.displayName || "",
+            behaviorBucket: status.behaviorBucket || "",
+            terminal: Boolean(status.terminal),
+            active: Boolean(status.active),
+            sortOrder: status.sortOrder ?? "",
+          }
+        : emptyStatusForm,
+    });
+  };
+
+  const openActionForm = (action = null) => {
+    if (action && isProtectedAction(action)) return;
+    setError("");
+    setStatusMessage("");
+    setMetadataForm({
+      entityType: "action",
+      mode: action ? "edit" : "create",
+      original: action,
+      values: action
+        ? {
+            actionKey: action.actionKey || "",
+            displayName: action.displayName || "",
+            buttonLabel: action.buttonLabel || "",
+            description: action.description || "",
+            active: Boolean(action.active),
+            sortOrder: action.sortOrder ?? "",
+            requiresComment: Boolean(action.requiresComment),
+            confirmationRequired: Boolean(action.confirmationRequired),
+          }
+        : emptyActionForm,
+    });
+  };
+
+  const updateMetadataForm = (field, value) => {
+    setMetadataForm((current) => current ? {
+      ...current,
+      values: {
+        ...current.values,
+        [field]: value,
+      },
+    } : current);
+  };
+
+  const buildStatusPayload = (values, includeKey) => ({
+    ...(includeKey ? { statusKey: values.statusKey.trim() } : {}),
+    displayName: values.displayName.trim(),
+    ...(includeKey ? { active: Boolean(values.active) } : {}),
+    terminal: Boolean(values.terminal),
+    behaviorBucket: values.behaviorBucket || null,
+    sortOrder: values.sortOrder === "" ? null : Number(values.sortOrder),
+  });
+
+  const buildActionPayload = (values, includeKey) => ({
+    ...(includeKey ? { actionKey: values.actionKey.trim() } : {}),
+    displayName: values.displayName.trim(),
+    buttonLabel: values.buttonLabel.trim(),
+    description: values.description.trim(),
+    ...(includeKey ? { active: Boolean(values.active) } : {}),
+    sortOrder: values.sortOrder === "" ? null : Number(values.sortOrder),
+    requiresComment: Boolean(values.requiresComment),
+    confirmationRequired: Boolean(values.confirmationRequired),
+  });
+
+  const saveMetadataForm = async (change = metadataForm) => {
+    if (!change) return;
+    const isStatus = change.entityType === "status";
+    const isCreate = change.mode === "create";
+    const endpoint = isStatus ? "/volt/workflow/statuses" : "/volt/workflow/actions";
+    const payload = isStatus
+      ? buildStatusPayload(change.values, isCreate)
+      : buildActionPayload(change.values, isCreate);
+
+    setIsSavingMetadata(true);
+    setError("");
+    setStatusMessage("");
+    try {
+      const response = await fetch(isCreate ? endpoint : `${endpoint}/${change.original.id}`, {
+        method: isCreate ? "POST" : "PATCH",
+        headers: authHeaders(true),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, `Unable to save workflow ${isStatus ? "status" : "action"}.`));
+      }
+
+      setMetadataForm(null);
+      setPendingMetadataChange(null);
+      await refreshMetadataAndValidate(`Workflow ${isStatus ? "status" : "action"} ${isCreate ? "created" : "updated"} and validation refreshed.`);
+    } catch (saveError) {
+      setError(saveError.message || `Unable to save workflow ${isStatus ? "status" : "action"}.`);
+    } finally {
+      setIsSavingMetadata(false);
+    }
+  };
+
+  const submitMetadataForm = (event) => {
+    event.preventDefault();
+    if (!metadataForm) return;
+
+    const { entityType, mode, original, values } = metadataForm;
+    if (entityType === "status" && mode === "edit") {
+      const terminalChanged = Boolean(original.terminal) !== Boolean(values.terminal);
+      const bucketChanged = (original.behaviorBucket || "") !== (values.behaviorBucket || "");
+      if (terminalChanged || bucketChanged) {
+        setPendingMetadataChange({
+          kind: "save",
+          entityType,
+          mode,
+          item: { ...original, ...values },
+          reason: `${terminalChanged ? "Terminal flag changed. " : ""}${bucketChanged ? "Behavior bucket changed." : ""}`.trim(),
+          action: () => saveMetadataForm(metadataForm),
+        });
+        return;
+      }
+    }
+
+    saveMetadataForm(metadataForm);
+  };
+
+  const requestMetadataStateChange = (entityType, item, nextActive) => {
+    const protectedRecord = entityType === "status" ? isProtectedStatus(item) : isProtectedAction(item);
+    if (protectedRecord) return;
+    setError("");
+    setStatusMessage("");
+    setPendingMetadataChange({
+      kind: "state",
+      entityType,
+      item,
+      nextActive,
+      reason: nextActive ? "This will re-enable the custom record." : "Disable is used instead of delete.",
+      action: async () => {
+        const endpoint = entityType === "status"
+          ? `/volt/workflow/statuses/${item.id}/status`
+          : `/volt/workflow/actions/${item.id}/status`;
+        setIsSavingMetadata(true);
+        setError("");
+        setStatusMessage("");
+        try {
+          const response = await fetch(endpoint, {
+            method: "PATCH",
+            headers: authHeaders(true),
+            body: JSON.stringify({ active: nextActive }),
+          });
+          if (!response.ok) {
+            throw new Error(await readApiError(response, `Unable to ${nextActive ? "enable" : "disable"} workflow ${entityType}.`));
+          }
+          setPendingMetadataChange(null);
+          await refreshMetadataAndValidate(`Workflow ${entityType} ${nextActive ? "enabled" : "disabled"} and validation refreshed.`);
+        } catch (stateError) {
+          setError(stateError.message || `Unable to ${nextActive ? "enable" : "disable"} workflow ${entityType}.`);
+        } finally {
+          setIsSavingMetadata(false);
+        }
+      },
+    });
+  };
+
+  const confirmMetadataChange = () => {
+    pendingMetadataChange?.action?.();
   };
 
   const openTransitionDrawer = (transition) => {
@@ -868,12 +1283,12 @@ export default function WorkflowManagement() {
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Statuses</span></BodyCell>
                   <BodyCell>{statuses.length} status records</BodyCell>
-                  <BodyCell><Badge tone="blue">Read-only</Badge></BodyCell>
+                  <BodyCell><Badge tone="blue">Custom management</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Actions</span></BodyCell>
                   <BodyCell>{actions.length} action records</BodyCell>
-                  <BodyCell><Badge tone="blue">Read-only</Badge></BodyCell>
+                  <BodyCell><Badge tone="blue">Custom management</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Validation</span></BodyCell>
@@ -929,73 +1344,162 @@ export default function WorkflowManagement() {
           )}
 
           {activeTab === "statuses" && (
-            <TableShell minWidth="min-w-[860px]">
-              <thead>
-                <tr>
-                  <HeaderCell>Display Name</HeaderCell>
-                  <HeaderCell>Status Key</HeaderCell>
-                  <HeaderCell>Behavior Bucket</HeaderCell>
-                  <HeaderCell>Terminal</HeaderCell>
-                  <HeaderCell>Active</HeaderCell>
-                  <HeaderCell>System/Protected</HeaderCell>
-                  <HeaderCell>Sort Order</HeaderCell>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading && <EmptyRows colSpan={7}>Loading workflow statuses...</EmptyRows>}
-                {!isLoading && statuses.length === 0 && <EmptyRows colSpan={7}>No workflow statuses found.</EmptyRows>}
-                {!isLoading && statuses.map((status) => (
-                  <tr key={status.id ?? status.statusKey} onClick={() => openStatusDrawer(status)} className="cursor-pointer hover:bg-blue-50/50">
-                    <BodyCell><span className="font-bold text-blue-950">{status.displayName || formatLabel(status.statusKey)}</span></BodyCell>
-                    <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{status.statusKey || "UNKNOWN"}</span></BodyCell>
-                    <BodyCell>{status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"}</BodyCell>
-                    <BodyCell><Badge tone={status.terminal ? "red" : "slate"}>{status.terminal ? "Terminal" : "Non-terminal"}</Badge></BodyCell>
-                    <BodyCell><StateBadge enabled={status.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
-                    <BodyCell>
-                      <div className="flex flex-wrap gap-1.5">
-                        <Badge tone={status.systemStatus ? "blue" : "slate"}>{status.systemStatus ? "System" : "Custom"}</Badge>
-                        <Badge tone={status.protectedStatus ? "yellow" : "slate"}>{status.protectedStatus ? "Protected" : "Read-only"}</Badge>
-                      </div>
-                    </BodyCell>
-                    <BodyCell>{status.sortOrder ?? "Not set"}</BodyCell>
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => openStatusForm()}
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900"
+                >
+                  Create Status
+                </button>
+              </div>
+              <TableShell minWidth="min-w-[1040px]">
+                <thead>
+                  <tr>
+                    <HeaderCell>Display Name</HeaderCell>
+                    <HeaderCell>Status Key</HeaderCell>
+                    <HeaderCell>Behavior Bucket</HeaderCell>
+                    <HeaderCell>Terminal</HeaderCell>
+                    <HeaderCell>Active</HeaderCell>
+                    <HeaderCell>System/Protected</HeaderCell>
+                    <HeaderCell>Sort Order</HeaderCell>
+                    <HeaderCell>Actions</HeaderCell>
                   </tr>
-                ))}
-              </tbody>
-            </TableShell>
+                </thead>
+                <tbody>
+                  {isLoading && <EmptyRows colSpan={8}>Loading workflow statuses...</EmptyRows>}
+                  {!isLoading && statuses.length === 0 && <EmptyRows colSpan={8}>No workflow statuses found.</EmptyRows>}
+                  {!isLoading && statuses.map((status) => {
+                    const protectedRecord = isProtectedStatus(status);
+                    return (
+                      <tr key={status.id ?? status.statusKey} onClick={() => openStatusDrawer(status)} className="cursor-pointer hover:bg-blue-50/50">
+                        <BodyCell><span className="font-bold text-blue-950">{status.displayName || formatLabel(status.statusKey)}</span></BodyCell>
+                        <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{status.statusKey || "UNKNOWN"}</span></BodyCell>
+                        <BodyCell>{status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"}</BodyCell>
+                        <BodyCell><Badge tone={status.terminal ? "red" : "slate"}>{status.terminal ? "Terminal" : "Non-terminal"}</Badge></BodyCell>
+                        <BodyCell><StateBadge enabled={status.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                        <BodyCell>
+                          <div className="flex flex-wrap gap-1.5">
+                            <Badge tone={status.systemStatus ? "blue" : "slate"}>{status.systemStatus ? "System" : "Custom"}</Badge>
+                            <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
+                          </div>
+                        </BodyCell>
+                        <BodyCell>{status.sortOrder ?? "Not set"}</BodyCell>
+                        <BodyCell>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openStatusForm(status);
+                              }}
+                              disabled={protectedRecord}
+                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                requestMetadataStateChange("status", status, !status.active);
+                              }}
+                              disabled={protectedRecord}
+                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50"
+                            >
+                              {status.active ? "Disable" : "Enable"}
+                            </button>
+                          </div>
+                        </BodyCell>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </TableShell>
+            </div>
           )}
 
           {activeTab === "actions" && (
-            <TableShell minWidth="min-w-[860px]">
-              <thead>
-                <tr>
-                  <HeaderCell>Display Name</HeaderCell>
-                  <HeaderCell>Action Key</HeaderCell>
-                  <HeaderCell>Active</HeaderCell>
-                  <HeaderCell>System/Protected</HeaderCell>
-                  <HeaderCell>Sort Order</HeaderCell>
-                  <HeaderCell>Access Key</HeaderCell>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading && <EmptyRows colSpan={6}>Loading workflow actions...</EmptyRows>}
-                {!isLoading && actions.length === 0 && <EmptyRows colSpan={6}>No workflow actions found.</EmptyRows>}
-                {!isLoading && actions.map((action) => (
-                  <tr key={action.id ?? action.actionKey} onClick={() => openActionDrawer(action)} className="cursor-pointer hover:bg-blue-50/50">
-                    <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
-                    <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{action.actionKey || "UNKNOWN"}</span></BodyCell>
-                    <BodyCell><StateBadge enabled={action.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
-                    <BodyCell>
-                      <div className="flex flex-wrap gap-1.5">
-                        <Badge tone={action.systemAction ? "blue" : "slate"}>{action.systemAction ? "System" : "Custom"}</Badge>
-                        <Badge tone={action.protectedAction ? "yellow" : "slate"}>{action.protectedAction ? "Protected" : "Read-only"}</Badge>
-                      </div>
-                    </BodyCell>
-                    <BodyCell>{action.sortOrder ?? "Not set"}</BodyCell>
-                    <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{action.actionKey || "Not available"}</span></BodyCell>
+            <div className="space-y-3">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <p className="text-sm font-semibold text-slate-600">Action key is the access key. Creating a custom action does not grant role access automatically.</p>
+                <button
+                  type="button"
+                  onClick={() => openActionForm()}
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900"
+                >
+                  Create Action
+                </button>
+              </div>
+              <TableShell minWidth="min-w-[1120px]">
+                <thead>
+                  <tr>
+                    <HeaderCell>Display Name</HeaderCell>
+                    <HeaderCell>Action Key / Access Key</HeaderCell>
+                    <HeaderCell>Active</HeaderCell>
+                    <HeaderCell>Requires Comment</HeaderCell>
+                    <HeaderCell>Confirmation Required</HeaderCell>
+                    <HeaderCell>System/Protected</HeaderCell>
+                    <HeaderCell>Sort Order</HeaderCell>
+                    <HeaderCell>Actions</HeaderCell>
                   </tr>
-                ))}
-              </tbody>
-            </TableShell>
+                </thead>
+                <tbody>
+                  {isLoading && <EmptyRows colSpan={8}>Loading workflow actions...</EmptyRows>}
+                  {!isLoading && actions.length === 0 && <EmptyRows colSpan={8}>No workflow actions found.</EmptyRows>}
+                  {!isLoading && actions.map((action) => {
+                    const protectedRecord = isProtectedAction(action);
+                    const metadata = accessKeyByKey[action.actionKey];
+                    return (
+                      <tr key={action.id ?? action.actionKey} onClick={() => openActionDrawer(action)} className="cursor-pointer hover:bg-blue-50/50">
+                        <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
+                        <BodyCell>
+                          <BusinessKeyLabel label={metadata?.displayName || action.displayName} technicalKey={action.actionKey} subtle />
+                          <span className="mt-1 block text-xs font-semibold text-slate-600">{metadata ? "Access metadata linked" : "Access metadata pending"}</span>
+                        </BodyCell>
+                        <BodyCell><StateBadge enabled={action.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                        <BodyCell><Badge tone={action.requiresComment ? "yellow" : "slate"}>{action.requiresComment ? "Required" : "No"}</Badge></BodyCell>
+                        <BodyCell><Badge tone={action.confirmationRequired ? "yellow" : "slate"}>{action.confirmationRequired ? "Required" : "No"}</Badge></BodyCell>
+                        <BodyCell>
+                          <div className="flex flex-wrap gap-1.5">
+                            <Badge tone={action.systemAction ? "blue" : "slate"}>{action.systemAction ? "System" : "Custom"}</Badge>
+                            <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
+                          </div>
+                        </BodyCell>
+                        <BodyCell>{action.sortOrder ?? "Not set"}</BodyCell>
+                        <BodyCell>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openActionForm(action);
+                              }}
+                              disabled={protectedRecord}
+                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                requestMetadataStateChange("action", action, !action.active);
+                              }}
+                              disabled={protectedRecord}
+                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50"
+                            >
+                              {action.active ? "Disable" : "Enable"}
+                            </button>
+                          </div>
+                        </BodyCell>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </TableShell>
+            </div>
           )}
 
           {activeTab === "roleAccess" && (
@@ -1138,6 +1642,19 @@ export default function WorkflowManagement() {
         onCancel={() => setPendingRuleChange(null)}
         onConfirm={confirmRuleChange}
         isSaving={isSavingRule}
+      />
+      <EntityFormModal
+        formState={metadataForm}
+        onCancel={() => setMetadataForm(null)}
+        onChange={updateMetadataForm}
+        onSubmit={submitMetadataForm}
+        isSaving={isSavingMetadata}
+      />
+      <ConfirmMetadataChangeDialog
+        pendingChange={pendingMetadataChange}
+        onCancel={() => setPendingMetadataChange(null)}
+        onConfirm={confirmMetadataChange}
+        isSaving={isSavingMetadata}
       />
     </main>
   );

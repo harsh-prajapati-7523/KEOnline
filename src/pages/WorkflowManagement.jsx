@@ -1,6 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Plus, RefreshCw, ToggleLeft, ToggleRight } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, CheckCircle2, RefreshCw, Search, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+
+const tabs = [
+  { id: "overview", label: "Overview" },
+  { id: "transitions", label: "Transitions" },
+  { id: "statuses", label: "Statuses" },
+  { id: "actions", label: "Actions" },
+  { id: "roleAccess", label: "Role Access" },
+  { id: "validation", label: "Validation" },
+];
 
 function authHeaders(includeContentType = false) {
   return {
@@ -19,11 +28,8 @@ async function readApiError(response, fallback) {
 }
 
 function formatLabel(value) {
-  return value ? value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
-}
-
-function formatWorkflowStatusLabel(displayName, statusKey) {
-  return displayName || formatLabel(statusKey);
+  if (!value) return "Not available";
+  return String(value).replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatDateTime(value) {
@@ -34,886 +40,859 @@ function formatDateTime(value) {
     : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 }
 
-function Message({ children, type = "success" }) {
-  if (!children) return null;
-  const className = type === "error"
-    ? "border-red-200 bg-red-50 text-red-700"
-    : "border-green-200 bg-green-50 text-green-700";
-  return <p className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${className}`}>{children}</p>;
+function normalizeArray(data, key) {
+  return Array.isArray(data) ? data : Array.isArray(data?.[key]) ? data[key] : [];
+}
+
+function normalizeRules(rules, keyName = "accessKey") {
+  const next = {};
+  if (!Array.isArray(rules)) return next;
+  rules.forEach((rule) => {
+    const key = rule?.[keyName];
+    if (typeof key === "string" && key.trim()) next[key] = rule;
+  });
+  return next;
 }
 
 function Badge({ children, tone = "slate" }) {
   const tones = {
-    green: "bg-green-50 text-green-700",
-    red: "bg-red-50 text-red-700",
-    blue: "bg-blue-50 text-blue-950",
-    yellow: "bg-yellow-100 text-yellow-800",
-    slate: "bg-slate-100 text-slate-700",
+    green: "border-green-200 bg-green-50 text-green-700",
+    red: "border-red-200 bg-red-50 text-red-700",
+    blue: "border-blue-200 bg-blue-50 text-blue-950",
+    yellow: "border-yellow-200 bg-yellow-50 text-yellow-800",
+    slate: "border-slate-200 bg-slate-100 text-slate-700",
   };
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${tones[tone]}`}>{children}</span>;
+
+  return (
+    <span className={`inline-flex min-h-6 items-center rounded-full border px-2 py-0.5 text-xs font-bold ${tones[tone] ?? tones.slate}`}>
+      {children}
+    </span>
+  );
 }
 
-function normalizeTransitionOptions(data) {
-  return Array.isArray(data?.options) ? data.options : [];
+function BusinessKeyLabel({ label, technicalKey, subtle = false }) {
+  return (
+    <span className="block min-w-0">
+      <span className={`block break-words font-bold ${subtle ? "text-slate-700" : "text-blue-950"}`}>
+        {label || formatLabel(technicalKey)}
+      </span>
+      <span className="mt-0.5 block break-all text-[0.7rem] font-bold uppercase text-slate-500">
+        {technicalKey || "UNKNOWN"}
+      </span>
+    </span>
+  );
 }
 
-function normalizeWorkflowActions(data) {
-  return Array.isArray(data) ? data : Array.isArray(data?.actions) ? data.actions : [];
+function EmptyRows({ colSpan, children }) {
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-4 py-5 text-sm font-semibold text-slate-600">
+        {children}
+      </td>
+    </tr>
+  );
 }
 
-function normalizeWorkflowStatuses(data) {
-  return Array.isArray(data) ? data : Array.isArray(data?.statuses) ? data.statuses : [];
+function TableShell({ children, minWidth = "min-w-[980px]" }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <table className={`${minWidth} w-full border-separate border-spacing-0 text-left text-sm`}>
+        {children}
+      </table>
+    </div>
+  );
 }
 
-function emptyStatusForm() {
-  return {
-    statusKey: "",
-    displayName: "",
-    active: true,
-    sortOrder: "",
-  };
+function HeaderCell({ children }) {
+  return (
+    <th className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-extrabold uppercase tracking-wide text-slate-600">
+      {children}
+    </th>
+  );
 }
 
-function validateStatusKey(value) {
-  const statusKey = value.trim();
-  if (!statusKey) return "Status key is required.";
-  if (!/^[A-Z0-9_]{2,50}$/.test(statusKey)) {
-    return "Status key must use 2 to 50 uppercase letters, numbers, or underscores.";
+function BodyCell({ children, className = "" }) {
+  return <td className={`border-b border-slate-100 px-4 py-3 align-top ${className}`}>{children}</td>;
+}
+
+function StateBadge({ enabled, trueLabel = "Enabled", falseLabel = "Disabled" }) {
+  return <Badge tone={enabled ? "green" : "red"}>{enabled ? trueLabel : falseLabel}</Badge>;
+}
+
+function ScopeBadge({ value }) {
+  if (value === "full") return <Badge tone="green">Full</Badge>;
+  if (value === "partial") return <Badge tone="yellow">Partial</Badge>;
+  return <Badge tone="red">None</Badge>;
+}
+
+function DetailRow({ label, value }) {
+  return (
+    <div className="border-b border-slate-100 py-3">
+      <dt className="text-xs font-extrabold uppercase text-slate-500">{label}</dt>
+      <dd className="mt-1 break-words text-sm font-semibold text-slate-800">{value ?? "Not available"}</dd>
+    </div>
+  );
+}
+
+function getStatusLabel(transition, direction) {
+  if (direction === "from") {
+    return {
+      label: transition.fromStatusDisplayName || formatLabel(transition.fromStatusKey || transition.fromStatus),
+      key: transition.fromStatusKey || transition.fromStatus,
+    };
   }
-  return "";
+
+  return {
+    label: transition.toStatusDisplayName || formatLabel(transition.toStatusKey || transition.toStatus),
+    key: transition.toStatusKey || transition.toStatus,
+  };
 }
 
-function validateStatusDisplayName(value) {
-  const displayName = value.trim();
-  if (!displayName) return "Display name is required.";
-  if (displayName.length > 80) return "Display name must be at most 80 characters.";
-  return "";
+function getCategoryRuleState(transitionId, selectedCategoryId, categoryRulesByTransitionId) {
+  const rules = categoryRulesByTransitionId[transitionId] || [];
+  if (rules.length === 0) return { label: "All categories", tone: "green" };
+  const selectedRule = rules.find((rule) => String(rule.categoryId) === String(selectedCategoryId));
+  if (selectedRule?.active) return { label: "Included", tone: "green" };
+  if (selectedRule) return { label: "Inactive rule", tone: "yellow" };
+  return { label: "Excluded", tone: "red" };
 }
 
-function validateStatusSortOrder(value) {
-  if (value === "" || value === null || value === undefined) return "";
-  return Number.isInteger(Number(value)) ? "" : "Sort order must be a number.";
+function roleRuleState(transitionId, roleId, roleRulesByTransitionId) {
+  const rules = roleRulesByTransitionId[transitionId] || [];
+  if (rules.length === 0) return "full";
+  const rule = rules.find((item) => String(item.roleId) === String(roleId));
+  if (rule?.active) return "full";
+  if (rule) return "partial";
+  return "none";
 }
 
-function WorkflowActionCard({ action }) {
-  const active = Boolean(action.active);
-  const requiresComment = Boolean(action.requiresComment);
-  const confirmationRequired = Boolean(action.confirmationRequired);
+function actionAccessState(actionKey, role, roleAccessByRoleId) {
+  if (role?.roleKey === "SUPER_ADMIN") return "full";
+  const access = roleAccessByRoleId[role?.id];
+  const rule = access?.rulesByKey?.[actionKey] || access?.dynamicRulesByKey?.[actionKey];
+  return rule?.allowed ? "full" : "none";
+}
+
+function combinedTransitionRoleState(transition, role, roleAccessByRoleId, roleRulesByTransitionId) {
+  const actionState = actionAccessState(transition.actionKey, role, roleAccessByRoleId);
+  const scopeState = roleRuleState(transition.id, role?.id, roleRulesByTransitionId);
+  if (actionState === "full" && scopeState === "full") return "full";
+  if (actionState === "full" || scopeState === "full" || scopeState === "partial") return "partial";
+  return "none";
+}
+
+function DetailDrawer({ item, onClose, categoryRulesByTransitionId, roleRulesByTransitionId }) {
+  if (!item) return null;
+
+  const isTransition = item.type === "transition";
+  const rules = isTransition ? categoryRulesByTransitionId[item.data.id] || [] : [];
+  const roleRules = isTransition ? roleRulesByTransitionId[item.data.id] || [] : [];
 
   return (
-    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-      <div className="min-w-0">
-        <h3 className="break-words text-base font-extrabold text-blue-950">
-          {action.displayName || formatLabel(action.actionKey)}
-        </h3>
-        <p className="mt-1 break-words text-xs font-bold uppercase text-gray-500">
-          {action.actionKey ?? "UNKNOWN"}
-        </p>
-        {action.description && (
-          <p className="mt-2 break-words text-sm text-slate-700">{action.description}</p>
-        )}
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge tone={active ? "green" : "red"}>{active ? "Active" : "Inactive"}</Badge>
-        <Badge tone={action.systemAction ? "blue" : "slate"}>{action.systemAction ? "System" : "Custom"}</Badge>
-        <Badge tone={action.protectedAction ? "yellow" : "slate"}>{action.protectedAction ? "Protected" : "Editable"}</Badge>
-        <Badge>Sort {action.sortOrder ?? "Not set"}</Badge>
-        <Badge tone={requiresComment ? "yellow" : "slate"}>{requiresComment ? "Requires Comment" : "No Comment"}</Badge>
-        <Badge tone={confirmationRequired ? "yellow" : "slate"}>{confirmationRequired ? "Confirmation Required" : "No Confirmation"}</Badge>
-      </div>
-
-      <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="font-bold text-gray-500">Button Label</dt>
-          <dd className="mt-1 break-words text-gray-800">{action.buttonLabel || "Not available"}</dd>
-        </div>
-        <div>
-          <dt className="font-bold text-gray-500">Updated</dt>
-          <dd className="mt-1 text-gray-800">{formatDateTime(action.updatedAt)}</dd>
-        </div>
-      </dl>
-    </article>
-  );
-}
-
-function TransitionCard({ transition, isProcessing, onToggle }) {
-  const active = Boolean(transition.active);
-  const Icon = active ? ToggleRight : ToggleLeft;
-  const fromStatusLabel = formatWorkflowStatusLabel(transition.fromStatusDisplayName, transition.fromStatus);
-  const toStatusLabel = formatWorkflowStatusLabel(transition.toStatusDisplayName, transition.toStatus);
-
-  return (
-    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h2 className="break-words text-base font-extrabold text-blue-950">
-            {transition.displayName || formatLabel(transition.actionKey)}
-          </h2>
-          <p className="mt-1 break-words text-xs font-bold uppercase text-gray-500">
-            {transition.actionKey ?? "UNKNOWN"} · {fromStatusLabel} -&gt; {toStatusLabel}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => onToggle(transition)}
-          disabled={isProcessing}
-          className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 py-2 text-sm font-bold transition disabled:opacity-60 ${
-            active
-              ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-              : "bg-blue-950 text-white hover:bg-blue-900"
-          }`}
-        >
-          <Icon size={18} aria-hidden="true" />
-          {isProcessing ? "Updating..." : active ? "Disable" : "Enable"}
-        </button>
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge tone={active ? "green" : "red"}>{active ? "Active" : "Inactive"}</Badge>
-        <Badge tone={transition.systemTransition ? "blue" : "slate"}>{transition.systemTransition ? "System" : "Custom"}</Badge>
-        <Badge tone={transition.protectedTransition ? "yellow" : "slate"}>{transition.protectedTransition ? "Protected" : "Editable"}</Badge>
-        <Badge>Sort {transition.sortOrder ?? "Not set"}</Badge>
-      </div>
-
-      <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-        <div>
-          <dt className="font-bold text-gray-500">Created</dt>
-          <dd className="mt-1 text-gray-800">{formatDateTime(transition.createdAt)}</dd>
-        </div>
-        <div>
-          <dt className="font-bold text-gray-500">Updated</dt>
-          <dd className="mt-1 text-gray-800">{formatDateTime(transition.updatedAt)}</dd>
-        </div>
-      </dl>
-    </article>
-  );
-}
-
-function WorkflowStatusCard({
-  status,
-  editForm,
-  editErrors,
-  isEditing,
-  isProcessing,
-  onEdit,
-  onEditInput,
-  onCancelEdit,
-  onSaveEdit,
-  onToggleStatus,
-}) {
-  const active = Boolean(status.active);
-  const terminal = Boolean(status.terminal);
-  const isCustomEditable = !status.systemStatus && !status.protectedStatus;
-  const behaviorBucketLabel = status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set";
-
-  return (
-    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h3 className="break-words text-base font-extrabold text-blue-950">
-            {status.displayName || formatLabel(status.statusKey)}
-          </h3>
-          <p className="mt-1 break-words text-xs font-bold uppercase text-gray-500">
-            {status.statusKey ?? "UNKNOWN"}
-          </p>
-        </div>
-
-        {isCustomEditable && !isEditing && (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onEdit(status)}
-              className="rounded-xl border border-blue-950 px-3 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => onToggleStatus(status)}
-              disabled={isProcessing}
-              className={`rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-60 ${
-                active
-                  ? "border border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
-                  : "bg-blue-950 text-white hover:bg-blue-900"
-              }`}
-            >
-              {isProcessing ? "Updating..." : active ? "Disable" : "Enable"}
-            </button>
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/30" role="dialog" aria-modal="true" aria-label="Workflow details">
+      <button type="button" className="hidden flex-1 lg:block" onClick={onClose} aria-label="Close details" />
+      <aside className="flex h-full w-full max-w-xl flex-col bg-white shadow-2xl sm:w-[34rem]">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div className="min-w-0">
+            <p className="text-xs font-extrabold uppercase text-slate-500">{item.type}</p>
+            <h2 className="mt-1 break-words text-lg font-extrabold text-blue-950">
+              {item.title}
+            </h2>
           </div>
-        )}
-      </div>
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge tone={active ? "green" : "red"}>{active ? "Active" : "Inactive"}</Badge>
-        <Badge tone={status.systemStatus ? "blue" : "slate"}>{status.systemStatus ? "System" : "Custom"}</Badge>
-        <Badge tone={status.protectedStatus ? "yellow" : "slate"}>{status.protectedStatus ? "Protected" : "Editable"}</Badge>
-        <Badge tone={terminal ? "red" : "slate"}>{terminal ? "Terminal" : "Non-terminal"}</Badge>
-        <Badge tone={status.behaviorBucket ? "blue" : "slate"}>Bucket: {behaviorBucketLabel}</Badge>
-        <Badge>Sort {status.sortOrder ?? "Not set"}</Badge>
-      </div>
-
-      {isEditing && (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-semibold text-slate-700">
-              Display Name
-              <input
-                name="displayName"
-                value={editForm.displayName}
-                onChange={onEditInput}
-                maxLength={80}
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950"
-              />
-              {editErrors.displayName && <span className="mt-1 block text-xs text-red-600">{editErrors.displayName}</span>}
-            </label>
-            <label className="block text-sm font-semibold text-slate-700">
-              Sort Order
-              <input
-                name="sortOrder"
-                type="number"
-                step="1"
-                value={editForm.sortOrder}
-                onChange={onEditInput}
-                className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950"
-              />
-              {editErrors.sortOrder && <span className="mt-1 block text-xs text-red-600">{editErrors.sortOrder}</span>}
-            </label>
-          </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => onSaveEdit(status)}
-              disabled={isProcessing}
-              className="rounded-xl bg-yellow-400 px-3 py-2 text-sm font-bold text-black hover:bg-yellow-300 disabled:opacity-60"
-            >
-              {isProcessing ? "Saving..." : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={onCancelEdit}
-              disabled={isProcessing}
-              className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-300 disabled:opacity-60"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </article>
-  );
-}
-
-function TransitionOptionCard({ option, isProcessing, onCreate }) {
-  const configured = Boolean(option.alreadyConfigured);
-
-  return (
-    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0">
-          <h3 className="break-words text-base font-extrabold text-blue-950">
-            {option.displayName || formatLabel(option.actionKey)}
-          </h3>
-          <p className="mt-1 break-words text-xs font-bold uppercase text-gray-500">
-            {option.actionKey ?? "UNKNOWN"} · {option.fromStatus ?? "UNKNOWN"} -&gt; {option.toStatus ?? "UNKNOWN"}
-          </p>
-        </div>
-
-        {!configured && (
-          <button
-            type="button"
-            onClick={() => onCreate(option)}
-            disabled={isProcessing}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-yellow-400 px-4 py-2 text-sm font-bold text-black transition hover:bg-yellow-300 disabled:opacity-60"
-          >
-            <Plus size={18} aria-hidden="true" />
-            {isProcessing ? "Creating..." : "Create"}
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+            Close
           </button>
-        )}
-      </div>
+        </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Badge tone={configured ? "green" : "yellow"}>{configured ? "Configured" : "Missing"}</Badge>
-        {configured && <Badge tone={option.active ? "green" : "red"}>{option.active ? "Active" : "Inactive"}</Badge>}
-        {configured && <Badge tone={option.systemTransition ? "blue" : "slate"}>{option.systemTransition ? "System" : "Custom"}</Badge>}
-        {configured && <Badge tone={option.protectedTransition ? "yellow" : "slate"}>{option.protectedTransition ? "Protected" : "Editable"}</Badge>}
-        <Badge>Sort {option.sortOrder ?? "Not set"}</Badge>
-      </div>
-    </article>
+        <div className="flex-1 overflow-y-auto px-5 py-3">
+          <dl>
+            {Object.entries(item.details).map(([label, value]) => (
+              <DetailRow key={label} label={label} value={value} />
+            ))}
+          </dl>
+
+          {isTransition && (
+            <>
+              <section className="mt-5">
+                <h3 className="text-sm font-extrabold text-blue-950">Category Rules</h3>
+                <div className="mt-2 space-y-2">
+                  {rules.length === 0 && <Badge tone="green">All categories</Badge>}
+                  {rules.map((rule) => (
+                    <div key={rule.id} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm">
+                      <BusinessKeyLabel label={rule.categoryDisplayName} technicalKey={rule.categoryKey} subtle />
+                      <StateBadge enabled={rule.active} trueLabel="Active" falseLabel="Inactive" />
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="mt-5">
+                <h3 className="text-sm font-extrabold text-blue-950">Workflow Transition Role Rules</h3>
+                <div className="mt-2 space-y-2">
+                  {roleRules.length === 0 && <Badge tone="green">All roles</Badge>}
+                  {roleRules.map((rule) => (
+                    <div key={rule.id} className="flex items-center justify-between gap-3 border-b border-slate-100 py-2 text-sm">
+                      <BusinessKeyLabel label={rule.roleDisplayName} technicalKey={rule.roleKey} subtle />
+                      <StateBadge enabled={rule.active} trueLabel="Active" falseLabel="Inactive" />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+        </div>
+      </aside>
+    </div>
   );
 }
 
 export default function WorkflowManagement() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("overview");
+  const [categories, setCategories] = useState([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState("");
+  const [categoryWorkflowConfig, setCategoryWorkflowConfig] = useState(null);
   const [transitions, setTransitions] = useState([]);
+  const [statuses, setStatuses] = useState([]);
+  const [actions, setActions] = useState([]);
+  const [roles, setRoles] = useState([]);
+  const [categoryRulesByTransitionId, setCategoryRulesByTransitionId] = useState({});
+  const [roleRulesByTransitionId, setRoleRulesByTransitionId] = useState({});
+  const [roleAccessByRoleId, setRoleAccessByRoleId] = useState({});
+  const [validationResult, setValidationResult] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const [message, setMessage] = useState("");
-  const [messageType, setMessageType] = useState("success");
-  const [processingId, setProcessingId] = useState(null);
-  const [transitionOptions, setTransitionOptions] = useState([]);
-  const [optionsLoading, setOptionsLoading] = useState(true);
-  const [optionsError, setOptionsError] = useState("");
-  const [createProcessingKey, setCreateProcessingKey] = useState("");
-  const [workflowActions, setWorkflowActions] = useState([]);
-  const [actionsLoading, setActionsLoading] = useState(true);
-  const [actionsError, setActionsError] = useState("");
-  const [workflowStatuses, setWorkflowStatuses] = useState([]);
-  const [statusesLoading, setStatusesLoading] = useState(true);
-  const [statusesError, setStatusesError] = useState("");
-  const [showStatusCreateForm, setShowStatusCreateForm] = useState(false);
-  const [statusForm, setStatusForm] = useState(emptyStatusForm());
-  const [statusFormErrors, setStatusFormErrors] = useState({});
-  const [statusProcessingKey, setStatusProcessingKey] = useState("");
-  const [editingStatusId, setEditingStatusId] = useState(null);
-  const [editStatusForm, setEditStatusForm] = useState({ displayName: "", sortOrder: "" });
-  const [editStatusErrors, setEditStatusErrors] = useState({});
+  const [isLoadingCategory, setIsLoadingCategory] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [error, setError] = useState("");
+  const [drawerItem, setDrawerItem] = useState(null);
 
-  const loadTransitions = useCallback(async () => {
+  const selectedCategory = useMemo(
+    () => categories.find((category) => String(category.id) === String(selectedCategoryId)),
+    [categories, selectedCategoryId]
+  );
+
+  const activeTransitions = useMemo(
+    () => transitions.filter((transition) => transition.active),
+    [transitions]
+  );
+
+  const actionByKey = useMemo(() => {
+    const next = {};
+    actions.forEach((action) => {
+      if (action.actionKey) next[action.actionKey] = action;
+    });
+    return next;
+  }, [actions]);
+
+  const enabledRoleCount = useMemo(
+    () => roles.filter((role) => role.active).length,
+    [roles]
+  );
+
+  const validationStatus = validationResult
+    ? validationResult.readyToActivate || validationResult.valid
+      ? "Ready"
+      : "Not Ready"
+    : "Not run";
+
+  const loadTransitionRules = useCallback(async (nextTransitions) => {
+    const categoryRuleEntries = await Promise.all(
+      nextTransitions.map(async (transition) => {
+        try {
+          const response = await fetch(`/volt/workflow/transitions/${transition.id}/category-rules`, { headers: authHeaders() });
+          if (!response.ok) throw new Error("Category rules request failed");
+          return [transition.id, normalizeArray(await response.json(), "rules")];
+        } catch {
+          return [transition.id, []];
+        }
+      })
+    );
+
+    const roleRuleEntries = await Promise.all(
+      nextTransitions.map(async (transition) => {
+        try {
+          const response = await fetch(`/volt/workflow/transitions/${transition.id}/role-rules`, { headers: authHeaders() });
+          if (!response.ok) throw new Error("Role rules request failed");
+          return [transition.id, normalizeArray(await response.json(), "rules")];
+        } catch {
+          return [transition.id, []];
+        }
+      })
+    );
+
+    setCategoryRulesByTransitionId(Object.fromEntries(categoryRuleEntries));
+    setRoleRulesByTransitionId(Object.fromEntries(roleRuleEntries));
+  }, []);
+
+  const loadRoleAccess = useCallback(async (nextRoles) => {
+    const entries = await Promise.all(
+      nextRoles.map(async (role) => {
+        try {
+          const [roleAccessResponse, dynamicAccessResponse] = await Promise.all([
+            fetch(`/volt/role-access/${role.id}`, { headers: authHeaders() }),
+            fetch(`/volt/role-access/${role.id}/dynamic`, { headers: authHeaders() }),
+          ]);
+
+          if (!roleAccessResponse.ok || !dynamicAccessResponse.ok) throw new Error("Role access request failed");
+
+          const roleAccess = await roleAccessResponse.json();
+          const dynamicAccess = await dynamicAccessResponse.json();
+          return [role.id, {
+            ...roleAccess,
+            dynamic: dynamicAccess,
+            rulesByKey: normalizeRules(roleAccess.rules),
+            dynamicRulesByKey: normalizeRules(dynamicAccess.rules),
+          }];
+        } catch {
+          return [role.id, { rulesByKey: {}, dynamicRulesByKey: {} }];
+        }
+      })
+    );
+
+    setRoleAccessByRoleId(Object.fromEntries(entries));
+  }, []);
+
+  const loadBaseData = useCallback(async () => {
     setIsLoading(true);
-    setLoadError("");
+    setError("");
     try {
-      const response = await fetch("/volt/workflow/transitions", { headers: authHeaders() });
-      if (!response.ok) throw new Error(await readApiError(response, "Unable to load workflow transitions. Please try again."));
-      const data = await response.json();
-      setTransitions(Array.isArray(data) ? data : []);
-    } catch (error) {
-      setTransitions([]);
-      setLoadError(error.message || "Unable to load workflow transitions. Please try again.");
+      const [categoryResponse, transitionResponse, statusResponse, actionResponse, roleResponse] = await Promise.all([
+        fetch("/volt/ticket-categories", { headers: authHeaders() }),
+        fetch("/volt/workflow/transitions", { headers: authHeaders() }),
+        fetch("/volt/workflow/statuses", { headers: authHeaders() }),
+        fetch("/volt/workflow/actions", { headers: authHeaders() }),
+        fetch("/volt/roles", { headers: authHeaders() }),
+      ]);
+
+      const responses = [categoryResponse, transitionResponse, statusResponse, actionResponse, roleResponse];
+      if (responses.some((response) => !response.ok)) {
+        throw new Error("Unable to load workflow management data. Please try again.");
+      }
+
+      const [categoryData, transitionData, statusData, actionData, roleData] = await Promise.all(responses.map((response) => response.json()));
+      const nextCategories = normalizeArray(categoryData, "categories");
+      const nextTransitions = normalizeArray(transitionData, "transitions");
+      const nextStatuses = normalizeArray(statusData, "statuses");
+      const nextActions = normalizeArray(actionData, "actions");
+      const nextRoles = normalizeArray(roleData, "roles");
+
+      setCategories(nextCategories);
+      setTransitions(nextTransitions);
+      setStatuses(nextStatuses);
+      setActions(nextActions);
+      setRoles(nextRoles);
+      setSelectedCategoryId((current) => current || nextCategories[0]?.id || "");
+
+      await Promise.all([loadTransitionRules(nextTransitions), loadRoleAccess(nextRoles)]);
+    } catch (loadError) {
+      setError(loadError.message || "Unable to load workflow management data. Please try again.");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadRoleAccess, loadTransitionRules]);
 
-  const loadTransitionOptions = useCallback(async () => {
-    setOptionsLoading(true);
-    setOptionsError("");
-    try {
-      const response = await fetch("/volt/workflow/transition-options", { headers: authHeaders() });
-      if (!response.ok) throw new Error("Unable to load workflow transition options. Please try again.");
-      const data = await response.json();
-      setTransitionOptions(normalizeTransitionOptions(data));
-    } catch (error) {
-      setTransitionOptions([]);
-      setOptionsError(error.message || "Unable to load workflow transition options. Please try again.");
-    } finally {
-      setOptionsLoading(false);
+  const loadCategoryConfig = useCallback(async (categoryId) => {
+    if (!categoryId) {
+      setCategoryWorkflowConfig(null);
+      return;
     }
-  }, []);
 
-  const loadWorkflowActions = useCallback(async () => {
-    setActionsLoading(true);
-    setActionsError("");
+    setIsLoadingCategory(true);
     try {
-      const response = await fetch("/volt/workflow/actions", { headers: authHeaders() });
-      if (!response.ok) throw new Error("Unable to load workflow actions. Please try again.");
-      const data = await response.json();
-      setWorkflowActions(normalizeWorkflowActions(data));
-    } catch (error) {
-      setWorkflowActions([]);
-      setActionsError(error.message || "Unable to load workflow actions. Please try again.");
+      const response = await fetch(`/volt/ticket-categories/${categoryId}/workflow-config`, { headers: authHeaders() });
+      if (!response.ok) throw new Error("Unable to load category workflow config.");
+      setCategoryWorkflowConfig(await response.json());
+    } catch {
+      setCategoryWorkflowConfig(null);
     } finally {
-      setActionsLoading(false);
-    }
-  }, []);
-
-  const loadWorkflowStatuses = useCallback(async () => {
-    setStatusesLoading(true);
-    setStatusesError("");
-    try {
-      const response = await fetch("/volt/workflow/statuses", { headers: authHeaders() });
-      if (!response.ok) throw new Error("Unable to load workflow statuses. Please try again.");
-      const data = await response.json();
-      setWorkflowStatuses(normalizeWorkflowStatuses(data));
-    } catch (error) {
-      setWorkflowStatuses([]);
-      setStatusesError(error.message || "Unable to load workflow statuses. Please try again.");
-    } finally {
-      setStatusesLoading(false);
+      setIsLoadingCategory(false);
     }
   }, []);
 
   useEffect(() => {
-    loadTransitions();
-    loadTransitionOptions();
-    loadWorkflowActions();
-    loadWorkflowStatuses();
-  }, [loadTransitions, loadTransitionOptions, loadWorkflowActions, loadWorkflowStatuses]);
+    const timeoutId = window.setTimeout(() => {
+      loadBaseData();
+    }, 0);
 
-  const refreshTransitions = async () => {
-    setMessage("");
-    await Promise.all([loadTransitions(), loadTransitionOptions(), loadWorkflowActions(), loadWorkflowStatuses()]);
+    return () => window.clearTimeout(timeoutId);
+  }, [loadBaseData]);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      loadCategoryConfig(selectedCategoryId);
+      setValidationResult(null);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [loadCategoryConfig, selectedCategoryId]);
+
+  const refreshData = async () => {
+    setValidationResult(null);
+    await loadBaseData();
   };
 
-  const toggleTransition = async (transition) => {
-    setProcessingId(transition.id);
-    setMessage("");
-    setLoadError("");
+  const runValidation = async () => {
+    if (!selectedCategoryId) return;
+    setIsValidating(true);
+    setError("");
     try {
-      const response = await fetch(`/volt/workflow/transitions/${transition.id}`, {
-        method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify({ active: !transition.active }),
-      });
-      if (!response.ok) throw new Error(await readApiError(response, "Unable to update workflow transition. Please try again."));
-      setMessageType("success");
-      setMessage("Workflow transition updated successfully.");
-      await Promise.all([loadTransitions(), loadTransitionOptions()]);
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error.message || "Unable to update workflow transition. Please try again.");
-    } finally {
-      setProcessingId(null);
-    }
-  };
-
-  const createTransition = async (option) => {
-    if (option.alreadyConfigured) {
-      setMessageType("error");
-      setMessage("This transition is already configured.");
-      return;
-    }
-
-    const createKey = `${option.actionKey}-${option.fromStatus}-${option.toStatus}`;
-    setCreateProcessingKey(createKey);
-    setMessage("");
-    setOptionsError("");
-    try {
-      const payload = {
-        actionKey: option.actionKey,
-        displayName: option.displayName,
-        fromStatus: option.fromStatus,
-        toStatus: option.toStatus,
-        active: true,
-      };
-
-      if (option.sortOrder !== null && option.sortOrder !== undefined) {
-        payload.sortOrder = option.sortOrder;
-      }
-
-      const response = await fetch("/volt/workflow/transitions", {
+      const response = await fetch("/volt/workflow/validate-category-workflow", {
         method: "POST",
         headers: authHeaders(true),
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ categoryId: Number(selectedCategoryId) }),
       });
-
-      if (response.status === 409) {
-        throw new Error("This transition is already configured.");
-      }
-
-      if (!response.ok) {
-        throw new Error("Unable to create workflow transition. Please try again.");
-      }
-
-      setMessageType("success");
-      setMessage("Workflow transition created successfully.");
-      await Promise.all([loadTransitions(), loadTransitionOptions()]);
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error.message || "Unable to create workflow transition. Please try again.");
+      if (!response.ok) throw new Error(await readApiError(response, "Unable to validate selected category workflow."));
+      setValidationResult(await response.json());
+    } catch (validationError) {
+      setError(validationError.message || "Unable to validate selected category workflow.");
     } finally {
-      setCreateProcessingKey("");
+      setIsValidating(false);
     }
   };
 
-  const handleStatusFormInput = (event) => {
-    const { name, value, checked, type } = event.target;
-    setStatusForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
-    setStatusFormErrors((current) => ({ ...current, [name]: "" }));
-  };
-
-  const validateCreateStatusForm = () => {
-    const errors = {};
-    const statusKeyError = validateStatusKey(statusForm.statusKey);
-    const displayNameError = validateStatusDisplayName(statusForm.displayName);
-    const sortOrderError = validateStatusSortOrder(statusForm.sortOrder);
-    if (statusKeyError) errors.statusKey = statusKeyError;
-    if (displayNameError) errors.displayName = displayNameError;
-    if (sortOrderError) errors.sortOrder = sortOrderError;
-    return errors;
-  };
-
-  const createWorkflowStatus = async () => {
-    const errors = validateCreateStatusForm();
-    if (Object.keys(errors).length > 0) {
-      setStatusFormErrors(errors);
-      return;
-    }
-
-    setStatusProcessingKey("create-status");
-    setMessage("");
-    try {
-      const payload = {
-        statusKey: statusForm.statusKey.trim(),
-        displayName: statusForm.displayName.trim(),
-        active: statusForm.active,
-      };
-      if (statusForm.sortOrder !== "") {
-        payload.sortOrder = Number(statusForm.sortOrder);
-      }
-
-      const response = await fetch("/volt/workflow/statuses", {
-        method: "POST",
-        headers: authHeaders(true),
-        body: JSON.stringify(payload),
-      });
-
-      if (response.status === 409) {
-        throw new Error("A workflow status with this key already exists.");
-      }
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Unable to create workflow status. Please try again."));
-      }
-
-      setMessageType("success");
-      setMessage("Workflow status created successfully.");
-      setStatusForm(emptyStatusForm());
-      setStatusFormErrors({});
-      setShowStatusCreateForm(false);
-      await loadWorkflowStatuses();
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error.message || "Unable to create workflow status. Please try again.");
-    } finally {
-      setStatusProcessingKey("");
-    }
-  };
-
-  const startEditStatus = (status) => {
-    setEditingStatusId(status.id);
-    setEditStatusForm({
-      displayName: status.displayName ?? "",
-      sortOrder: status.sortOrder ?? "",
+  const openTransitionDrawer = (transition) => {
+    const from = getStatusLabel(transition, "from");
+    const to = getStatusLabel(transition, "to");
+    setDrawerItem({
+      type: "transition",
+      title: transition.displayName || formatLabel(transition.actionKey),
+      data: transition,
+      details: {
+        "Action": `${transition.displayName || formatLabel(transition.actionKey)} / ${transition.actionKey || "UNKNOWN"}`,
+        "From Status": `${from.label} / ${from.key || "UNKNOWN"}`,
+        "To Status": `${to.label} / ${to.key || "UNKNOWN"}`,
+        "Active": transition.active ? "Active" : "Inactive",
+        "System": transition.systemTransition ? "System" : "Custom",
+        "Protected": transition.protectedTransition ? "Protected" : "Read-only",
+        "Sort Order": transition.sortOrder ?? "Not set",
+        "Created": formatDateTime(transition.createdAt),
+        "Updated": formatDateTime(transition.updatedAt),
+      },
     });
-    setEditStatusErrors({});
-    setMessage("");
   };
 
-  const handleEditStatusInput = (event) => {
-    const { name, value } = event.target;
-    setEditStatusForm((current) => ({ ...current, [name]: value }));
-    setEditStatusErrors((current) => ({ ...current, [name]: "" }));
+  const openStatusDrawer = (status) => {
+    setDrawerItem({
+      type: "status",
+      title: status.displayName || formatLabel(status.statusKey),
+      data: status,
+      details: {
+        "Status": `${status.displayName || formatLabel(status.statusKey)} / ${status.statusKey || "UNKNOWN"}`,
+        "Behavior Bucket": status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set",
+        "Terminal": status.terminal ? "Terminal" : "Non-terminal",
+        "Active": status.active ? "Active" : "Inactive",
+        "System": status.systemStatus ? "System" : "Custom",
+        "Protected": status.protectedStatus ? "Protected" : "Read-only",
+        "Sort Order": status.sortOrder ?? "Not set",
+        "Created": formatDateTime(status.createdAt),
+        "Updated": formatDateTime(status.updatedAt),
+      },
+    });
   };
 
-  const cancelEditStatus = () => {
-    setEditingStatusId(null);
-    setEditStatusForm({ displayName: "", sortOrder: "" });
-    setEditStatusErrors({});
+  const openActionDrawer = (action) => {
+    setDrawerItem({
+      type: "action",
+      title: action.displayName || formatLabel(action.actionKey),
+      data: action,
+      details: {
+        "Action": `${action.displayName || formatLabel(action.actionKey)} / ${action.actionKey || "UNKNOWN"}`,
+        "Button Label": action.buttonLabel || "Not available",
+        "Description": action.description || "Not available",
+        "Active": action.active ? "Active" : "Inactive",
+        "System": action.systemAction ? "System" : "Custom",
+        "Protected": action.protectedAction ? "Protected" : "Read-only",
+        "Requires Comment": action.requiresComment ? "Yes" : "No",
+        "Confirmation Required": action.confirmationRequired ? "Yes" : "No",
+        "Sort Order": action.sortOrder ?? "Not set",
+        "Created": formatDateTime(action.createdAt),
+        "Updated": formatDateTime(action.updatedAt),
+      },
+    });
   };
 
-  const saveWorkflowStatus = async (status) => {
-    const errors = {};
-    const displayNameError = validateStatusDisplayName(editStatusForm.displayName);
-    const sortOrderError = validateStatusSortOrder(editStatusForm.sortOrder);
-    if (displayNameError) errors.displayName = displayNameError;
-    if (sortOrderError) errors.sortOrder = sortOrderError;
-    if (Object.keys(errors).length > 0) {
-      setEditStatusErrors(errors);
-      return;
-    }
-
-    setStatusProcessingKey(`edit-status-${status.id}`);
-    setMessage("");
-    try {
-      const payload = {
-        displayName: editStatusForm.displayName.trim(),
-      };
-      if (editStatusForm.sortOrder !== "") {
-        payload.sortOrder = Number(editStatusForm.sortOrder);
-      }
-
-      const response = await fetch(`/volt/workflow/statuses/${status.id}`, {
-        method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Unable to update workflow status. Please try again."));
-      }
-
-      setMessageType("success");
-      setMessage("Workflow status updated successfully.");
-      cancelEditStatus();
-      await loadWorkflowStatuses();
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error.message || "Unable to update workflow status. Please try again.");
-    } finally {
-      setStatusProcessingKey("");
-    }
-  };
-
-  const toggleWorkflowStatus = async (status) => {
-    setStatusProcessingKey(`toggle-status-${status.id}`);
-    setMessage("");
-    try {
-      const response = await fetch(`/volt/workflow/statuses/${status.id}/status`, {
-        method: "PATCH",
-        headers: authHeaders(true),
-        body: JSON.stringify({ active: !status.active }),
-      });
-
-      if (!response.ok) {
-        throw new Error(await readApiError(response, "Unable to update workflow status. Please try again."));
-      }
-
-      setMessageType("success");
-      setMessage("Workflow status updated successfully.");
-      await loadWorkflowStatuses();
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error.message || "Unable to update workflow status. Please try again.");
-    } finally {
-      setStatusProcessingKey("");
-    }
-  };
+  const issueRows = validationResult
+    ? (validationResult.blockingIssues?.length || validationResult.warnings?.length)
+      ? [...(validationResult.blockingIssues || []), ...(validationResult.warnings || [])]
+      : validationResult.issues || []
+    : [];
 
   return (
-    <main className="min-h-screen bg-gray-50 px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-5xl">
-        <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex items-center gap-2 font-semibold text-blue-950">
-          <ArrowLeft size={18} aria-hidden="true" /> Dashboard
+    <main id="main-content" className="min-h-screen bg-gray-50 px-4 py-5 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-[92rem]">
+        <button type="button" onClick={() => navigate("/employee-dashboard")} className="inline-flex items-center gap-2 text-sm font-bold text-blue-950">
+          <ArrowLeft size={17} aria-hidden="true" /> Dashboard
         </button>
 
-        <header className="mt-4 rounded-3xl bg-blue-950 p-5 text-white shadow-lg sm:p-7">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <header className="mt-4 border-b border-slate-200 pb-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h1 className="text-2xl font-extrabold sm:text-3xl">Workflow Management</h1>
-              <p className="mt-2 text-sm text-blue-100">Enable existing transitions or create missing backend-approved safe transitions.</p>
+              <p className="text-xs font-extrabold uppercase text-slate-500">Administration</p>
+              <h1 className="mt-1 text-2xl font-extrabold text-blue-950 sm:text-3xl">Workflow Management</h1>
             </div>
             <button
               type="button"
-              onClick={refreshTransitions}
+              onClick={refreshData}
               disabled={isLoading}
-              className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 py-2 font-bold text-white transition hover:bg-white/20 disabled:opacity-60"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50 disabled:opacity-60 lg:self-center"
             >
-              <RefreshCw size={18} aria-hidden="true" />
-              Refresh
+              <RefreshCw size={16} aria-hidden="true" />
+              {isLoading ? "Refreshing..." : "Refresh"}
             </button>
           </div>
         </header>
 
-        <Message type={messageType}>{message}</Message>
+        {error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
 
-        <section className="mt-5" aria-labelledby="workflow-status-list">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 id="workflow-status-list" className="text-xl font-extrabold text-blue-950">Workflow Statuses</h2>
-              <p className="mt-1 text-sm text-gray-500">Current workflow status metadata.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
+        <section className="mt-4" aria-label="Workflow summary">
+          <div className="flex flex-wrap gap-2">
+            <Badge tone="blue">Category: {selectedCategory?.displayName || "Select category"}</Badge>
+            <Badge tone="slate">Key: {selectedCategory?.categoryKey || "Not selected"}</Badge>
+            <Badge tone="blue">Mode: {categoryWorkflowConfig?.workflowMode || "Not loaded"}</Badge>
+            <StateBadge enabled={Boolean(categoryWorkflowConfig?.dbWorkflowEnabled)} trueLabel="DB workflow enabled" falseLabel="DB workflow disabled" />
+            <StateBadge enabled={Boolean(categoryWorkflowConfig?.fixedActionsEnabled)} trueLabel="Fixed actions enabled" falseLabel="Fixed actions disabled" />
+            <Badge tone={validationStatus === "Ready" ? "green" : validationStatus === "Not Ready" ? "red" : "yellow"}>Validation: {validationStatus}</Badge>
+            <Badge tone="green">Active transitions: {activeTransitions.length}</Badge>
+            <Badge tone="blue">Roles enabled: {enabledRoleCount}</Badge>
+          </div>
+        </section>
+
+        <section className="mt-4 flex flex-col gap-3 border-y border-slate-200 bg-white px-3 py-3 lg:flex-row lg:items-center lg:justify-between" aria-label="Workflow controls">
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-bold text-slate-700 lg:max-w-md">
+            Category selector
+            <select
+              value={selectedCategoryId}
+              onChange={(event) => setSelectedCategoryId(event.target.value)}
+              className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950"
+            >
+              {categories.length === 0 && <option value="">No categories available</option>}
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.displayName || formatLabel(category.categoryKey)} / {category.categoryKey}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+            <Search size={16} aria-hidden="true" />
+            {isLoadingCategory ? "Loading category config..." : "Read-only category view"}
+          </div>
+        </section>
+
+        <nav className="mt-4 overflow-x-auto border-b border-slate-200" aria-label="Workflow tabs">
+          <div className="flex min-w-max gap-1">
+            {tabs.map((tab) => (
               <button
+                key={tab.id}
                 type="button"
-                onClick={() => {
-                  setShowStatusCreateForm((current) => !current);
-                  setStatusFormErrors({});
-                }}
-                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-yellow-400 px-3 py-2 text-sm font-bold text-black hover:bg-yellow-300"
+                onClick={() => setActiveTab(tab.id)}
+                className={`border-b-2 px-4 py-3 text-sm font-extrabold ${
+                  activeTab === tab.id
+                    ? "border-blue-950 text-blue-950"
+                    : "border-transparent text-slate-500 hover:text-blue-950"
+                }`}
               >
-                <Plus size={16} aria-hidden="true" />
-                {showStatusCreateForm ? "Close" : "Add Status"}
+                {tab.label}
               </button>
-              <span className="rounded-full bg-blue-50 px-3 py-2 text-xs font-bold text-blue-950">
-                {workflowStatuses.length} statuses
-              </span>
-            </div>
+            ))}
           </div>
+        </nav>
 
-          <p className="mb-3 rounded-xl border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
-            Custom statuses are metadata only right now. They do not affect tickets, transitions, filters, or available actions until later migration steps are approved.
-          </p>
+        <section className="mt-4">
+          {activeTab === "overview" && (
+            <TableShell minWidth="min-w-[760px]">
+              <thead>
+                <tr>
+                  <HeaderCell>Area</HeaderCell>
+                  <HeaderCell>Value</HeaderCell>
+                  <HeaderCell>Status</HeaderCell>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <BodyCell><span className="font-bold text-blue-950">Selected category</span></BodyCell>
+                  <BodyCell><BusinessKeyLabel label={selectedCategory?.displayName} technicalKey={selectedCategory?.categoryKey} subtle /></BodyCell>
+                  <BodyCell><StateBadge enabled={Boolean(selectedCategory?.active)} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                </tr>
+                <tr>
+                  <BodyCell><span className="font-bold text-blue-950">Workflow config</span></BodyCell>
+                  <BodyCell>{categoryWorkflowConfig?.workflowMode || "Not available"}</BodyCell>
+                  <BodyCell>
+                    <div className="flex flex-wrap gap-2">
+                      <StateBadge enabled={Boolean(categoryWorkflowConfig?.dbWorkflowEnabled)} trueLabel="DB workflow enabled" falseLabel="DB workflow disabled" />
+                      <StateBadge enabled={Boolean(categoryWorkflowConfig?.fixedActionsEnabled)} trueLabel="Fixed enabled" falseLabel="Fixed disabled" />
+                    </div>
+                  </BodyCell>
+                </tr>
+                <tr>
+                  <BodyCell><span className="font-bold text-blue-950">Transitions</span></BodyCell>
+                  <BodyCell>{transitions.length} total, {activeTransitions.length} active</BodyCell>
+                  <BodyCell><Badge tone="blue">Read-only</Badge></BodyCell>
+                </tr>
+                <tr>
+                  <BodyCell><span className="font-bold text-blue-950">Statuses</span></BodyCell>
+                  <BodyCell>{statuses.length} status records</BodyCell>
+                  <BodyCell><Badge tone="blue">Read-only</Badge></BodyCell>
+                </tr>
+                <tr>
+                  <BodyCell><span className="font-bold text-blue-950">Actions</span></BodyCell>
+                  <BodyCell>{actions.length} action records</BodyCell>
+                  <BodyCell><Badge tone="blue">Read-only</Badge></BodyCell>
+                </tr>
+                <tr>
+                  <BodyCell><span className="font-bold text-blue-950">Validation</span></BodyCell>
+                  <BodyCell>{validationStatus}</BodyCell>
+                  <BodyCell><Badge tone={validationStatus === "Ready" ? "green" : validationStatus === "Not Ready" ? "red" : "yellow"}>{validationStatus}</Badge></BodyCell>
+                </tr>
+              </tbody>
+            </TableShell>
+          )}
 
-          {showStatusCreateForm && (
-            <div className="mb-4 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-              <h3 className="text-base font-extrabold text-blue-950">Add Status</h3>
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <label className="block text-sm font-semibold text-slate-700">
-                  Status Key
-                  <input
-                    name="statusKey"
-                    value={statusForm.statusKey}
-                    onChange={handleStatusFormInput}
-                    maxLength={50}
-                    placeholder="WAITING_FOR_CUSTOMER"
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 uppercase outline-none focus:border-blue-950"
-                  />
-                  {statusFormErrors.statusKey && <span className="mt-1 block text-xs text-red-600">{statusFormErrors.statusKey}</span>}
-                </label>
-                <label className="block text-sm font-semibold text-slate-700">
-                  Display Name
-                  <input
-                    name="displayName"
-                    value={statusForm.displayName}
-                    onChange={handleStatusFormInput}
-                    maxLength={80}
-                    placeholder="Waiting For Customer"
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950"
-                  />
-                  {statusFormErrors.displayName && <span className="mt-1 block text-xs text-red-600">{statusFormErrors.displayName}</span>}
-                </label>
-                <label className="block text-sm font-semibold text-slate-700">
-                  Sort Order
-                  <input
-                    name="sortOrder"
-                    type="number"
-                    step="1"
-                    value={statusForm.sortOrder}
-                    onChange={handleStatusFormInput}
-                    className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950"
-                  />
-                  {statusFormErrors.sortOrder && <span className="mt-1 block text-xs text-red-600">{statusFormErrors.sortOrder}</span>}
-                </label>
-                <label className="flex items-center gap-3 text-sm font-semibold text-slate-700">
-                  <input
-                    name="active"
-                    type="checkbox"
-                    checked={statusForm.active}
-                    onChange={handleStatusFormInput}
-                    className="h-4 w-4 rounded border-slate-300"
-                  />
-                  Active
-                </label>
+          {activeTab === "transitions" && (
+            <TableShell>
+              <thead>
+                <tr>
+                  <HeaderCell>From Status</HeaderCell>
+                  <HeaderCell>Action</HeaderCell>
+                  <HeaderCell>To Status</HeaderCell>
+                  <HeaderCell>Category Rule</HeaderCell>
+                  <HeaderCell>Roles Enabled</HeaderCell>
+                  <HeaderCell>Active</HeaderCell>
+                  <HeaderCell>Protected/System</HeaderCell>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading && <EmptyRows colSpan={7}>Loading workflow transitions...</EmptyRows>}
+                {!isLoading && transitions.length === 0 && <EmptyRows colSpan={7}>No workflow transitions found.</EmptyRows>}
+                {!isLoading && transitions.map((transition) => {
+                  const from = getStatusLabel(transition, "from");
+                  const to = getStatusLabel(transition, "to");
+                  const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
+                  const roleRules = roleRulesByTransitionId[transition.id] || [];
+                  const activeRoleRules = roleRules.filter((rule) => rule.active);
+
+                  return (
+                    <tr key={transition.id} onClick={() => openTransitionDrawer(transition)} className="cursor-pointer hover:bg-blue-50/50">
+                      <BodyCell><BusinessKeyLabel label={from.label} technicalKey={from.key} subtle /></BodyCell>
+                      <BodyCell><BusinessKeyLabel label={transition.displayName || actionByKey[transition.actionKey]?.displayName} technicalKey={transition.actionKey} /></BodyCell>
+                      <BodyCell><BusinessKeyLabel label={to.label} technicalKey={to.key} subtle /></BodyCell>
+                      <BodyCell><Badge tone={categoryState.tone}>{categoryState.label}</Badge></BodyCell>
+                      <BodyCell>{roleRules.length === 0 ? <Badge tone="green">All roles</Badge> : <Badge tone="yellow">{activeRoleRules.length}/{roleRules.length} scoped</Badge>}</BodyCell>
+                      <BodyCell><StateBadge enabled={transition.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                      <BodyCell>
+                        <div className="flex flex-wrap gap-1.5">
+                          <Badge tone={transition.protectedTransition ? "yellow" : "slate"}>{transition.protectedTransition ? "Protected" : "Not protected"}</Badge>
+                          <Badge tone={transition.systemTransition ? "blue" : "slate"}>{transition.systemTransition ? "System" : "Custom"}</Badge>
+                        </div>
+                      </BodyCell>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </TableShell>
+          )}
+
+          {activeTab === "statuses" && (
+            <TableShell minWidth="min-w-[860px]">
+              <thead>
+                <tr>
+                  <HeaderCell>Display Name</HeaderCell>
+                  <HeaderCell>Status Key</HeaderCell>
+                  <HeaderCell>Behavior Bucket</HeaderCell>
+                  <HeaderCell>Terminal</HeaderCell>
+                  <HeaderCell>Active</HeaderCell>
+                  <HeaderCell>System/Protected</HeaderCell>
+                  <HeaderCell>Sort Order</HeaderCell>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading && <EmptyRows colSpan={7}>Loading workflow statuses...</EmptyRows>}
+                {!isLoading && statuses.length === 0 && <EmptyRows colSpan={7}>No workflow statuses found.</EmptyRows>}
+                {!isLoading && statuses.map((status) => (
+                  <tr key={status.id ?? status.statusKey} onClick={() => openStatusDrawer(status)} className="cursor-pointer hover:bg-blue-50/50">
+                    <BodyCell><span className="font-bold text-blue-950">{status.displayName || formatLabel(status.statusKey)}</span></BodyCell>
+                    <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{status.statusKey || "UNKNOWN"}</span></BodyCell>
+                    <BodyCell>{status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"}</BodyCell>
+                    <BodyCell><Badge tone={status.terminal ? "red" : "slate"}>{status.terminal ? "Terminal" : "Non-terminal"}</Badge></BodyCell>
+                    <BodyCell><StateBadge enabled={status.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                    <BodyCell>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge tone={status.systemStatus ? "blue" : "slate"}>{status.systemStatus ? "System" : "Custom"}</Badge>
+                        <Badge tone={status.protectedStatus ? "yellow" : "slate"}>{status.protectedStatus ? "Protected" : "Read-only"}</Badge>
+                      </div>
+                    </BodyCell>
+                    <BodyCell>{status.sortOrder ?? "Not set"}</BodyCell>
+                  </tr>
+                ))}
+              </tbody>
+            </TableShell>
+          )}
+
+          {activeTab === "actions" && (
+            <TableShell minWidth="min-w-[860px]">
+              <thead>
+                <tr>
+                  <HeaderCell>Display Name</HeaderCell>
+                  <HeaderCell>Action Key</HeaderCell>
+                  <HeaderCell>Active</HeaderCell>
+                  <HeaderCell>System/Protected</HeaderCell>
+                  <HeaderCell>Sort Order</HeaderCell>
+                  <HeaderCell>Access Key</HeaderCell>
+                </tr>
+              </thead>
+              <tbody>
+                {isLoading && <EmptyRows colSpan={6}>Loading workflow actions...</EmptyRows>}
+                {!isLoading && actions.length === 0 && <EmptyRows colSpan={6}>No workflow actions found.</EmptyRows>}
+                {!isLoading && actions.map((action) => (
+                  <tr key={action.id ?? action.actionKey} onClick={() => openActionDrawer(action)} className="cursor-pointer hover:bg-blue-50/50">
+                    <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
+                    <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{action.actionKey || "UNKNOWN"}</span></BodyCell>
+                    <BodyCell><StateBadge enabled={action.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                    <BodyCell>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge tone={action.systemAction ? "blue" : "slate"}>{action.systemAction ? "System" : "Custom"}</Badge>
+                        <Badge tone={action.protectedAction ? "yellow" : "slate"}>{action.protectedAction ? "Protected" : "Read-only"}</Badge>
+                      </div>
+                    </BodyCell>
+                    <BodyCell>{action.sortOrder ?? "Not set"}</BodyCell>
+                    <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{action.actionKey || "Not available"}</span></BodyCell>
+                  </tr>
+                ))}
+              </tbody>
+            </TableShell>
+          )}
+
+          {activeTab === "roleAccess" && (
+            <div className="space-y-5">
+              <div>
+                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">role_access_rules</h2>
+                <TableShell minWidth="min-w-[900px]">
+                  <thead>
+                    <tr>
+                      <HeaderCell>Action</HeaderCell>
+                      {roles.map((role) => <HeaderCell key={role.id}>{role.displayName || role.roleKey}</HeaderCell>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {actions.map((action) => (
+                      <tr key={action.id ?? action.actionKey}>
+                        <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
+                        {roles.map((role) => (
+                          <BodyCell key={role.id}>
+                            <ScopeBadge value={actionAccessState(action.actionKey, role, roleAccessByRoleId)} />
+                          </BodyCell>
+                        ))}
+                      </tr>
+                    ))}
+                    {actions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No workflow actions available for role access matrix.</EmptyRows>}
+                  </tbody>
+                </TableShell>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
+
+              <div>
+                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">workflow_transition_role_rules</h2>
+                <TableShell minWidth="min-w-[1040px]">
+                  <thead>
+                    <tr>
+                      <HeaderCell>Action / Transition</HeaderCell>
+                      {roles.map((role) => <HeaderCell key={role.id}>{role.displayName || role.roleKey}</HeaderCell>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {transitions.map((transition) => {
+                      const from = getStatusLabel(transition, "from");
+                      const to = getStatusLabel(transition, "to");
+                      return (
+                        <tr key={transition.id} onClick={() => openTransitionDrawer(transition)} className="cursor-pointer hover:bg-blue-50/50">
+                          <BodyCell>
+                            <BusinessKeyLabel label={transition.displayName || actionByKey[transition.actionKey]?.displayName} technicalKey={transition.actionKey} />
+                            <span className="mt-1 block text-xs font-semibold text-slate-600">{from.label} to {to.label}</span>
+                          </BodyCell>
+                          {roles.map((role) => (
+                            <BodyCell key={role.id}>
+                              <ScopeBadge value={combinedTransitionRoleState(transition, role, roleAccessByRoleId, roleRulesByTransitionId)} />
+                            </BodyCell>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                    {transitions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No workflow transitions available for role rule matrix.</EmptyRows>}
+                  </tbody>
+                </TableShell>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "validation" && (
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 border border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-base font-extrabold text-blue-950">Selected Category Validation</h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">
+                    {selectedCategory?.displayName || "No category selected"} / {selectedCategory?.categoryKey || "UNKNOWN"}
+                  </p>
+                </div>
                 <button
                   type="button"
-                  onClick={createWorkflowStatus}
-                  disabled={statusProcessingKey === "create-status"}
-                  className="rounded-xl bg-blue-950 px-3 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
+                  onClick={runValidation}
+                  disabled={!selectedCategoryId || isValidating}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
                 >
-                  {statusProcessingKey === "create-status" ? "Creating..." : "Create Status"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowStatusCreateForm(false);
-                    setStatusForm(emptyStatusForm());
-                    setStatusFormErrors({});
-                  }}
-                  disabled={statusProcessingKey === "create-status"}
-                  className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-bold text-slate-800 hover:bg-slate-300 disabled:opacity-60"
-                >
-                  Cancel
+                  <RefreshCw size={16} aria-hidden="true" />
+                  {isValidating ? "Validating..." : "Run Validation"}
                 </button>
               </div>
-            </div>
-          )}
 
-          {statusesLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow statuses...</p>}
-          {statusesError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{statusesError}</p>}
-          {!statusesLoading && !statusesError && workflowStatuses.length === 0 && (
-            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No workflow statuses found.</p>
-          )}
-          {!statusesLoading && !statusesError && workflowStatuses.length > 0 && (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {workflowStatuses.map((status) => (
-                <WorkflowStatusCard
-                  key={status.id ?? status.statusKey}
-                  status={status}
-                  editForm={editStatusForm}
-                  editErrors={editStatusErrors}
-                  isEditing={String(editingStatusId) === String(status.id)}
-                  isProcessing={statusProcessingKey === `edit-status-${status.id}` || statusProcessingKey === `toggle-status-${status.id}`}
-                  onEdit={startEditStatus}
-                  onEditInput={handleEditStatusInput}
-                  onCancelEdit={cancelEditStatus}
-                  onSaveEdit={saveWorkflowStatus}
-                  onToggleStatus={toggleWorkflowStatus}
-                />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="mt-5" aria-labelledby="workflow-action-list">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 id="workflow-action-list" className="text-xl font-extrabold text-blue-950">Workflow Actions</h2>
-              <p className="mt-1 text-sm text-gray-500">Read-only metadata for current workflow actions. Custom action creation is not enabled yet.</p>
-            </div>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
-              {workflowActions.length} actions
-            </span>
-          </div>
-
-          {actionsLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow actions...</p>}
-          {actionsError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{actionsError}</p>}
-          {!actionsLoading && !actionsError && workflowActions.length === 0 && (
-            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No workflow actions found.</p>
-          )}
-          {!actionsLoading && !actionsError && workflowActions.length > 0 && (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {workflowActions.map((action) => (
-                <WorkflowActionCard key={action.id ?? action.actionKey} action={action} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="mt-5" aria-labelledby="workflow-transition-options">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 id="workflow-transition-options" className="text-xl font-extrabold text-blue-950">Create Missing Transition</h2>
-              <p className="mt-1 text-sm text-gray-500">Backend-approved safe transition options.</p>
-            </div>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
-              {transitionOptions.length} options
-            </span>
-          </div>
-
-          {optionsLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow transition options...</p>}
-          {optionsError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{optionsError}</p>}
-          {!optionsLoading && !optionsError && transitionOptions.length === 0 && (
-            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No workflow transition options found.</p>
-          )}
-          {!optionsLoading && !optionsError && transitionOptions.length > 0 && (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {transitionOptions.map((option) => {
-                const optionKey = `${option.actionKey}-${option.fromStatus}-${option.toStatus}`;
-                return (
-                  <TransitionOptionCard
-                    key={option.transitionId ?? optionKey}
-                    option={option}
-                    isProcessing={createProcessingKey === optionKey}
-                    onCreate={createTransition}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </section>
-
-        <section className="mt-5" aria-labelledby="workflow-transition-list">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h2 id="workflow-transition-list" className="text-xl font-extrabold text-blue-950">Transition List</h2>
-              <p className="mt-1 text-sm text-gray-500">Existing transitions only.</p>
-            </div>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-950">
-              {transitions.length} transitions
-            </span>
-          </div>
-
-          {isLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow transitions...</p>}
-          {loadError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{loadError}</p>}
-          {!isLoading && !loadError && transitions.length === 0 && (
-            <p className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No workflow transitions found.</p>
-          )}
-          {!isLoading && !loadError && transitions.length > 0 && (
-            <div className="grid grid-cols-1 gap-3">
-              {transitions.map((transition) => (
-                <TransitionCard
-                  key={transition.id}
-                  transition={transition}
-                  isProcessing={String(processingId) === String(transition.id)}
-                  onToggle={toggleTransition}
-                />
-              ))}
+              <TableShell minWidth="min-w-[820px]">
+                <thead>
+                  <tr>
+                    <HeaderCell>Result</HeaderCell>
+                    <HeaderCell>Code</HeaderCell>
+                    <HeaderCell>Message</HeaderCell>
+                    <HeaderCell>Transition</HeaderCell>
+                  </tr>
+                </thead>
+                <tbody>
+                  {!validationResult && <EmptyRows colSpan={4}>Validation has not been run for the selected category.</EmptyRows>}
+                  {validationResult && (
+                    <tr>
+                      <BodyCell>
+                        <span className="inline-flex items-center gap-2 font-bold text-blue-950">
+                          {(validationResult.readyToActivate || validationResult.valid) ? <CheckCircle2 size={17} className="text-green-600" aria-hidden="true" /> : <XCircle size={17} className="text-red-600" aria-hidden="true" />}
+                          {(validationResult.readyToActivate || validationResult.valid) ? "Ready" : "Not Ready"}
+                        </span>
+                      </BodyCell>
+                      <BodyCell>SUMMARY</BodyCell>
+                      <BodyCell>
+                        Blocking issues: {(validationResult.blockingIssues || []).length}; Warnings: {(validationResult.warnings || []).length}
+                      </BodyCell>
+                      <BodyCell>All</BodyCell>
+                    </tr>
+                  )}
+                  {issueRows.map((issue, index) => {
+                    const transition = transitions.find((item) => String(item.id) === String(issue.transitionId));
+                    return (
+                      <tr key={`${issue.code}-${issue.transitionId ?? "none"}-${index}`} className={transition ? "cursor-pointer hover:bg-blue-50/50" : ""} onClick={() => transition && openTransitionDrawer(transition)}>
+                        <BodyCell><Badge tone={(validationResult?.warnings || []).some((warning) => warning === issue) ? "yellow" : "red"}>{(validationResult?.warnings || []).some((warning) => warning === issue) ? "Warning" : "Blocking"}</Badge></BodyCell>
+                        <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{issue.code || "ISSUE"}</span></BodyCell>
+                        <BodyCell>{issue.message || "Validation issue found"}</BodyCell>
+                        <BodyCell>{issue.transitionId ? `#${issue.transitionId}` : "Not linked"}</BodyCell>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </TableShell>
             </div>
           )}
         </section>
       </div>
+
+      <DetailDrawer
+        item={drawerItem}
+        onClose={() => setDrawerItem(null)}
+        categoryRulesByTransitionId={categoryRulesByTransitionId}
+        roleRulesByTransitionId={roleRulesByTransitionId}
+      />
     </main>
   );
 }

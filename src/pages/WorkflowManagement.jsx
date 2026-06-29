@@ -648,69 +648,116 @@ function ConfirmWorkflowModeChangeDialog({ pendingChange, onCancel, onConfirm, i
   );
 }
 
+function statusSearchText(status) {
+  return `${status?.statusKey || ""} ${status?.displayName || ""}`.toUpperCase();
+}
+
+function matchesStatus(status, terms) {
+  const text = statusSearchText(status);
+  return terms.some((term) => text.includes(term));
+}
+
+function compactActionLabel(transition, actionByKey) {
+  return transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey);
+}
+
 function WorkflowMapView({
   statuses,
   transitions,
   selectedItem,
   onSelectItem,
   actionByKey,
-  categoryRulesByTransitionId,
-  selectedCategoryId,
 }) {
   const sortedStatuses = [...statuses].sort((first, second) => (first.sortOrder ?? 999) - (second.sortOrder ?? 999) || String(first.statusKey).localeCompare(String(second.statusKey)));
-  const columns = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(Math.max(sortedStatuses.length, 1)))));
-  const nodeWidth = 180;
-  const nodeHeight = 82;
-  const columnGap = 72;
-  const rowGap = 58;
-  const mapWidth = Math.max(960, columns * nodeWidth + (columns - 1) * columnGap + 80);
-  const rows = Math.max(1, Math.ceil(sortedStatuses.length / columns));
-  const mapHeight = Math.max(500, rows * nodeHeight + (rows - 1) * rowGap + 120);
+  const nodeWidth = 176;
+  const nodeHeight = 68;
+  const mainY = 260;
+  const upperY = 88;
+  const lowerY = 430;
+
+  const findStatus = (terms) => sortedStatuses.find((status) => matchesStatus(status, terms));
+  const preferredMainPath = [
+    findStatus(["NEW"]),
+    findStatus(["IN_PROGRESS", "IN PROGRESS"]),
+    findStatus(["REPAIR_COMPLETED", "REPAIR COMPLETED", "READY_FOR_DELIVERY", "READY FOR DELIVERY", "COMPLETED"]),
+    findStatus(["DELIVERED_TO_CUSTOMER", "DELIVERED TO CUSTOMER", "DELIVERED"]),
+  ].filter(Boolean);
+  const mainPath = preferredMainPath.length >= 2 ? [...new Map(preferredMainPath.map((status) => [String(status.id), status])).values()] : sortedStatuses.slice(0, 4);
+  const mainIds = new Set(mainPath.map((status) => String(status.id)));
+  const branches = sortedStatuses.filter((status) => !mainIds.has(String(status.id)));
+  const upperBranches = branches.filter((status) => !status.terminal && !matchesStatus(status, ["CANCEL", "DECLINED", "DELIVERED"]));
+  const lowerBranches = branches.filter((status) => !upperBranches.includes(status));
+  const laneCount = Math.max(mainPath.length, upperBranches.length + 1, lowerBranches.length + 1, 4);
+  const stepX = 238;
+  const mapWidth = Math.max(1040, 80 + (laneCount - 1) * stepX + nodeWidth + 80);
+  const mapHeight = 560;
   const statusPositions = {};
 
-  sortedStatuses.forEach((status, index) => {
-    const row = Math.floor(index / columns);
-    const column = index % columns;
-    statusPositions[String(status.id)] = {
-      x: 40 + column * (nodeWidth + columnGap),
-      y: 60 + row * (nodeHeight + rowGap),
-    };
+  mainPath.forEach((status, index) => {
+    statusPositions[String(status.id)] = { x: 72 + index * stepX, y: mainY, lane: "main" };
+  });
+  upperBranches.forEach((status, index) => {
+    statusPositions[String(status.id)] = { x: 188 + index * stepX, y: upperY, lane: "branch" };
+  });
+  lowerBranches.forEach((status, index) => {
+    statusPositions[String(status.id)] = { x: 188 + index * stepX, y: lowerY, lane: "branch" };
   });
 
   const visibleTransitions = transitions.filter((transition) => statusPositions[String(transition.fromStatusId)] && statusPositions[String(transition.toStatusId)]);
+  const mainEdges = new Set(mainPath.slice(0, -1).map((status, index) => `${status.id}:${mainPath[index + 1]?.id}`));
+  const actionLabelSlots = new Map();
 
   return (
     <div className="overflow-auto rounded-lg border border-slate-200 bg-white">
       <div
-        className="relative bg-[radial-gradient(circle,#dbe4f0_1px,transparent_1px)]"
-        style={{ width: mapWidth, minHeight: mapHeight, backgroundSize: "22px 22px" }}
+        className="relative bg-[radial-gradient(circle,#e2e8f0_1px,transparent_1px)]"
+        style={{ width: mapWidth, minHeight: mapHeight, backgroundSize: "28px 28px" }}
       >
+        <div className="absolute left-6 top-5 rounded-full border border-slate-200 bg-white/95 px-3 py-1 text-xs font-extrabold uppercase text-slate-500 shadow-sm">
+          Branches / Exceptions
+        </div>
+        <div className="absolute left-6 top-[244px] rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-extrabold uppercase text-blue-950">
+          Primary Flow
+        </div>
+        <div className="absolute left-6 top-[386px] rounded-full border border-slate-200 bg-white/95 px-3 py-1 text-xs font-extrabold uppercase text-slate-500 shadow-sm">
+          Alternate Outcomes
+        </div>
+
         <svg className="absolute inset-0" width={mapWidth} height={mapHeight} aria-hidden="true">
           <defs>
             <marker id="workflow-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-              <path d="M0,0 L0,6 L9,3 z" fill="#475569" />
+              <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
             </marker>
             <marker id="workflow-arrow-selected" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
               <path d="M0,0 L0,6 L9,3 z" fill="#1d4ed8" />
+            </marker>
+            <marker id="workflow-arrow-main" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#0f172a" />
             </marker>
           </defs>
           {visibleTransitions.map((transition) => {
             const from = statusPositions[String(transition.fromStatusId)];
             const to = statusPositions[String(transition.toStatusId)];
             const selected = selectedItem?.type === "transition" && String(selectedItem.data.id) === String(transition.id);
+            const isMainEdge = mainEdges.has(`${transition.fromStatusId}:${transition.toStatusId}`);
             const startX = from.x + nodeWidth;
             const startY = from.y + nodeHeight / 2;
             const endX = to.x;
             const endY = to.y + nodeHeight / 2;
             const midX = (startX + endX) / 2;
+            const sweep = isMainEdge ? 0 : Math.max(48, Math.min(110, Math.abs(endY - startY) * 0.65));
+            const path = isMainEdge
+              ? `M ${startX} ${startY} L ${endX} ${endY}`
+              : `M ${startX} ${startY} C ${midX} ${startY + (endY > startY ? sweep : -sweep)}, ${midX} ${endY - (endY > startY ? sweep : -sweep)}, ${endX} ${endY}`;
             return (
               <path
                 key={transition.id}
-                d={`M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`}
-                className={`${getEdgeTone(transition, selected)} fill-none`}
-                strokeWidth={selected ? 3 : 2}
-                strokeDasharray={transition.active ? "0" : "6 6"}
-                markerEnd={selected ? "url(#workflow-arrow-selected)" : "url(#workflow-arrow)"}
+                d={path}
+                className={`${selected ? "stroke-blue-700" : isMainEdge ? "stroke-slate-900" : getEdgeTone(transition, selected)} fill-none`}
+                strokeWidth={selected ? 3.5 : isMainEdge ? 3 : 1.7}
+                strokeDasharray={transition.active ? (isMainEdge ? "0" : "7 7") : "4 8"}
+                opacity={selected || isMainEdge ? 1 : 0.62}
+                markerEnd={selected ? "url(#workflow-arrow-selected)" : isMainEdge ? "url(#workflow-arrow-main)" : "url(#workflow-arrow)"}
               />
             );
           })}
@@ -720,49 +767,71 @@ function WorkflowMapView({
           const from = statusPositions[String(transition.fromStatusId)];
           const to = statusPositions[String(transition.toStatusId)];
           const selected = selectedItem?.type === "transition" && String(selectedItem.data.id) === String(transition.id);
-          const left = (from.x + nodeWidth + to.x) / 2 - 76;
-          const top = (from.y + to.y) / 2 + nodeHeight / 2 - 18;
-          const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
+          const isMainEdge = mainEdges.has(`${transition.fromStatusId}:${transition.toStatusId}`);
+          const slotKey = `${Math.round((from.x + to.x) / 2)}:${Math.round((from.y + to.y) / 2)}`;
+          const slotOffset = actionLabelSlots.get(slotKey) || 0;
+          actionLabelSlots.set(slotKey, slotOffset + 1);
+          const left = (from.x + nodeWidth + to.x) / 2 - (isMainEdge ? 72 : 62);
+          const top = (from.y + to.y) / 2 + nodeHeight / 2 - 16 + slotOffset * 28;
           return (
             <button
               key={`label-${transition.id}`}
               type="button"
+              title={`${compactActionLabel(transition, actionByKey)} (${transition.actionKey})`}
               onClick={() => onSelectItem({ type: "transition", data: transition })}
-              className={`absolute z-20 w-40 rounded-lg border bg-white px-2 py-1 text-left text-[0.68rem] font-bold shadow-sm hover:border-blue-400 ${selected ? "border-blue-500 ring-2 ring-blue-200" : "border-slate-200"} ${transition.active ? "text-blue-950" : "text-slate-500"}`}
-              style={{ left, top }}
+              className={`absolute z-20 truncate rounded-full border bg-white px-3 py-1 text-center text-[0.68rem] font-extrabold shadow-sm transition hover:border-blue-400 hover:text-blue-950 ${selected ? "border-blue-500 text-blue-950 ring-2 ring-blue-200" : isMainEdge ? "border-slate-300 text-slate-800" : "border-slate-200 text-slate-500"} ${transition.active ? "" : "opacity-60"}`}
+              style={{ left, top, width: isMainEdge ? 144 : 124 }}
             >
-              <span className="block truncate">{transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey)}</span>
-              <span className="block truncate text-[0.62rem] uppercase text-slate-500">{transition.actionKey}</span>
-              <span className={`mt-1 inline-flex rounded-full border px-1.5 py-0.5 text-[0.58rem] ${categoryState.tone === "green" ? "border-green-200 bg-green-50 text-green-700" : categoryState.tone === "red" ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
-                {categoryState.label}
-              </span>
+              {compactActionLabel(transition, actionByKey)}
             </button>
           );
         })}
 
         {sortedStatuses.map((status) => {
           const position = statusPositions[String(status.id)];
+          if (!position) return null;
           const selected = selectedItem?.type === "status" && String(selectedItem.data.id) === String(status.id);
+          const protectedRecord = isProtectedStatus(status);
+          const isMain = position.lane === "main";
           return (
             <button
               key={status.id ?? status.statusKey}
               type="button"
+              title={`${status.displayName || formatLabel(status.statusKey)} (${status.statusKey})`}
               onClick={() => onSelectItem({ type: "status", data: status })}
-              className={`absolute z-30 rounded-xl border-2 px-3 py-3 text-left shadow-sm transition hover:shadow-md ${getStatusTone(status)} ${selected ? "ring-4 ring-blue-200" : ""}`}
+              className={`absolute z-30 rounded-lg border-2 px-3 py-3 text-left shadow-sm transition hover:shadow-md ${getStatusTone(status)} ${selected ? "ring-4 ring-blue-200" : ""} ${isMain ? "shadow-md" : "opacity-95"}`}
               style={{ left: position.x, top: position.y, width: nodeWidth, minHeight: nodeHeight }}
             >
-              <span className="block text-sm font-extrabold">{status.displayName || formatLabel(status.statusKey)}</span>
-              <span className="mt-1 block break-all text-[0.68rem] font-extrabold uppercase opacity-75">{status.statusKey}</span>
-              <span className="mt-2 flex flex-wrap gap-1">
-                {status.terminal && <Badge tone="green">Terminal</Badge>}
-                {isProtectedStatus(status) && <Badge tone="yellow">Protected</Badge>}
-                {!status.active && <Badge tone="red">Inactive</Badge>}
+              <span className="line-clamp-2 block text-sm font-extrabold leading-snug">{status.displayName || formatLabel(status.statusKey)}</span>
+              <span className="mt-2 flex items-center gap-1.5">
+                {status.terminal && <span className="h-2.5 w-2.5 rounded-full bg-green-500" aria-label="Terminal status" />}
+                {protectedRecord && <span className="h-2.5 w-2.5 rounded-full bg-yellow-500" aria-label="Protected status" />}
+                {!protectedRecord && !status.terminal && <span className="h-2.5 w-2.5 rounded-full bg-blue-500" aria-label="Custom status" />}
+                {!status.active && <span className="text-[0.64rem] font-extrabold uppercase text-slate-500">Inactive</span>}
               </span>
             </button>
           );
         })}
       </div>
     </div>
+  );
+}
+
+function MapPanelSection({ title, children }) {
+  return (
+    <section className="border-t border-slate-200 py-4">
+      <h3 className="text-xs font-extrabold uppercase text-slate-500">{title}</h3>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function MapDisclosureSection({ title, children }) {
+  return (
+    <details className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <summary className="cursor-pointer text-xs font-extrabold uppercase text-blue-950">{title}</summary>
+      <div className="mt-3">{children}</div>
+    </details>
   );
 }
 
@@ -792,37 +861,53 @@ function MapDetailPanel({
 }) {
   if (!selectedItem) {
     return (
-      <aside className="rounded-lg border border-slate-200 bg-white px-4 py-4">
-        <p className="text-xs font-extrabold uppercase text-slate-500">Selected Category</p>
-        <BusinessKeyLabel label={selectedCategory?.displayName} technicalKey={selectedCategory?.categoryKey} />
-        <div className="mt-4 space-y-3 text-sm font-semibold text-slate-700">
-          <DetailRow label="Workflow Mode" value={categoryWorkflowConfig?.workflowMode} />
-          <DetailRow label="DB Workflow" value={categoryWorkflowConfig?.dbWorkflowEnabled ? "Enabled" : "Disabled"} />
-          <DetailRow label="Fixed Actions" value={categoryWorkflowConfig?.fixedActionsEnabled ? "Enabled" : "Disabled"} />
-          <DetailRow label="Updated" value={`${formatDateTime(categoryWorkflowConfig?.workflowModeUpdatedAt)} / ${categoryWorkflowConfig?.workflowModeUpdatedByEmployeeId || "Unknown"}`} />
-        </div>
-        <div className="mt-4 flex flex-col gap-2">
-          <Badge tone={readyToActivate ? "green" : "yellow"}>readyToActivate: {readyToActivate ? "true" : "false"}</Badge>
-          <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>Blockers: {blockingIssueCount}</Badge>
-          <Badge tone={warningCount > 0 ? "yellow" : "slate"}>Warnings: {warningCount}</Badge>
-          {!validationForSelectedCategory && <p className="text-sm font-bold text-yellow-800">Run Validation before activation.</p>}
-          <button
-            type="button"
-            onClick={() => onRequestWorkflowModeChange(activationTargetConfig)}
-            disabled={!selectedCategory?.id || !readyToActivate || categoryWorkflowConfig?.workflowMode === "DB_CONFIGURED" || isSavingWorkflowMode}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
-          >
-            Activate DB Workflow
-          </button>
-          <button
-            type="button"
-            onClick={() => onRequestWorkflowModeChange(rollbackTargetConfig)}
-            disabled={!selectedCategory?.id || !categoryWorkflowConfig || categoryWorkflowConfig.workflowMode === "LEGACY_FIXED" || isSavingWorkflowMode}
-            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
-          >
-            Rollback to Legacy
-          </button>
-        </div>
+      <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4">
+        <MapPanelSection title="Selected Item">
+          <BusinessKeyLabel label={selectedCategory?.displayName || "Selected Category"} technicalKey={selectedCategory?.categoryKey} />
+          <p className="mt-2 text-sm font-semibold text-slate-600">Select a status or transition on the map to view rules and controls.</p>
+        </MapPanelSection>
+
+        <MapPanelSection title="Basic Details">
+          <dl className="space-y-1">
+            <DetailRow label="Workflow Mode" value={categoryWorkflowConfig?.workflowMode} />
+            <DetailRow label="DB Workflow" value={categoryWorkflowConfig?.dbWorkflowEnabled ? "Enabled" : "Disabled"} />
+            <DetailRow label="Fixed Actions" value={categoryWorkflowConfig?.fixedActionsEnabled ? "Enabled" : "Disabled"} />
+          </dl>
+        </MapPanelSection>
+
+        <MapPanelSection title="Rules Summary">
+          <div className="flex flex-wrap gap-2">
+            <Badge tone={readyToActivate ? "green" : "yellow"}>{readyToActivate ? "Ready to Activate" : "Validation Needed"}</Badge>
+            <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>{blockingIssueCount} Blockers</Badge>
+            <Badge tone={warningCount > 0 ? "yellow" : "slate"}>{warningCount} Warnings</Badge>
+          </div>
+          {!validationForSelectedCategory && <p className="mt-3 text-sm font-bold text-yellow-800">Run Validation before activation.</p>}
+        </MapPanelSection>
+
+        <MapPanelSection title="Actions Available">
+          <p className="text-sm font-semibold text-slate-600">Use the map for quick selection, or switch to the management tabs for full tables.</p>
+        </MapPanelSection>
+
+        <MapPanelSection title="Advanced Controls">
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => onRequestWorkflowModeChange(activationTargetConfig)}
+              disabled={!selectedCategory?.id || !readyToActivate || categoryWorkflowConfig?.workflowMode === "DB_CONFIGURED" || isSavingWorkflowMode}
+              className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
+            >
+              Activate DB Workflow
+            </button>
+            <button
+              type="button"
+              onClick={() => onRequestWorkflowModeChange(rollbackTargetConfig)}
+              disabled={!selectedCategory?.id || !categoryWorkflowConfig || categoryWorkflowConfig.workflowMode === "LEGACY_FIXED" || isSavingWorkflowMode}
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              Rollback to Legacy
+            </button>
+          </div>
+        </MapPanelSection>
       </aside>
     );
   }
@@ -831,19 +916,37 @@ function MapDetailPanel({
     const status = selectedItem.data;
     const protectedRecord = isProtectedStatus(status);
     return (
-      <aside className="rounded-lg border border-slate-200 bg-white px-4 py-4">
-        <p className="text-xs font-extrabold uppercase text-slate-500">Selected Status</p>
-        <BusinessKeyLabel label={status.displayName} technicalKey={status.statusKey} />
-        <div className="mt-4 space-y-3">
-          <DetailRow label="Behavior Bucket" value={status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"} />
-          <DetailRow label="Terminal" value={status.terminal ? "Yes" : "No"} />
-          <DetailRow label="Active" value={status.active ? "Active" : "Inactive"} />
-          <DetailRow label="System / Protected" value={`${status.systemStatus ? "System" : "Custom"} / ${protectedRecord ? "Protected" : "Editable"}`} />
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button type="button" onClick={() => onOpenStatusForm(status)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Edit Status</button>
-          <button type="button" onClick={() => onRequestMetadataStateChange("status", status, !status.active)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50">{status.active ? "Disable" : "Enable"}</button>
-        </div>
+      <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4">
+        <MapPanelSection title="Selected Item">
+          <BusinessKeyLabel label={status.displayName} technicalKey={status.statusKey} />
+        </MapPanelSection>
+
+        <MapPanelSection title="Basic Details">
+          <dl className="space-y-1">
+            <DetailRow label="Behavior Bucket" value={status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"} />
+            <DetailRow label="Terminal" value={status.terminal ? "Yes" : "No"} />
+            <DetailRow label="Active" value={status.active ? "Active" : "Inactive"} />
+          </dl>
+        </MapPanelSection>
+
+        <MapPanelSection title="Rules Summary">
+          <div className="flex flex-wrap gap-2">
+            <Badge tone={protectedRecord ? "yellow" : "blue"}>{protectedRecord ? "Protected" : "Custom"}</Badge>
+            <Badge tone={status.active ? "green" : "red"}>{status.active ? "Active" : "Inactive"}</Badge>
+            {status.terminal && <Badge tone="green">Terminal</Badge>}
+          </div>
+        </MapPanelSection>
+
+        <MapPanelSection title="Actions Available">
+          <p className="text-sm font-semibold text-slate-600">{protectedRecord ? "System/protected statuses are read-only." : "Custom statuses can be edited or safely disabled."}</p>
+        </MapPanelSection>
+
+        <MapPanelSection title="Advanced Controls">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => onOpenStatusForm(status)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Edit Status</button>
+            <button type="button" onClick={() => onRequestMetadataStateChange("status", status, !status.active)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50">{status.active ? "Disable" : "Enable"}</button>
+          </div>
+        </MapPanelSection>
       </aside>
     );
   }
@@ -859,52 +962,79 @@ function MapDetailPanel({
   const action = actionByKey[transition.actionKey];
 
   return (
-    <aside className="rounded-lg border border-slate-200 bg-white px-4 py-4">
-      <p className="text-xs font-extrabold uppercase text-slate-500">Selected Transition</p>
-      <BusinessKeyLabel label={transition.displayName || action?.displayName} technicalKey={transition.actionKey} />
-      <div className="mt-4 space-y-3">
-        <DetailRow label="From Status" value={`${from.label} / ${from.key || "UNKNOWN"}`} />
-        <DetailRow label="Action" value={`${transition.displayName || action?.displayName || formatLabel(transition.actionKey)} / ${transition.actionKey}`} />
-        <DetailRow label="To Status" value={`${to.label} / ${to.key || "UNKNOWN"}`} />
-        <DetailRow label="Active" value={transition.active ? "Active" : "Inactive"} />
-        <DetailRow label="Category Rule" value={categoryState.label} />
-        <DetailRow label="Role Rules" value={roleRules.length === 0 ? "All roles" : `${roleRules.filter((rule) => rule.active).length}/${roleRules.length} active`} />
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button type="button" onClick={() => onOpenTransitionForm(transition)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Edit Transition</button>
-        <button type="button" onClick={() => onRequestTransitionStateChange(transition, !transition.active)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50">{transition.active ? "Disable" : "Enable"}</button>
-      </div>
-      <section className="mt-5">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="text-sm font-extrabold text-blue-950">Selected Category Rule</h3>
-          <Badge tone={categoryState.tone}>{categoryState.label}</Badge>
+    <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4">
+      <MapPanelSection title="Selected Item">
+        <BusinessKeyLabel label={transition.displayName || action?.displayName} technicalKey={transition.actionKey} />
+      </MapPanelSection>
+
+      <MapPanelSection title="Basic Details">
+        <dl className="space-y-1">
+          <DetailRow label="From Status" value={from.label} />
+          <DetailRow label="Action" value={transition.displayName || action?.displayName || formatLabel(transition.actionKey)} />
+          <DetailRow label="To Status" value={to.label} />
+          <DetailRow label="Active" value={transition.active ? "Active" : "Inactive"} />
+        </dl>
+        <MapDisclosureSection title="Technical Keys">
+          <dl className="space-y-1">
+            <DetailRow label="From Key" value={from.key || "UNKNOWN"} />
+            <DetailRow label="Action Key" value={transition.actionKey} />
+            <DetailRow label="To Key" value={to.key || "UNKNOWN"} />
+          </dl>
+        </MapDisclosureSection>
+      </MapPanelSection>
+
+      <MapPanelSection title="Rules Summary">
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={categoryState.tone}>Category: {categoryState.label}</Badge>
+          <Badge tone={roleRules.length === 0 ? "green" : "blue"}>Roles: {roleRules.length === 0 ? "All roles" : `${roleRules.filter((rule) => rule.active).length}/${roleRules.length} active`}</Badge>
+          <Badge tone={protectedRecord ? "yellow" : "blue"}>{protectedRecord ? "Protected" : "Custom"}</Badge>
         </div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <button type="button" onClick={() => onRequestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: true })} disabled={!selectedCategory || selectedCategoryRule?.active || isSavingRule} className="inline-flex min-h-9 items-center justify-center rounded-lg bg-blue-950 px-3 py-2 text-xs font-extrabold text-white hover:bg-blue-900 disabled:opacity-50">Enable</button>
-          <button type="button" onClick={() => onRequestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: false })} disabled={!selectedCategoryRule || !selectedCategoryRule.active || isSavingRule} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50">Disable</button>
+      </MapPanelSection>
+
+      <MapPanelSection title="Actions Available">
+        <p className="text-sm font-semibold text-slate-600">{protectedRecord ? "System/protected transitions are read-only." : "Custom transitions can be edited or safely enabled/disabled."}</p>
+      </MapPanelSection>
+
+      <MapPanelSection title="Advanced Controls">
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => onOpenTransitionForm(transition)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Edit Transition</button>
+            <button type="button" onClick={() => onRequestTransitionStateChange(transition, !transition.active)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50">{transition.active ? "Disable" : "Enable"}</button>
+          </div>
+
+          <MapDisclosureSection title="Category Rule Controls">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-bold text-slate-700">Selected category</span>
+              <Badge tone={categoryState.tone}>{categoryState.label}</Badge>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button type="button" onClick={() => onRequestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: true })} disabled={!selectedCategory || selectedCategoryRule?.active || isSavingRule} className="inline-flex min-h-9 items-center justify-center rounded-lg bg-blue-950 px-3 py-2 text-xs font-extrabold text-white hover:bg-blue-900 disabled:opacity-50">Enable</button>
+              <button type="button" onClick={() => onRequestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: false })} disabled={!selectedCategoryRule || !selectedCategoryRule.active || isSavingRule} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50">Disable</button>
+            </div>
+          </MapDisclosureSection>
+
+          <MapDisclosureSection title="Role Rule Controls">
+            <div className="space-y-2">
+              {managedRoles.map((role) => {
+                const rule = roleRules.find((item) => String(item.roleId) === String(role.id));
+                const state = getRuleVisualState(rule);
+                return (
+                  <div key={role.id} className="border-b border-slate-200 py-2 last:border-b-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <BusinessKeyLabel label={role.displayName} technicalKey={role.roleKey} subtle />
+                      <Badge tone={state.tone}>{state.label}</Badge>
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" onClick={() => onRequestRuleChange({ scope: "role", transition, role, rule, nextActive: true })} disabled={rule?.active || isSavingRule} className="inline-flex min-h-8 items-center justify-center rounded-lg bg-blue-950 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-blue-900 disabled:opacity-50">Enable</button>
+                      <button type="button" onClick={() => onRequestRuleChange({ scope: "role", transition, role, rule, nextActive: false })} disabled={!rule || !rule.active || isSavingRule} className="inline-flex min-h-8 items-center justify-center rounded-lg border border-red-200 px-3 py-1.5 text-xs font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50">Disable</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </MapDisclosureSection>
         </div>
-      </section>
-      <section className="mt-5">
-        <h3 className="text-sm font-extrabold text-blue-950">Role Rules</h3>
-        <div className="mt-2 space-y-2">
-          {managedRoles.map((role) => {
-            const rule = roleRules.find((item) => String(item.roleId) === String(role.id));
-            const state = getRuleVisualState(rule);
-            return (
-              <div key={role.id} className="border-b border-slate-100 py-2">
-                <div className="flex items-start justify-between gap-2">
-                  <BusinessKeyLabel label={role.displayName} technicalKey={role.roleKey} subtle />
-                  <Badge tone={state.tone}>{state.label}</Badge>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <button type="button" onClick={() => onRequestRuleChange({ scope: "role", transition, role, rule, nextActive: true })} disabled={rule?.active || isSavingRule} className="inline-flex min-h-8 items-center justify-center rounded-lg bg-blue-950 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-blue-900 disabled:opacity-50">Enable</button>
-                  <button type="button" onClick={() => onRequestRuleChange({ scope: "role", transition, role, rule, nextActive: false })} disabled={!rule || !rule.active || isSavingRule} className="inline-flex min-h-8 items-center justify-center rounded-lg border border-red-200 px-3 py-1.5 text-xs font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50">Disable</button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+      </MapPanelSection>
     </aside>
   );
 }

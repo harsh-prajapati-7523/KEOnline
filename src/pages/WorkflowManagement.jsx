@@ -36,6 +36,15 @@ const emptyActionForm = {
   confirmationRequired: false,
 };
 
+const emptyTransitionForm = {
+  fromStatusId: "",
+  actionKey: "",
+  toStatusId: "",
+  displayName: "",
+  active: true,
+  sortOrder: "",
+};
+
 function authHeaders(includeContentType = false) {
   return {
     ...(includeContentType ? { "Content-Type": "application/json" } : {}),
@@ -220,6 +229,10 @@ function isProtectedAction(action) {
   return Boolean(action?.systemAction || action?.protectedAction || protectedActionKeys.includes(action?.actionKey));
 }
 
+function isProtectedTransition(transition) {
+  return Boolean(transition?.systemTransition || transition?.protectedTransition);
+}
+
 function normalizeKey(value) {
   return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
 }
@@ -340,6 +353,87 @@ function EntityFormModal({ formState, onCancel, onChange, onSubmit, isSaving }) 
   );
 }
 
+function TransitionFormModal({ formState, statuses, actions, onCancel, onChange, onSubmit, isSaving }) {
+  if (!formState) return null;
+
+  const { mode, values, original } = formState;
+  const isCreate = mode === "create";
+  const activeStatuses = statuses.filter((status) => status.active);
+  const activeCustomActions = actions.filter((action) => action.active && !isProtectedAction(action));
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 px-4" role="dialog" aria-modal="true" aria-label={`${isCreate ? "Create" : "Edit"} workflow transition`}>
+      <form onSubmit={onSubmit} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-xs font-extrabold uppercase text-slate-500">Workflow Transition</p>
+          <h2 className="mt-1 text-lg font-extrabold text-blue-950">{isCreate ? "Create Custom Transition" : "Edit Transition Metadata"}</h2>
+        </div>
+
+        <div className="grid gap-4 px-5 py-4 sm:grid-cols-2">
+          {isCreate ? (
+            <>
+              <FormField label="From Status">
+                <select className={textInputClass()} value={values.fromStatusId} onChange={(event) => onChange("fromStatusId", event.target.value)} required>
+                  <option value="">Select source status</option>
+                  {activeStatuses.map((status) => (
+                    <option key={status.id} value={status.id}>{status.displayName || formatLabel(status.statusKey)} / {status.statusKey}</option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label="Action">
+                <select className={textInputClass()} value={values.actionKey} onChange={(event) => onChange("actionKey", event.target.value)} required>
+                  <option value="">Select custom action</option>
+                  {activeCustomActions.map((action) => (
+                    <option key={action.id ?? action.actionKey} value={action.actionKey}>{action.displayName || formatLabel(action.actionKey)} / {action.actionKey}</option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label="To Status">
+                <select className={textInputClass()} value={values.toStatusId} onChange={(event) => onChange("toStatusId", event.target.value)} required>
+                  <option value="">Select target status</option>
+                  {activeStatuses.map((status) => (
+                    <option key={status.id} value={status.id}>{status.displayName || formatLabel(status.statusKey)} / {status.statusKey}</option>
+                  ))}
+                </select>
+              </FormField>
+            </>
+          ) : (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-600 sm:col-span-2">
+              <BusinessKeyLabel label={original?.displayName || formatLabel(original?.actionKey)} technicalKey={original?.actionKey} subtle />
+              <p className="mt-2">From Status, Action, and To Status are create-only to avoid breaking configured workflow paths.</p>
+            </div>
+          )}
+
+          <FormField label="Display Name">
+            <input className={textInputClass()} value={values.displayName} onChange={(event) => onChange("displayName", event.target.value)} maxLength={80} required />
+          </FormField>
+          <FormField label="Sort Order">
+            <input className={textInputClass()} type="number" value={values.sortOrder} onChange={(event) => onChange("sortOrder", event.target.value)} />
+          </FormField>
+          {isCreate && (
+            <label className="flex min-h-10 items-center gap-2 text-sm font-bold text-slate-700">
+              <input type="checkbox" checked={values.active} onChange={(event) => onChange("active", event.target.checked)} />
+              Active on create
+            </label>
+          )}
+          <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800 sm:col-span-2">
+            Creating a transition does not automatically enable it for a category or role. Use category and role rule controls separately after creation.
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onCancel} disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            Cancel
+          </button>
+          <button type="submit" disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60">
+            {isSaving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function ConfirmRuleChangeDialog({ pendingChange, onCancel, onConfirm, isSaving }) {
   if (!pendingChange) return null;
 
@@ -422,6 +516,51 @@ function ConfirmMetadataChangeDialog({ pendingChange, onCancel, onConfirm, isSav
             <p>This may affect transitions that use this status. Validation will run after the change.</p>
           ) : (
             <p>This may affect transitions that use this action. This does not grant or remove role access automatically. Validation will run after the change.</p>
+          )}
+          {pendingChange.reason && (
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-bold text-yellow-800">
+              {pendingChange.reason}
+            </div>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+          <button type="button" onClick={onCancel} disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm} disabled={isSaving} className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60">
+            {isSaving ? "Saving..." : "Confirm"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfirmTransitionChangeDialog({ pendingChange, onCancel, onConfirm, isSaving }) {
+  if (!pendingChange) return null;
+
+  const isState = pendingChange.kind === "state";
+  const actionText = isState
+    ? pendingChange.nextActive ? "Enable" : "Disable"
+    : pendingChange.mode === "create" ? "Create" : "Save";
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 px-4" role="dialog" aria-modal="true" aria-label="Confirm workflow transition change">
+      <div className="w-full max-w-lg rounded-lg border border-slate-200 bg-white shadow-2xl">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <p className="text-xs font-extrabold uppercase text-slate-500">Confirm Transition Change</p>
+          <h2 className="mt-1 text-lg font-extrabold text-blue-950">{actionText} workflow transition</h2>
+        </div>
+        <div className="space-y-3 px-5 py-4 text-sm font-semibold text-slate-700">
+          <BusinessKeyLabel label={pendingChange.item?.displayName || formatLabel(pendingChange.item?.actionKey)} technicalKey={pendingChange.item?.actionKey} subtle />
+          {isState && pendingChange.nextActive && (
+            <p>Backend may reject this if another active transition already uses the same source status and action. Validation will run after the change.</p>
+          )}
+          {isState && !pendingChange.nextActive && (
+            <p>This may remove an available workflow path for the selected category. Validation will run after the change.</p>
+          )}
+          {!isState && (
+            <p>Validation will run after the transition metadata change.</p>
           )}
           {pendingChange.reason && (
             <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-bold text-yellow-800">
@@ -598,6 +737,7 @@ export default function WorkflowManagement() {
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [categoryWorkflowConfig, setCategoryWorkflowConfig] = useState(null);
   const [transitions, setTransitions] = useState([]);
+  const [transitionOptions, setTransitionOptions] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [actions, setActions] = useState([]);
   const [accessKeys, setAccessKeys] = useState([]);
@@ -611,12 +751,15 @@ export default function WorkflowManagement() {
   const [isValidating, setIsValidating] = useState(false);
   const [isSavingRule, setIsSavingRule] = useState(false);
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
+  const [isSavingTransition, setIsSavingTransition] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [drawerItem, setDrawerItem] = useState(null);
   const [pendingRuleChange, setPendingRuleChange] = useState(null);
   const [metadataForm, setMetadataForm] = useState(null);
   const [pendingMetadataChange, setPendingMetadataChange] = useState(null);
+  const [transitionForm, setTransitionForm] = useState(null);
+  const [pendingTransitionChange, setPendingTransitionChange] = useState(null);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => String(category.id) === String(selectedCategoryId)),
@@ -625,6 +768,11 @@ export default function WorkflowManagement() {
 
   const activeTransitions = useMemo(
     () => transitions.filter((transition) => transition.active),
+    [transitions]
+  );
+
+  const editableTransitions = useMemo(
+    () => transitions.filter((transition) => !isProtectedTransition(transition)),
     [transitions]
   );
 
@@ -714,6 +862,26 @@ export default function WorkflowManagement() {
     }));
   }, []);
 
+  const loadTransitionsAndRules = useCallback(async () => {
+    const [transitionResponse, optionResponse] = await Promise.all([
+      fetch("/volt/workflow/transitions", { headers: authHeaders() }),
+      fetch("/volt/workflow/transition-options", { headers: authHeaders() }),
+    ]);
+
+    if (!transitionResponse.ok) {
+      throw new Error("Unable to refresh workflow transitions.");
+    }
+
+    const transitionData = await transitionResponse.json();
+    const nextTransitions = normalizeArray(transitionData, "transitions");
+    setTransitions(nextTransitions);
+    if (optionResponse.ok) {
+      const optionData = await optionResponse.json();
+      setTransitionOptions(normalizeArray(optionData, "options"));
+    }
+    await loadTransitionRules(nextTransitions);
+  }, [loadTransitionRules]);
+
   const loadWorkflowMetadata = useCallback(async () => {
     const [statusResponse, actionResponse, accessKeyResponse] = await Promise.all([
       fetch("/volt/workflow/statuses", { headers: authHeaders() }),
@@ -769,9 +937,10 @@ export default function WorkflowManagement() {
     setIsLoading(true);
     setError("");
     try {
-      const [categoryResponse, transitionResponse, statusResponse, actionResponse, roleResponse, accessKeyResponse] = await Promise.all([
+      const [categoryResponse, transitionResponse, transitionOptionResponse, statusResponse, actionResponse, roleResponse, accessKeyResponse] = await Promise.all([
         fetch("/volt/ticket-categories", { headers: authHeaders() }),
         fetch("/volt/workflow/transitions", { headers: authHeaders() }),
+        fetch("/volt/workflow/transition-options", { headers: authHeaders() }),
         fetch("/volt/workflow/statuses", { headers: authHeaders() }),
         fetch("/volt/workflow/actions", { headers: authHeaders() }),
         fetch("/volt/roles", { headers: authHeaders() }),
@@ -792,6 +961,10 @@ export default function WorkflowManagement() {
 
       setCategories(nextCategories);
       setTransitions(nextTransitions);
+      if (transitionOptionResponse.ok) {
+        const optionData = await transitionOptionResponse.json();
+        setTransitionOptions(normalizeArray(optionData, "options"));
+      }
       setStatuses(nextStatuses);
       setActions(nextActions);
       if (accessKeyResponse.ok) {
@@ -925,6 +1098,145 @@ export default function WorkflowManagement() {
     await loadWorkflowMetadata();
     await runValidation();
     setStatusMessage(message);
+  };
+
+  const refreshTransitionsAndValidate = async (message) => {
+    await loadTransitionsAndRules();
+    await runValidation();
+    setStatusMessage(message);
+  };
+
+  const openTransitionForm = (transition = null) => {
+    if (transition && isProtectedTransition(transition)) return;
+    setError("");
+    setStatusMessage("");
+    setTransitionForm({
+      mode: transition ? "edit" : "create",
+      original: transition,
+      values: transition
+        ? {
+            fromStatusId: transition.fromStatusId || "",
+            actionKey: transition.actionKey || "",
+            toStatusId: transition.toStatusId || "",
+            displayName: transition.displayName || "",
+            active: Boolean(transition.active),
+            sortOrder: transition.sortOrder ?? "",
+          }
+        : emptyTransitionForm,
+    });
+  };
+
+  const updateTransitionForm = (field, value) => {
+    setTransitionForm((current) => current ? {
+      ...current,
+      values: {
+        ...current.values,
+        [field]: value,
+      },
+    } : current);
+  };
+
+  const hasDuplicateTransition = (values) => transitions.some((transition) => (
+    String(transition.fromStatusId) === String(values.fromStatusId)
+      && String(transition.toStatusId) === String(values.toStatusId)
+      && transition.actionKey === values.actionKey
+  ));
+
+  const buildTransitionPayload = (values, includeCreateOnly) => ({
+    ...(includeCreateOnly ? {
+      fromStatusId: Number(values.fromStatusId),
+      actionKey: values.actionKey,
+      toStatusId: Number(values.toStatusId),
+      active: Boolean(values.active),
+    } : {}),
+    displayName: values.displayName.trim(),
+    sortOrder: values.sortOrder === "" ? null : Number(values.sortOrder),
+  });
+
+  const saveTransitionForm = async (change = transitionForm) => {
+    if (!change) return;
+    const isCreate = change.mode === "create";
+
+    if (isCreate && hasDuplicateTransition(change.values)) {
+      setError("Workflow transition already exists for the selected source status, action, and target status.");
+      return;
+    }
+
+    setIsSavingTransition(true);
+    setError("");
+    setStatusMessage("");
+    try {
+      const response = await fetch(isCreate ? "/volt/workflow/transitions" : `/volt/workflow/transitions/${change.original.id}`, {
+        method: isCreate ? "POST" : "PATCH",
+        headers: authHeaders(true),
+        body: JSON.stringify(buildTransitionPayload(change.values, isCreate)),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Unable to save workflow transition."));
+      }
+
+      setTransitionForm(null);
+      setPendingTransitionChange(null);
+      await refreshTransitionsAndValidate(`Workflow transition ${isCreate ? "created" : "updated"} and validation refreshed.`);
+    } catch (saveError) {
+      setError(saveError.message || "Unable to save workflow transition.");
+      try {
+        await loadTransitionsAndRules();
+      } catch {
+        // Keep the original conflict/save message visible.
+      }
+    } finally {
+      setIsSavingTransition(false);
+    }
+  };
+
+  const submitTransitionForm = (event) => {
+    event.preventDefault();
+    if (!transitionForm) return;
+    saveTransitionForm(transitionForm);
+  };
+
+  const requestTransitionStateChange = (transition, nextActive) => {
+    if (isProtectedTransition(transition)) return;
+    setError("");
+    setStatusMessage("");
+    setPendingTransitionChange({
+      kind: "state",
+      item: transition,
+      nextActive,
+      reason: nextActive ? "Activation can fail when category/action/source status matches overlap." : "Disable is used instead of delete.",
+      action: async () => {
+        setIsSavingTransition(true);
+        setError("");
+        setStatusMessage("");
+        try {
+          const response = await fetch(`/volt/workflow/transitions/${transition.id}`, {
+            method: "PATCH",
+            headers: authHeaders(true),
+            body: JSON.stringify({ active: nextActive }),
+          });
+          if (!response.ok) {
+            throw new Error(await readApiError(response, `Unable to ${nextActive ? "enable" : "disable"} workflow transition.`));
+          }
+          setPendingTransitionChange(null);
+          await refreshTransitionsAndValidate(`Workflow transition ${nextActive ? "enabled" : "disabled"} and validation refreshed.`);
+        } catch (stateError) {
+          setError(stateError.message || `Unable to ${nextActive ? "enable" : "disable"} workflow transition.`);
+          try {
+            await loadTransitionsAndRules();
+          } catch {
+            // Keep the original conflict/save message visible.
+          }
+        } finally {
+          setIsSavingTransition(false);
+        }
+      },
+    });
+  };
+
+  const confirmTransitionChange = () => {
+    pendingTransitionChange?.action?.();
   };
 
   const openStatusForm = (status = null) => {
@@ -1278,7 +1590,7 @@ export default function WorkflowManagement() {
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Transitions</span></BodyCell>
                   <BodyCell>{transitions.length} total, {activeTransitions.length} active</BodyCell>
-                  <BodyCell><Badge tone="blue">Rule management</Badge></BodyCell>
+                  <BodyCell><Badge tone="blue">Transition management</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Statuses</span></BodyCell>
@@ -1300,47 +1612,92 @@ export default function WorkflowManagement() {
           )}
 
           {activeTab === "transitions" && (
-            <TableShell>
-              <thead>
-                <tr>
-                  <HeaderCell>From Status</HeaderCell>
-                  <HeaderCell>Action</HeaderCell>
-                  <HeaderCell>To Status</HeaderCell>
-                  <HeaderCell>Category Rule</HeaderCell>
-                  <HeaderCell>Roles Enabled</HeaderCell>
-                  <HeaderCell>Active</HeaderCell>
-                  <HeaderCell>Protected/System</HeaderCell>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading && <EmptyRows colSpan={7}>Loading workflow transitions...</EmptyRows>}
-                {!isLoading && transitions.length === 0 && <EmptyRows colSpan={7}>No workflow transitions found.</EmptyRows>}
-                {!isLoading && transitions.map((transition) => {
-                  const from = getStatusLabel(transition, "from");
-                  const to = getStatusLabel(transition, "to");
-                  const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
-                  const roleRules = roleRulesByTransitionId[transition.id] || [];
-                  const activeRoleRules = roleRules.filter((rule) => rule.active);
+            <div className="space-y-3">
+              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap gap-2">
+                  <Badge tone="blue">Custom editable: {editableTransitions.length}</Badge>
+                  <Badge tone="slate">Safe options: {transitionOptions.length}</Badge>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => openTransitionForm()}
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900"
+                >
+                  Create Transition
+                </button>
+              </div>
+              <TableShell minWidth="min-w-[1180px]">
+                <thead>
+                  <tr>
+                    <HeaderCell>From Status</HeaderCell>
+                    <HeaderCell>Action</HeaderCell>
+                    <HeaderCell>To Status</HeaderCell>
+                    <HeaderCell>Category Rule</HeaderCell>
+                    <HeaderCell>Roles Enabled</HeaderCell>
+                    <HeaderCell>Active</HeaderCell>
+                    <HeaderCell>Protected/System</HeaderCell>
+                    <HeaderCell>Sort Order</HeaderCell>
+                    <HeaderCell>Actions</HeaderCell>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading && <EmptyRows colSpan={9}>Loading workflow transitions...</EmptyRows>}
+                  {!isLoading && transitions.length === 0 && <EmptyRows colSpan={9}>No workflow transitions found.</EmptyRows>}
+                  {!isLoading && transitions.map((transition) => {
+                    const from = getStatusLabel(transition, "from");
+                    const to = getStatusLabel(transition, "to");
+                    const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
+                    const roleRules = roleRulesByTransitionId[transition.id] || [];
+                    const activeRoleRules = roleRules.filter((rule) => rule.active);
+                    const protectedRecord = isProtectedTransition(transition);
 
-                  return (
-                    <tr key={transition.id} onClick={() => openTransitionDrawer(transition)} className="cursor-pointer hover:bg-blue-50/50">
-                      <BodyCell><BusinessKeyLabel label={from.label} technicalKey={from.key} subtle /></BodyCell>
-                      <BodyCell><BusinessKeyLabel label={transition.displayName || actionByKey[transition.actionKey]?.displayName} technicalKey={transition.actionKey} /></BodyCell>
-                      <BodyCell><BusinessKeyLabel label={to.label} technicalKey={to.key} subtle /></BodyCell>
-                      <BodyCell><Badge tone={categoryState.tone}>{categoryState.label}</Badge></BodyCell>
-                      <BodyCell>{roleRules.length === 0 ? <Badge tone="green">All roles</Badge> : <Badge tone="yellow">{activeRoleRules.length}/{roleRules.length} scoped</Badge>}</BodyCell>
-                      <BodyCell><StateBadge enabled={transition.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
-                      <BodyCell>
-                        <div className="flex flex-wrap gap-1.5">
-                          <Badge tone={transition.protectedTransition ? "yellow" : "slate"}>{transition.protectedTransition ? "Protected" : "Not protected"}</Badge>
-                          <Badge tone={transition.systemTransition ? "blue" : "slate"}>{transition.systemTransition ? "System" : "Custom"}</Badge>
-                        </div>
-                      </BodyCell>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </TableShell>
+                    return (
+                      <tr key={transition.id} onClick={() => openTransitionDrawer(transition)} className="cursor-pointer hover:bg-blue-50/50">
+                        <BodyCell><BusinessKeyLabel label={from.label} technicalKey={from.key} subtle /></BodyCell>
+                        <BodyCell><BusinessKeyLabel label={transition.displayName || actionByKey[transition.actionKey]?.displayName} technicalKey={transition.actionKey} /></BodyCell>
+                        <BodyCell><BusinessKeyLabel label={to.label} technicalKey={to.key} subtle /></BodyCell>
+                        <BodyCell><Badge tone={categoryState.tone}>{categoryState.label}</Badge></BodyCell>
+                        <BodyCell>{roleRules.length === 0 ? <Badge tone="green">All roles</Badge> : <Badge tone="yellow">{activeRoleRules.length}/{roleRules.length} scoped</Badge>}</BodyCell>
+                        <BodyCell><StateBadge enabled={transition.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                        <BodyCell>
+                          <div className="flex flex-wrap gap-1.5">
+                            <Badge tone={transition.systemTransition ? "blue" : "slate"}>{transition.systemTransition ? "System" : "Custom"}</Badge>
+                            <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
+                          </div>
+                        </BodyCell>
+                        <BodyCell>{transition.sortOrder ?? "Not set"}</BodyCell>
+                        <BodyCell>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openTransitionForm(transition);
+                              }}
+                              disabled={protectedRecord}
+                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                requestTransitionStateChange(transition, !transition.active);
+                              }}
+                              disabled={protectedRecord}
+                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50"
+                            >
+                              {transition.active ? "Disable" : "Enable"}
+                            </button>
+                          </div>
+                        </BodyCell>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </TableShell>
+            </div>
           )}
 
           {activeTab === "statuses" && (
@@ -1655,6 +2012,21 @@ export default function WorkflowManagement() {
         onCancel={() => setPendingMetadataChange(null)}
         onConfirm={confirmMetadataChange}
         isSaving={isSavingMetadata}
+      />
+      <TransitionFormModal
+        formState={transitionForm}
+        statuses={statuses}
+        actions={actions}
+        onCancel={() => setTransitionForm(null)}
+        onChange={updateTransitionForm}
+        onSubmit={submitTransitionForm}
+        isSaving={isSavingTransition}
+      />
+      <ConfirmTransitionChangeDialog
+        pendingChange={pendingTransitionChange}
+        onCancel={() => setPendingTransitionChange(null)}
+        onConfirm={confirmTransitionChange}
+        isSaving={isSavingTransition}
       />
     </main>
   );

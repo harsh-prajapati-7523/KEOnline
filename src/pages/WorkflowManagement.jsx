@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, RefreshCw, Search, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const tabs = [
+  { id: "map", label: "Map" },
   { id: "overview", label: "Overview" },
   { id: "transitions", label: "Transitions" },
   { id: "statuses", label: "Statuses" },
@@ -231,6 +232,22 @@ function isProtectedAction(action) {
 
 function isProtectedTransition(transition) {
   return Boolean(transition?.systemTransition || transition?.protectedTransition);
+}
+
+function getStatusTone(status) {
+  if (!status?.active) return "border-slate-300 bg-slate-100 text-slate-500";
+  if (status.terminal) return "border-green-400 bg-green-50 text-green-900";
+  if (status.behaviorBucket === "COMPLETED") return "border-violet-300 bg-violet-50 text-violet-950";
+  if (status.behaviorBucket === "CANCELLED") return "border-red-300 bg-red-50 text-red-900";
+  if (status.behaviorBucket === "IN_PROGRESS") return "border-blue-300 bg-blue-50 text-blue-950";
+  return "border-yellow-300 bg-yellow-50 text-yellow-900";
+}
+
+function getEdgeTone(transition, selected) {
+  if (selected) return "stroke-blue-700";
+  if (!transition.active) return "stroke-slate-300";
+  if (isProtectedTransition(transition)) return "stroke-slate-700";
+  return "stroke-slate-500";
 }
 
 function normalizeKey(value) {
@@ -631,6 +648,267 @@ function ConfirmWorkflowModeChangeDialog({ pendingChange, onCancel, onConfirm, i
   );
 }
 
+function WorkflowMapView({
+  statuses,
+  transitions,
+  selectedItem,
+  onSelectItem,
+  actionByKey,
+  categoryRulesByTransitionId,
+  selectedCategoryId,
+}) {
+  const sortedStatuses = [...statuses].sort((first, second) => (first.sortOrder ?? 999) - (second.sortOrder ?? 999) || String(first.statusKey).localeCompare(String(second.statusKey)));
+  const columns = Math.min(4, Math.max(1, Math.ceil(Math.sqrt(Math.max(sortedStatuses.length, 1)))));
+  const nodeWidth = 180;
+  const nodeHeight = 82;
+  const columnGap = 72;
+  const rowGap = 58;
+  const mapWidth = Math.max(960, columns * nodeWidth + (columns - 1) * columnGap + 80);
+  const rows = Math.max(1, Math.ceil(sortedStatuses.length / columns));
+  const mapHeight = Math.max(500, rows * nodeHeight + (rows - 1) * rowGap + 120);
+  const statusPositions = {};
+
+  sortedStatuses.forEach((status, index) => {
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    statusPositions[String(status.id)] = {
+      x: 40 + column * (nodeWidth + columnGap),
+      y: 60 + row * (nodeHeight + rowGap),
+    };
+  });
+
+  const visibleTransitions = transitions.filter((transition) => statusPositions[String(transition.fromStatusId)] && statusPositions[String(transition.toStatusId)]);
+
+  return (
+    <div className="overflow-auto rounded-lg border border-slate-200 bg-white">
+      <div
+        className="relative bg-[radial-gradient(circle,#dbe4f0_1px,transparent_1px)]"
+        style={{ width: mapWidth, minHeight: mapHeight, backgroundSize: "22px 22px" }}
+      >
+        <svg className="absolute inset-0" width={mapWidth} height={mapHeight} aria-hidden="true">
+          <defs>
+            <marker id="workflow-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#475569" />
+            </marker>
+            <marker id="workflow-arrow-selected" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L0,6 L9,3 z" fill="#1d4ed8" />
+            </marker>
+          </defs>
+          {visibleTransitions.map((transition) => {
+            const from = statusPositions[String(transition.fromStatusId)];
+            const to = statusPositions[String(transition.toStatusId)];
+            const selected = selectedItem?.type === "transition" && String(selectedItem.data.id) === String(transition.id);
+            const startX = from.x + nodeWidth;
+            const startY = from.y + nodeHeight / 2;
+            const endX = to.x;
+            const endY = to.y + nodeHeight / 2;
+            const midX = (startX + endX) / 2;
+            return (
+              <path
+                key={transition.id}
+                d={`M ${startX} ${startY} C ${midX} ${startY}, ${midX} ${endY}, ${endX} ${endY}`}
+                className={`${getEdgeTone(transition, selected)} fill-none`}
+                strokeWidth={selected ? 3 : 2}
+                strokeDasharray={transition.active ? "0" : "6 6"}
+                markerEnd={selected ? "url(#workflow-arrow-selected)" : "url(#workflow-arrow)"}
+              />
+            );
+          })}
+        </svg>
+
+        {visibleTransitions.map((transition) => {
+          const from = statusPositions[String(transition.fromStatusId)];
+          const to = statusPositions[String(transition.toStatusId)];
+          const selected = selectedItem?.type === "transition" && String(selectedItem.data.id) === String(transition.id);
+          const left = (from.x + nodeWidth + to.x) / 2 - 76;
+          const top = (from.y + to.y) / 2 + nodeHeight / 2 - 18;
+          const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
+          return (
+            <button
+              key={`label-${transition.id}`}
+              type="button"
+              onClick={() => onSelectItem({ type: "transition", data: transition })}
+              className={`absolute z-20 w-40 rounded-lg border bg-white px-2 py-1 text-left text-[0.68rem] font-bold shadow-sm hover:border-blue-400 ${selected ? "border-blue-500 ring-2 ring-blue-200" : "border-slate-200"} ${transition.active ? "text-blue-950" : "text-slate-500"}`}
+              style={{ left, top }}
+            >
+              <span className="block truncate">{transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey)}</span>
+              <span className="block truncate text-[0.62rem] uppercase text-slate-500">{transition.actionKey}</span>
+              <span className={`mt-1 inline-flex rounded-full border px-1.5 py-0.5 text-[0.58rem] ${categoryState.tone === "green" ? "border-green-200 bg-green-50 text-green-700" : categoryState.tone === "red" ? "border-red-200 bg-red-50 text-red-700" : "border-slate-200 bg-slate-50 text-slate-600"}`}>
+                {categoryState.label}
+              </span>
+            </button>
+          );
+        })}
+
+        {sortedStatuses.map((status) => {
+          const position = statusPositions[String(status.id)];
+          const selected = selectedItem?.type === "status" && String(selectedItem.data.id) === String(status.id);
+          return (
+            <button
+              key={status.id ?? status.statusKey}
+              type="button"
+              onClick={() => onSelectItem({ type: "status", data: status })}
+              className={`absolute z-30 rounded-xl border-2 px-3 py-3 text-left shadow-sm transition hover:shadow-md ${getStatusTone(status)} ${selected ? "ring-4 ring-blue-200" : ""}`}
+              style={{ left: position.x, top: position.y, width: nodeWidth, minHeight: nodeHeight }}
+            >
+              <span className="block text-sm font-extrabold">{status.displayName || formatLabel(status.statusKey)}</span>
+              <span className="mt-1 block break-all text-[0.68rem] font-extrabold uppercase opacity-75">{status.statusKey}</span>
+              <span className="mt-2 flex flex-wrap gap-1">
+                {status.terminal && <Badge tone="green">Terminal</Badge>}
+                {isProtectedStatus(status) && <Badge tone="yellow">Protected</Badge>}
+                {!status.active && <Badge tone="red">Inactive</Badge>}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function MapDetailPanel({
+  selectedItem,
+  selectedCategory,
+  categoryWorkflowConfig,
+  validationForSelectedCategory,
+  readyToActivate,
+  blockingIssueCount,
+  warningCount,
+  selectedCategoryId,
+  categoryRulesByTransitionId,
+  roleRulesByTransitionId,
+  managedRoles,
+  actionByKey,
+  onOpenStatusForm,
+  onOpenTransitionForm,
+  onRequestMetadataStateChange,
+  onRequestTransitionStateChange,
+  onRequestRuleChange,
+  onRequestWorkflowModeChange,
+  activationTargetConfig,
+  rollbackTargetConfig,
+  isSavingRule,
+  isSavingWorkflowMode,
+}) {
+  if (!selectedItem) {
+    return (
+      <aside className="rounded-lg border border-slate-200 bg-white px-4 py-4">
+        <p className="text-xs font-extrabold uppercase text-slate-500">Selected Category</p>
+        <BusinessKeyLabel label={selectedCategory?.displayName} technicalKey={selectedCategory?.categoryKey} />
+        <div className="mt-4 space-y-3 text-sm font-semibold text-slate-700">
+          <DetailRow label="Workflow Mode" value={categoryWorkflowConfig?.workflowMode} />
+          <DetailRow label="DB Workflow" value={categoryWorkflowConfig?.dbWorkflowEnabled ? "Enabled" : "Disabled"} />
+          <DetailRow label="Fixed Actions" value={categoryWorkflowConfig?.fixedActionsEnabled ? "Enabled" : "Disabled"} />
+          <DetailRow label="Updated" value={`${formatDateTime(categoryWorkflowConfig?.workflowModeUpdatedAt)} / ${categoryWorkflowConfig?.workflowModeUpdatedByEmployeeId || "Unknown"}`} />
+        </div>
+        <div className="mt-4 flex flex-col gap-2">
+          <Badge tone={readyToActivate ? "green" : "yellow"}>readyToActivate: {readyToActivate ? "true" : "false"}</Badge>
+          <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>Blockers: {blockingIssueCount}</Badge>
+          <Badge tone={warningCount > 0 ? "yellow" : "slate"}>Warnings: {warningCount}</Badge>
+          {!validationForSelectedCategory && <p className="text-sm font-bold text-yellow-800">Run Validation before activation.</p>}
+          <button
+            type="button"
+            onClick={() => onRequestWorkflowModeChange(activationTargetConfig)}
+            disabled={!selectedCategory?.id || !readyToActivate || categoryWorkflowConfig?.workflowMode === "DB_CONFIGURED" || isSavingWorkflowMode}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
+          >
+            Activate DB Workflow
+          </button>
+          <button
+            type="button"
+            onClick={() => onRequestWorkflowModeChange(rollbackTargetConfig)}
+            disabled={!selectedCategory?.id || !categoryWorkflowConfig || categoryWorkflowConfig.workflowMode === "LEGACY_FIXED" || isSavingWorkflowMode}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            Rollback to Legacy
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
+  if (selectedItem.type === "status") {
+    const status = selectedItem.data;
+    const protectedRecord = isProtectedStatus(status);
+    return (
+      <aside className="rounded-lg border border-slate-200 bg-white px-4 py-4">
+        <p className="text-xs font-extrabold uppercase text-slate-500">Selected Status</p>
+        <BusinessKeyLabel label={status.displayName} technicalKey={status.statusKey} />
+        <div className="mt-4 space-y-3">
+          <DetailRow label="Behavior Bucket" value={status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"} />
+          <DetailRow label="Terminal" value={status.terminal ? "Yes" : "No"} />
+          <DetailRow label="Active" value={status.active ? "Active" : "Inactive"} />
+          <DetailRow label="System / Protected" value={`${status.systemStatus ? "System" : "Custom"} / ${protectedRecord ? "Protected" : "Editable"}`} />
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button type="button" onClick={() => onOpenStatusForm(status)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Edit Status</button>
+          <button type="button" onClick={() => onRequestMetadataStateChange("status", status, !status.active)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50">{status.active ? "Disable" : "Enable"}</button>
+        </div>
+      </aside>
+    );
+  }
+
+  const transition = selectedItem.data;
+  const from = getStatusLabel(transition, "from");
+  const to = getStatusLabel(transition, "to");
+  const protectedRecord = isProtectedTransition(transition);
+  const categoryRules = categoryRulesByTransitionId[transition.id] || [];
+  const selectedCategoryRule = categoryRules.find((rule) => String(rule.categoryId) === String(selectedCategoryId));
+  const categoryState = getRuleVisualState(selectedCategoryRule);
+  const roleRules = roleRulesByTransitionId[transition.id] || [];
+  const action = actionByKey[transition.actionKey];
+
+  return (
+    <aside className="rounded-lg border border-slate-200 bg-white px-4 py-4">
+      <p className="text-xs font-extrabold uppercase text-slate-500">Selected Transition</p>
+      <BusinessKeyLabel label={transition.displayName || action?.displayName} technicalKey={transition.actionKey} />
+      <div className="mt-4 space-y-3">
+        <DetailRow label="From Status" value={`${from.label} / ${from.key || "UNKNOWN"}`} />
+        <DetailRow label="Action" value={`${transition.displayName || action?.displayName || formatLabel(transition.actionKey)} / ${transition.actionKey}`} />
+        <DetailRow label="To Status" value={`${to.label} / ${to.key || "UNKNOWN"}`} />
+        <DetailRow label="Active" value={transition.active ? "Active" : "Inactive"} />
+        <DetailRow label="Category Rule" value={categoryState.label} />
+        <DetailRow label="Role Rules" value={roleRules.length === 0 ? "All roles" : `${roleRules.filter((rule) => rule.active).length}/${roleRules.length} active`} />
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button type="button" onClick={() => onOpenTransitionForm(transition)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Edit Transition</button>
+        <button type="button" onClick={() => onRequestTransitionStateChange(transition, !transition.active)} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50">{transition.active ? "Disable" : "Enable"}</button>
+      </div>
+      <section className="mt-5">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-sm font-extrabold text-blue-950">Selected Category Rule</h3>
+          <Badge tone={categoryState.tone}>{categoryState.label}</Badge>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" onClick={() => onRequestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: true })} disabled={!selectedCategory || selectedCategoryRule?.active || isSavingRule} className="inline-flex min-h-9 items-center justify-center rounded-lg bg-blue-950 px-3 py-2 text-xs font-extrabold text-white hover:bg-blue-900 disabled:opacity-50">Enable</button>
+          <button type="button" onClick={() => onRequestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: false })} disabled={!selectedCategoryRule || !selectedCategoryRule.active || isSavingRule} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-red-200 px-3 py-2 text-xs font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50">Disable</button>
+        </div>
+      </section>
+      <section className="mt-5">
+        <h3 className="text-sm font-extrabold text-blue-950">Role Rules</h3>
+        <div className="mt-2 space-y-2">
+          {managedRoles.map((role) => {
+            const rule = roleRules.find((item) => String(item.roleId) === String(role.id));
+            const state = getRuleVisualState(rule);
+            return (
+              <div key={role.id} className="border-b border-slate-100 py-2">
+                <div className="flex items-start justify-between gap-2">
+                  <BusinessKeyLabel label={role.displayName} technicalKey={role.roleKey} subtle />
+                  <Badge tone={state.tone}>{state.label}</Badge>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button type="button" onClick={() => onRequestRuleChange({ scope: "role", transition, role, rule, nextActive: true })} disabled={rule?.active || isSavingRule} className="inline-flex min-h-8 items-center justify-center rounded-lg bg-blue-950 px-3 py-1.5 text-xs font-extrabold text-white hover:bg-blue-900 disabled:opacity-50">Enable</button>
+                  <button type="button" onClick={() => onRequestRuleChange({ scope: "role", transition, role, rule, nextActive: false })} disabled={!rule || !rule.active || isSavingRule} className="inline-flex min-h-8 items-center justify-center rounded-lg border border-red-200 px-3 py-1.5 text-xs font-extrabold text-red-700 hover:bg-red-50 disabled:opacity-50">Disable</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </aside>
+  );
+}
+
 function DetailDrawer({
   item,
   onClose,
@@ -782,7 +1060,7 @@ function DetailDrawer({
 
 export default function WorkflowManagement() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("map");
   const [categories, setCategories] = useState([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [categoryWorkflowConfig, setCategoryWorkflowConfig] = useState(null);
@@ -812,6 +1090,7 @@ export default function WorkflowManagement() {
   const [transitionForm, setTransitionForm] = useState(null);
   const [pendingTransitionChange, setPendingTransitionChange] = useState(null);
   const [pendingWorkflowModeChange, setPendingWorkflowModeChange] = useState(null);
+  const [selectedMapItem, setSelectedMapItem] = useState(null);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => String(category.id) === String(selectedCategoryId)),
@@ -1610,20 +1889,39 @@ export default function WorkflowManagement() {
         </button>
 
         <header className="mt-4 border-b border-slate-200 pb-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div>
               <p className="text-xs font-extrabold uppercase text-slate-500">Administration</p>
               <h1 className="mt-1 text-2xl font-extrabold text-blue-950 sm:text-3xl">Workflow Management</h1>
             </div>
-            <button
-              type="button"
-              onClick={refreshData}
-              disabled={isLoading}
-              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50 disabled:opacity-60 lg:self-center"
-            >
-              <RefreshCw size={16} aria-hidden="true" />
-              {isLoading ? "Refreshing..." : "Refresh"}
-            </button>
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+              <label className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                Category
+                <select
+                  value={selectedCategoryId}
+                  onChange={(event) => setSelectedCategoryId(event.target.value)}
+                  className="min-h-10 min-w-60 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950"
+                >
+                  {categories.length === 0 && <option value="">No categories available</option>}
+                  {categories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.displayName || formatLabel(category.categoryKey)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Badge tone="blue">{categoryWorkflowConfig?.workflowMode || "Not loaded"}</Badge>
+              <Badge tone={readyToActivate ? "green" : "yellow"}>{readyToActivate ? "Ready to Activate" : "Validation Needed"}</Badge>
+              <button
+                type="button"
+                onClick={refreshData}
+                disabled={isLoading}
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50 disabled:opacity-60"
+              >
+                <RefreshCw size={16} aria-hidden="true" />
+                {isLoading ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
           </div>
         </header>
 
@@ -1643,28 +1941,6 @@ export default function WorkflowManagement() {
           </div>
         </section>
 
-        <section className="mt-4 flex flex-col gap-3 border-y border-slate-200 bg-white px-3 py-3 lg:flex-row lg:items-center lg:justify-between" aria-label="Workflow controls">
-          <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-bold text-slate-700 lg:max-w-md">
-            Category selector
-            <select
-              value={selectedCategoryId}
-              onChange={(event) => setSelectedCategoryId(event.target.value)}
-              className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950"
-            >
-              {categories.length === 0 && <option value="">No categories available</option>}
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.displayName || formatLabel(category.categoryKey)} / {category.categoryKey}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-            <Search size={16} aria-hidden="true" />
-            {isLoadingCategory ? "Loading category config..." : "Rule changes apply only to the selected category"}
-          </div>
-        </section>
-
         <section className="mt-4 border border-slate-200 bg-white px-4 py-3" aria-label="Activation readiness">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
@@ -1673,6 +1949,7 @@ export default function WorkflowManagement() {
                 <Badge tone="blue">Category: {selectedCategory?.displayName || "Select category"}</Badge>
                 <Badge tone="slate">Key: {selectedCategory?.categoryKey || "Not selected"}</Badge>
                 <Badge tone="blue">Mode: {categoryWorkflowConfig?.workflowMode || "Not loaded"}</Badge>
+                {isLoadingCategory && <Badge tone="yellow">Loading config</Badge>}
                 <StateBadge enabled={Boolean(categoryWorkflowConfig?.dbWorkflowEnabled)} trueLabel="DB enabled" falseLabel="DB disabled" />
                 <StateBadge enabled={Boolean(categoryWorkflowConfig?.fixedActionsEnabled)} trueLabel="Fixed enabled" falseLabel="Fixed disabled" />
                 <Badge tone={readyToActivate ? "green" : "yellow"}>readyToActivate: {readyToActivate ? "true" : "false"}</Badge>
@@ -1727,6 +2004,96 @@ export default function WorkflowManagement() {
         </nav>
 
         <section className="mt-4">
+          {activeTab === "map" && (
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+              <div className="min-w-0 space-y-3">
+                <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge tone="blue">{statuses.length} Statuses</Badge>
+                    <Badge tone="green">{actions.length} Actions</Badge>
+                    <Badge tone="yellow">{transitions.length} Transitions</Badge>
+                    <Badge tone="slate">{roles.length} Roles</Badge>
+                    <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>{blockingIssueCount} Blockers</Badge>
+                    <Badge tone={warningCount > 0 ? "yellow" : "green"}>{warningCount} Warnings</Badge>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("transitions")}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
+                    >
+                      Manage Transitions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("statuses")}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
+                    >
+                      Manage Statuses
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("actions")}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
+                    >
+                      Manage Actions
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("validation")}
+                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
+                    >
+                      Validation
+                    </button>
+                  </div>
+                </div>
+
+                <WorkflowMapView
+                  statuses={statuses}
+                  transitions={transitions}
+                  selectedItem={selectedMapItem}
+                  onSelectItem={setSelectedMapItem}
+                  actionByKey={actionByKey}
+                  categoryRulesByTransitionId={categoryRulesByTransitionId}
+                  selectedCategoryId={selectedCategoryId}
+                />
+
+                <div className="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-blue-300 bg-blue-50" /> Open / Active</span>
+                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-yellow-300 bg-yellow-50" /> Waiting / Pending</span>
+                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-violet-300 bg-violet-50" /> Complete</span>
+                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-red-300 bg-red-50" /> Cancelled</span>
+                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-green-400 bg-green-50" /> Terminal</span>
+                </div>
+              </div>
+
+              <MapDetailPanel
+                selectedItem={selectedMapItem}
+                selectedCategory={selectedCategory}
+                categoryWorkflowConfig={categoryWorkflowConfig}
+                validationForSelectedCategory={validationForSelectedCategory}
+                readyToActivate={readyToActivate}
+                blockingIssueCount={blockingIssueCount}
+                warningCount={warningCount}
+                selectedCategoryId={selectedCategoryId}
+                categoryRulesByTransitionId={categoryRulesByTransitionId}
+                roleRulesByTransitionId={roleRulesByTransitionId}
+                managedRoles={managedRoles}
+                actionByKey={actionByKey}
+                onOpenStatusForm={openStatusForm}
+                onOpenTransitionForm={openTransitionForm}
+                onRequestMetadataStateChange={requestMetadataStateChange}
+                onRequestTransitionStateChange={requestTransitionStateChange}
+                onRequestRuleChange={requestRuleChange}
+                onRequestWorkflowModeChange={requestWorkflowModeChange}
+                activationTargetConfig={activationTargetConfig}
+                rollbackTargetConfig={rollbackTargetConfig}
+                isSavingRule={isSavingRule}
+                isSavingWorkflowMode={isSavingWorkflowMode}
+              />
+            </div>
+          )}
+
           {activeTab === "overview" && (
             <TableShell minWidth="min-w-[760px]">
               <thead>

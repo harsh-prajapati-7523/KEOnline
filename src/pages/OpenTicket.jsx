@@ -8,18 +8,35 @@ function authHeaders() {
   };
 }
 
+function getTicketNumberDigits(value) {
+  return value.replace(/^KE-/i, "").replace(/\D/g, "").slice(0, 8);
+}
+
+function getTicketNumberCandidates(digits) {
+  const normalizedDigits = digits.replace(/^0+(?=\d)/, "");
+  if (!normalizedDigits) return [];
+
+  const candidates = new Set();
+  candidates.add(`KE-${normalizedDigits.padStart(3, "0")}`);
+  if (normalizedDigits.length >= 3) {
+    candidates.add(`KE-${normalizedDigits.padStart(5, "0")}`);
+  }
+
+  return Array.from(candidates);
+}
+
 export default function OpenTicket() {
   const navigate = useNavigate();
-  const [ticketNumber, setTicketNumber] = useState("");
+  const [ticketDigits, setTicketDigits] = useState("");
   const [message, setMessage] = useState("");
   const [isOpening, setIsOpening] = useState(false);
+  const ticketNumberCandidates = getTicketNumberCandidates(ticketDigits);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (isOpening) return;
 
-    const normalizedTicketNumber = ticketNumber.trim();
-    if (!normalizedTicketNumber) {
+    if (ticketNumberCandidates.length === 0) {
       setMessage("Enter a ticket number to open.");
       return;
     }
@@ -28,24 +45,28 @@ export default function OpenTicket() {
     setMessage("");
 
     try {
-      const response = await fetch(`/volt/tickets/by-number/${encodeURIComponent(normalizedTicketNumber)}`, {
-        headers: authHeaders(),
-      });
+      for (const ticketNumber of ticketNumberCandidates) {
+        const response = await fetch(`/volt/tickets/by-number/${encodeURIComponent(ticketNumber)}`, {
+          headers: authHeaders(),
+        });
 
-      if (response.status === 404) {
-        setMessage(`No ticket found for ${normalizedTicketNumber}.`);
+        if (response.status === 404) {
+          continue;
+        }
+
+        if (!response.ok) throw new Error("Ticket lookup failed");
+
+        const ticket = await response.json();
+        if (!ticket?.id) {
+          setMessage("Ticket found, but it cannot be opened.");
+          return;
+        }
+
+        navigate(`/tickets/${ticket.id}`);
         return;
       }
 
-      if (!response.ok) throw new Error("Ticket lookup failed");
-
-      const ticket = await response.json();
-      if (!ticket?.id) {
-        setMessage("Ticket found, but it cannot be opened.");
-        return;
-      }
-
-      navigate(`/tickets/${ticket.id}`);
+      setMessage(`No ticket found for ${ticketNumberCandidates.join(" or ")}.`);
     } catch {
       setMessage("Unable to open ticket. Please try again.");
     } finally {
@@ -71,19 +92,33 @@ export default function OpenTicket() {
           <label htmlFor="ticket-number" className="block text-sm font-extrabold text-blue-950">
             Ticket Number
           </label>
-          <input
-            id="ticket-number"
-            type="text"
-            value={ticketNumber}
-            onChange={(event) => {
-              setTicketNumber(event.target.value);
-              setMessage("");
-            }}
-            placeholder="KE-001"
-            className="mt-2 min-h-14 w-full rounded-xl border border-gray-300 px-4 py-3 text-xl font-extrabold uppercase tracking-normal text-blue-950 outline-none focus:border-blue-950"
-            autoComplete="off"
-            inputMode="text"
-          />
+          <div className="mt-2 flex min-h-14 overflow-hidden rounded-xl border border-gray-300 bg-white focus-within:border-blue-950">
+            <span className="flex shrink-0 items-center border-r border-gray-200 bg-blue-50 px-4 text-xl font-extrabold text-blue-950">
+              KE-
+            </span>
+            <input
+              id="ticket-number"
+              type="text"
+              value={ticketDigits}
+              onChange={(event) => {
+                setTicketDigits(getTicketNumberDigits(event.target.value));
+                setMessage("");
+              }}
+              placeholder="001"
+              className="min-h-14 min-w-0 flex-1 px-4 py-3 text-xl font-extrabold tracking-normal text-blue-950 outline-none"
+              autoComplete="off"
+              inputMode="numeric"
+            />
+          </div>
+          {ticketNumberCandidates.length > 0 && (
+            <div className="mt-3 flex min-w-0 flex-wrap gap-2" aria-label="Ticket number formats to try">
+              {ticketNumberCandidates.map((candidate) => (
+                <span key={candidate} className="rounded-full bg-blue-50 px-3 py-1.5 text-sm font-extrabold text-blue-950">
+                  {candidate}
+                </span>
+              ))}
+            </div>
+          )}
           {message && (
             <p className={`mt-3 rounded-xl px-4 py-3 text-sm font-semibold ${message.startsWith("No ticket") || message.startsWith("Enter") ? "bg-yellow-50 text-yellow-800" : "bg-red-50 text-red-700"}`}>
               {message}

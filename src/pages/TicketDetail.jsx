@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Calendar, ChevronDown, ChevronRight, Eye, MapPin, Phone, PhoneCall, Plus } from "lucide-react";
+import { ArrowLeft, Calendar, ChevronDown, ChevronRight, Eye, MapPin, Phone, PhoneCall, Plus, UserPlus } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { hasAccess } from "../utils/access";
 
@@ -55,6 +55,13 @@ function formatEnumDisplay(value) {
 
 function getTicketStatusLabel(ticket) {
   return ticket?.statusDisplayName || formatLabel(ticket?.status);
+}
+
+function getCurrentOwnerLabel(ticket) {
+  return ticket?.currentOwnerEmployeeName
+    || ticket?.currentOwnerEmployeeId
+    || ticket?.pickedByEmployeeId
+    || "Unassigned";
 }
 
 function getHistoryActor(historyItem) {
@@ -229,6 +236,12 @@ export default function TicketDetail() {
   const [showWorkflowHistory, setShowWorkflowHistory] = useState(false);
   const [expandedWorkflowHistoryId, setExpandedWorkflowHistoryId] = useState(null);
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
+  const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [assignableEmployees, setAssignableEmployees] = useState([]);
+  const [assignableEmployeesLoading, setAssignableEmployeesLoading] = useState(false);
+  const [assignableEmployeesError, setAssignableEmployeesError] = useState("");
+  const [assignForm, setAssignForm] = useState({ employeeId: "", note: "" });
+  const [assignError, setAssignError] = useState("");
   const [pendingDeleteChargeId, setPendingDeleteChargeId] = useState(null);
   const availableActionsTicketIdRef = useRef(ticketId);
   const customerHistoryTicketIdRef = useRef(ticketId);
@@ -385,6 +398,9 @@ export default function TicketDetail() {
     setShowWorkflowHistory(false);
     setExpandedWorkflowHistoryId(null);
     setShowCancelConfirmation(false);
+    setShowAssignDialog(false);
+    setAssignForm({ employeeId: "", note: "" });
+    setAssignError("");
     setPendingDeleteChargeId(null);
     setAvailableActions(null);
     setAvailableActionsLoading(false);
@@ -505,6 +521,107 @@ export default function TicketDetail() {
   const confirmCancelTicket = async () => {
     setShowCancelConfirmation(false);
     await runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.");
+  };
+
+  const loadAssignableEmployees = async () => {
+    setAssignableEmployeesLoading(true);
+    setAssignableEmployeesError("");
+    try {
+      const response = await fetch("/volt/tickets/assignable-employees", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Unable to load assignable employees");
+
+      const data = await response.json();
+      setAssignableEmployees(Array.isArray(data) ? data : []);
+    } catch {
+      setAssignableEmployees([]);
+      setAssignableEmployeesError("Unable to load employees. Please try again.");
+    } finally {
+      setAssignableEmployeesLoading(false);
+    }
+  };
+
+  const openAssignDialog = async () => {
+    setShowAssignDialog(true);
+    setAssignError("");
+    setAssignForm({ employeeId: "", note: "" });
+    if (assignableEmployees.length === 0 && !assignableEmployeesLoading) {
+      await loadAssignableEmployees();
+    }
+  };
+
+  const closeAssignDialog = () => {
+    if (processingKeys[`assign-${ticketId}`]) return;
+    setShowAssignDialog(false);
+    setAssignError("");
+    setAssignForm({ employeeId: "", note: "" });
+  };
+
+  const handleAssignInput = (event) => {
+    const { name, value } = event.target;
+    setAssignForm((current) => ({ ...current, [name]: value }));
+    setAssignError("");
+  };
+
+  const assignTicket = async () => {
+    const targetEmployeeId = assignForm.employeeId.trim();
+    if (!targetEmployeeId) {
+      setAssignError("Select an employee to assign this ticket.");
+      return;
+    }
+    if (ticket?.currentOwnerEmployeeId && targetEmployeeId.toLowerCase() === String(ticket.currentOwnerEmployeeId).toLowerCase()) {
+      setAssignError("This employee is already the current owner.");
+      return;
+    }
+    if (ticket?.pickedByEmployeeId && targetEmployeeId.toLowerCase() === String(ticket.pickedByEmployeeId).toLowerCase()) {
+      setAssignError("This employee is already the current owner.");
+      return;
+    }
+
+    const key = `assign-${ticketId}`;
+    setProcessing(key, true);
+    setAssignError("");
+    setStatusMessage("");
+    try {
+      const response = await fetch(`/volt/tickets/${ticketId}/assign`, {
+        method: "PATCH",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          employeeId: targetEmployeeId,
+          note: assignForm.note.trim(),
+        }),
+      });
+
+      if (!response.ok) {
+        let message = "Unable to assign ticket. Please try again.";
+        try {
+          const data = await response.json();
+          if (typeof data.message === "string" && data.message.trim()) {
+            message = data.message.trim();
+          }
+        } catch {
+          // Keep fallback message.
+        }
+        throw new Error(message);
+      }
+
+      await loadTicket();
+      if (showWorkflowHistory) await loadWorkflowHistory(0, true);
+      setShowAssignDialog(false);
+      setAssignForm({ employeeId: "", note: "" });
+      setStatusMessage("Ticket assigned successfully.");
+    } catch (assignRequestError) {
+      setAssignError(assignRequestError.message || "Unable to assign ticket. Please try again.");
+    } finally {
+      setProcessing(key, false);
+    }
   };
 
   const runDynamicWorkflowAction = async (action) => {
@@ -682,6 +799,7 @@ export default function TicketDetail() {
     && hasAccess("CANCEL_TICKET")
     && ["NEW", "PICKED", "IN_PROGRESS"].includes(ticket?.status);
   const canViewCustomerHistory = hasAccess("VIEW_CUSTOMER_HISTORY");
+  const canAssignTicket = hasAccess("ASSIGN_TICKET");
   const canViewCharges = hasAccess("VIEW_CHARGES");
   const canAddCharge = ticket
     && hasAccess("ADD_CHARGE")
@@ -815,8 +933,14 @@ export default function TicketDetail() {
                 <InfoItem label="Category">{formatEnumDisplay(ticket.category)}</InfoItem>
                 <InfoItem label="Amount">{formatCurrency(ticket.totalCharge)}</InfoItem>
                 <InfoItem label="Created Date"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
+                <InfoItem label="Current Owner">{getCurrentOwnerLabel(ticket)}</InfoItem>
                 <InfoItem label="Complaint Description" className="sm:col-span-2">{ticket.complaintDescription}</InfoItem>
               </dl>
+              {canAssignTicket && (
+                <button type="button" onClick={openAssignDialog} className="ke-primary-action mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold">
+                  <UserPlus size={16} aria-hidden="true" /> Assign Ticket
+                </button>
+              )}
             </section>
 
             {renderWorkflowActions(true)}
@@ -876,7 +1000,7 @@ export default function TicketDetail() {
               {showStatusDetails && (
                 <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-blue-100 pt-4 text-sm sm:grid-cols-2">
                   <InfoItem label="Status">{getTicketStatusLabel(ticket)}</InfoItem>
-                  <InfoItem label="Picked By">{ticket.pickedByEmployeeId ?? "Not picked"}</InfoItem>
+                  <InfoItem label="Current Owner">{getCurrentOwnerLabel(ticket)}</InfoItem>
                   <InfoItem label="Created Date"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
                   {ticket.status === "COMPLETED" && <InfoItem label="Completed By">{ticket.completedByEmployeeId}</InfoItem>}
                   {ticket.status === "COMPLETED" && <InfoItem label="Completed At">{formatDateTime(ticket.completedAt)}</InfoItem>}
@@ -1053,6 +1177,70 @@ export default function TicketDetail() {
                     </button>
                     <button type="button" onClick={confirmCancelTicket} disabled={processingKeys[`cancel-${ticketId}`]} className="ke-danger-action min-h-11 rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60">
                       Cancel Ticket
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {showAssignDialog && (
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="assign-ticket-title">
+                <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl">
+                  <h2 id="assign-ticket-title" className="text-lg font-extrabold text-blue-950">Assign Ticket</h2>
+                  <dl className="mt-3 grid grid-cols-1 gap-2 rounded-xl bg-blue-50 p-3 text-sm">
+                    <InfoItem label="Ticket Number">{ticket.ticketNumber}</InfoItem>
+                    <InfoItem label="Current Owner">{getCurrentOwnerLabel(ticket)}</InfoItem>
+                  </dl>
+
+                  <label className="mt-4 block text-sm font-bold text-gray-700">
+                    Assign To
+                    <select
+                      name="employeeId"
+                      value={assignForm.employeeId}
+                      onChange={handleAssignInput}
+                      disabled={assignableEmployeesLoading || processingKeys[`assign-${ticketId}`]}
+                      className="mt-2 min-h-12 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-base outline-none focus:border-blue-950 disabled:opacity-70"
+                    >
+                      <option value="">{assignableEmployeesLoading ? "Loading employees..." : "Select employee"}</option>
+                      {assignableEmployees.map((employee) => (
+                        <option key={employee.employeeId} value={employee.employeeId}>
+                          {employee.name ? `${employee.name} (${employee.employeeId})` : employee.employeeId}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {assignableEmployeesError && (
+                    <p className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{assignableEmployeesError}</p>
+                  )}
+
+                  <label className="mt-4 block text-sm font-bold text-gray-700">
+                    Optional Note
+                    <textarea
+                      name="note"
+                      value={assignForm.note}
+                      onChange={handleAssignInput}
+                      disabled={processingKeys[`assign-${ticketId}`]}
+                      maxLength={1000}
+                      rows={3}
+                      className="mt-2 w-full resize-none rounded-xl border border-gray-300 px-4 py-3 text-base outline-none focus:border-blue-950 disabled:opacity-70"
+                    />
+                  </label>
+
+                  {assignError && (
+                    <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{assignError}</p>
+                  )}
+
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={closeAssignDialog} disabled={processingKeys[`assign-${ticketId}`]} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50 disabled:opacity-60">
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={assignTicket}
+                      disabled={processingKeys[`assign-${ticketId}`] || assignableEmployeesLoading || Boolean(assignableEmployeesError)}
+                      className="ke-primary-action min-h-11 rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60"
+                    >
+                      {processingKeys[`assign-${ticketId}`] ? "Assigning..." : "Assign Ticket"}
                     </button>
                   </div>
                 </div>

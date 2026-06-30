@@ -55,6 +55,7 @@ const emptyTransitionForm = {
   toStatusId: "",
   displayName: "",
   active: true,
+  enableForSelectedCategory: true,
   sortOrder: "",
 };
 
@@ -373,7 +374,7 @@ function EntityFormModal({ formState, onCancel, onChange, onSubmit, isSaving, er
   );
 }
 
-function TransitionFormModal({ formState, statuses, actions, onCancel, onChange, onSubmit, isSaving }) {
+function TransitionFormModal({ formState, statuses, actions, selectedCategory, onCancel, onChange, onSubmit, isSaving }) {
   if (!formState) return null;
 
   const { mode, values, original } = formState;
@@ -436,8 +437,14 @@ function TransitionFormModal({ formState, statuses, actions, onCancel, onChange,
               Active on create
             </label>
           )}
+          {isCreate && selectedCategory?.id && (
+            <label className="flex min-h-10 items-center gap-2 text-sm font-bold text-slate-700 sm:col-span-2">
+              <input type="checkbox" checked={values.enableForSelectedCategory} onChange={(event) => onChange("enableForSelectedCategory", event.target.checked)} />
+              Enable for {selectedCategory.displayName || formatLabel(selectedCategory.categoryKey)}
+            </label>
+          )}
           <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-semibold text-yellow-800 sm:col-span-2">
-            Creating a transition does not automatically enable it for a category or role. Use category and role rule controls separately after creation.
+            Category use is controlled by the category rule. Role access is still configured separately after creation.
           </div>
         </div>
 
@@ -1942,11 +1949,33 @@ export default function WorkflowManagement() {
       }
 
       const savedTransition = await response.json();
+      let categoryRuleAttached = false;
+      let categoryRuleError = "";
+      if (isCreate && change.values.enableForSelectedCategory && selectedCategory?.id && savedTransition?.id) {
+        const categoryRuleResponse = await fetch(`/volt/workflow/transitions/${savedTransition.id}/category-rules`, {
+          method: "POST",
+          headers: authHeaders(true),
+          body: JSON.stringify({ categoryId: Number(selectedCategory.id), active: true }),
+        });
+
+        if (categoryRuleResponse.ok) {
+          categoryRuleAttached = true;
+        } else {
+          categoryRuleError = await readApiError(categoryRuleResponse, "Transition created, but category rule could not be enabled.");
+        }
+      }
+
       setTransitionForm(null);
       setPendingTransitionChange(null);
-      await refreshTransitionsAndValidate(isCreate
-        ? `Workflow transition created as workflow metadata. To use it in ${selectedCategory?.displayName || selectedCategory?.categoryKey || "the selected category"}, enable the category rule for this transition.`
-        : "Workflow transition updated and validation refreshed.");
+      const categoryName = selectedCategory?.displayName || selectedCategory?.categoryKey || "the selected category";
+      const successMessage = isCreate
+        ? categoryRuleAttached
+          ? `Workflow transition created and enabled for ${categoryName}. Validation refreshed.`
+          : categoryRuleError
+          ? categoryRuleError
+          : `Workflow transition created as workflow metadata. To use it in ${categoryName}, enable the category rule for this transition.`
+        : "Workflow transition updated and validation refreshed.";
+      await refreshTransitionsAndValidate(successMessage);
       if (isCreate && savedTransition?.id) {
         openTransitionDrawer(savedTransition);
       }
@@ -3182,6 +3211,7 @@ export default function WorkflowManagement() {
         formState={transitionForm}
         statuses={statuses}
         actions={actions}
+        selectedCategory={selectedCategory}
         onCancel={() => setTransitionForm(null)}
         onChange={updateTransitionForm}
         onSubmit={submitTransitionForm}

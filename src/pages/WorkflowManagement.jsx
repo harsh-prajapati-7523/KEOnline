@@ -269,7 +269,9 @@ function EntityFormModal({ formState, onCancel, onChange, onSubmit, isSaving, er
   const { entityType, mode, values, original } = formState;
   const isStatus = entityType === "status";
   const isCreate = mode === "create";
-  const title = `${isCreate ? "Create" : "Edit"} ${isStatus ? "Custom Status" : "Custom Action"}`;
+  const title = isCreate
+    ? `Create Global ${isStatus ? "Status" : "Action"} Metadata`
+    : `Edit ${isStatus ? "Custom Status" : "Custom Action"}`;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 px-4" role="dialog" aria-modal="true" aria-label={title}>
@@ -1847,6 +1849,17 @@ export default function WorkflowManagement() {
     setStatusMessage(message);
   };
 
+  const metadataSaveSuccessMessage = (isStatus, isCreate) => {
+    if (!isCreate) {
+      return `Workflow ${isStatus ? "status" : "action"} updated and validation refreshed.`;
+    }
+
+    const categoryName = selectedCategory?.displayName || selectedCategory?.categoryKey || "the selected category";
+    return isStatus
+      ? `Workflow status created as reusable global metadata. To use it in ${categoryName}, create a transition involving this status and enable the category rule.`
+      : `Workflow action created as reusable global metadata. To use it in ${categoryName}, create a transition using this action and enable the category rule.`;
+  };
+
   const refreshTransitionsAndValidate = async (message) => {
     await loadTransitionsAndRules();
     await runValidation();
@@ -2197,7 +2210,7 @@ export default function WorkflowManagement() {
 
       setMetadataForm(null);
       setPendingMetadataChange(null);
-      await refreshMetadataAndValidate(`Workflow ${isStatus ? "status" : "action"} ${isCreate ? "created" : "updated"} and validation refreshed.`);
+      await refreshMetadataAndValidate(metadataSaveSuccessMessage(isStatus, isCreate));
     } catch (saveError) {
       const message = saveError.message || `Unable to save workflow ${isStatus ? "status" : "action"}.`;
       setMetadataFormError(message);
@@ -2676,9 +2689,10 @@ export default function WorkflowManagement() {
                   onClick={() => openStatusForm()}
                   className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900"
                 >
-                  Create Status
+                  Create Global Status Metadata
                 </button>
               </div>
+              <p className="text-sm font-semibold text-slate-600">Selected-category statuses below come from this category's transitions. New status metadata becomes available for transition creation, then appears here after a selected-category transition uses it.</p>
               <TableShell minWidth="min-w-[1040px]">
                 <thead>
                   <tr>
@@ -2790,13 +2804,13 @@ export default function WorkflowManagement() {
           {activeTab === "actions" && (
             <div className="space-y-3">
               <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                <p className="text-sm font-semibold text-slate-600">Action key is the access key. Creating a custom action does not grant role access automatically.</p>
+                <p className="text-sm font-semibold text-slate-600">Selected-category actions below come from this category's transitions. New action metadata becomes available for transition creation, then appears here after a selected-category transition uses it. Creating a custom action does not grant role access automatically.</p>
                 <button
                   type="button"
                   onClick={() => openActionForm()}
                   className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900"
                 >
-                  Create Action
+                  Create Global Action Metadata
                 </button>
               </div>
               <TableShell minWidth="min-w-[1120px]">

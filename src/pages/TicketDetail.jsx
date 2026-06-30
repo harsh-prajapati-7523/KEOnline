@@ -770,8 +770,8 @@ export default function TicketDetail() {
   return (
     <main className="ke-page-main ticket-detail-page bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-4xl">
-        <button type="button" onClick={() => navigate(`/tickets${location.search}`)} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950">
-          <ArrowLeft size={18} aria-hidden="true" /> Back to Tickets
+        <button type="button" onClick={() => navigate(`/tickets/find${location.search}`)} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950">
+          <ArrowLeft size={18} aria-hidden="true" /> Back to Find Tickets
         </button>
 
         {isLoading && <TicketDetailSkeleton />}

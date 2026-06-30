@@ -6,6 +6,7 @@ import {
   ListPlus,
   ListChecks,
   PlusCircle,
+  Search,
   Settings2,
   ShieldCheck,
   Tags,
@@ -111,8 +112,18 @@ export default function EmployeeDashboard() {
                 </DashboardAction>
               )}
               {canViewTickets && (
-                <DashboardAction icon={ListChecks} onClick={() => navigate("/tickets")}>
-                  View Tickets
+                <DashboardAction icon={ListChecks} onClick={() => navigate("/tickets/my")}>
+                  My Tickets
+                </DashboardAction>
+              )}
+              {canViewTickets && (
+                <DashboardAction icon={Search} onClick={() => navigate("/tickets/open")}>
+                  Open Ticket
+                </DashboardAction>
+              )}
+              {canViewTickets && (
+                <DashboardAction icon={ClipboardList} onClick={() => navigate("/tickets/find")}>
+                  Find Tickets
                 </DashboardAction>
               )}
             </div>

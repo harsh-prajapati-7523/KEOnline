@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Download, Home, LayoutDashboard, ListChecks, LogIn, LogOut, PlusCircle, X } from "lucide-react";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -16,6 +16,8 @@ const TicketCategoryFieldManagement = lazy(() => import("./pages/TicketCategoryF
 const TicketFieldManagement = lazy(() => import("./pages/TicketFieldManagement"));
 const DropdownSourceManagement = lazy(() => import("./pages/DropdownSourceManagement"));
 const CreateTicket = lazy(() => import("./pages/CreateTicket"));
+const MyTickets = lazy(() => import("./pages/MyTickets"));
+const OpenTicket = lazy(() => import("./pages/OpenTicket"));
 
 let ticketListImportPromise;
 function loadTicketList() {
@@ -58,11 +60,11 @@ function scheduleIdlePreload(callback, delay = 1200) {
   };
 }
 
-if (window.location.pathname === "/tickets") {
+if (window.location.pathname === "/tickets" || window.location.pathname === "/tickets/find") {
   preloadTicketList();
 }
 
-if (/^\/tickets\/[^/]+/.test(window.location.pathname)) {
+if (/^\/tickets\/\d+/.test(window.location.pathname)) {
   preloadTicketDetail();
 }
 
@@ -198,8 +200,8 @@ function Navbar() {
               <button type="button" onClick={() => navigate("/employee-dashboard")} className={buttonClassName(active === "/employee-dashboard")} aria-label="Dashboard">
                 <LayoutDashboard size={18} aria-hidden="true" /> Dashboard
               </button>
-              <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets")} className={buttonClassName(active.startsWith("/tickets"))} aria-label="View Tickets">
-                <ListChecks size={18} aria-hidden="true" /> Tickets
+              <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets/find")} className={buttonClassName(active.startsWith("/tickets"))} aria-label="Find Tickets">
+                <ListChecks size={18} aria-hidden="true" /> Find Tickets
               </button>
               <button type="button" onClick={logout} className="flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold transition hover:bg-white/20 sm:px-4 sm:text-base" aria-label="Logout">
                 Logout
@@ -259,9 +261,9 @@ function AuthenticatedBottomNav() {
           </button>
         )}
         {canViewTickets && (
-          <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets")} className={itemClassName(active.startsWith("/tickets") && active !== "/tickets/new")} aria-label="View Tickets">
+          <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets/find")} className={itemClassName(active === "/tickets/find" || active === "/tickets")} aria-label="Find Tickets">
             <ListChecks size={17} aria-hidden="true" />
-            Tickets
+            Find
           </button>
         )}
         <button type="button" onClick={logout} className={itemClassName(false)} aria-label="Logout">
@@ -286,11 +288,11 @@ function AppRoutes() {
   }, [isAuthenticated, location.pathname]);
 
   useEffect(() => {
-    if (!isAuthenticated || /^\/tickets\/[^/]+/.test(location.pathname) || !hasAnyAccess(["VIEW_TICKETS"])) {
+    if (!isAuthenticated || /^\/tickets\/\d+/.test(location.pathname) || !hasAnyAccess(["VIEW_TICKETS"])) {
       return undefined;
     }
 
-    return scheduleIdlePreload(preloadTicketDetail, location.pathname === "/tickets" ? 900 : 1800);
+    return scheduleIdlePreload(preloadTicketDetail, location.pathname === "/tickets/find" ? 900 : 1800);
   }, [isAuthenticated, location.pathname]);
 
   return (
@@ -349,11 +351,22 @@ function AppRoutes() {
               <CreateTicket />
             </ProtectedRoute>
           }/>
-          <Route path="/tickets" element={
+          <Route path="/tickets/my" element={
+            <ProtectedRoute accessKey="VIEW_TICKETS">
+              <MyTickets />
+            </ProtectedRoute>
+          }/>
+          <Route path="/tickets/open" element={
+            <ProtectedRoute accessKey="VIEW_TICKETS">
+              <OpenTicket />
+            </ProtectedRoute>
+          }/>
+          <Route path="/tickets/find" element={
             <ProtectedRoute accessKey="VIEW_TICKETS">
               <TicketList />
             </ProtectedRoute>
           }/>
+          <Route path="/tickets" element={<Navigate to="/tickets/find" replace />} />
           <Route path="/tickets/:ticketId" element={
             <ProtectedRoute accessKey="VIEW_TICKETS">
               <TicketDetail />

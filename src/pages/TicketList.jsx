@@ -524,7 +524,7 @@ export default function TicketList() {
   }, []);
 
   return (
-    <main className="ke-page-main lg:px-8">
+    <main id="main-content" className="ke-page-main lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
         <div className="mb-3 flex min-w-0 items-center gap-2 sm:mb-5">
           <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2">
@@ -532,7 +532,7 @@ export default function TicketList() {
             <span className="sr-only sm:not-sr-only">Dashboard</span>
           </button>
           <div className="min-w-0 flex-1">
-            <h1 className="break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Tickets</h1>
+            <h1 className="break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Find Tickets</h1>
             <p className="mt-0.5 text-xs font-semibold text-gray-500 sm:text-sm">Search, filter, and open service tickets.</p>
           </div>
         </div>

@@ -1437,6 +1437,7 @@ export default function WorkflowManagement() {
     () => isLegacyWorkflowMode ? [] : configuredTransitions,
     [configuredTransitions, isLegacyWorkflowMode]
   );
+  const selectedCategoryTransitions = configuredTransitions;
 
   const categoryWorkflowActionKeys = useMemo(
     () => new Set(categoryWorkflowTransitions.map((transition) => transition.actionKey)),
@@ -1469,14 +1470,14 @@ export default function WorkflowManagement() {
   );
 
   const editableConfiguredTransitions = useMemo(
-    () => categoryWorkflowTransitions.filter((transition) => !isProtectedTransition(transition)),
-    [categoryWorkflowTransitions]
+    () => selectedCategoryTransitions.filter((transition) => !isProtectedTransition(transition)),
+    [selectedCategoryTransitions]
   );
 
   const availableGlobalTransitions = useMemo(() => {
-    const selectedTransitionIds = new Set(categoryWorkflowTransitions.map((transition) => String(transition.id)));
+    const selectedTransitionIds = new Set(selectedCategoryTransitions.map((transition) => String(transition.id)));
     return transitions.filter((transition) => !selectedTransitionIds.has(String(transition.id)));
-  }, [categoryWorkflowTransitions, transitions]);
+  }, [selectedCategoryTransitions, transitions]);
 
   const actionByKey = useMemo(() => {
     const next = {};
@@ -2675,8 +2676,8 @@ export default function WorkflowManagement() {
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Transitions</span></BodyCell>
-                  <BodyCell>{categoryWorkflowTransitions.length} configured for selected category</BodyCell>
-                  <BodyCell><Badge tone={categoryWorkflowTransitions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
+                  <BodyCell>{selectedCategoryTransitions.length} configured for selected category</BodyCell>
+                  <BodyCell><Badge tone={selectedCategoryTransitions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Statuses</span></BodyCell>
@@ -2731,11 +2732,13 @@ export default function WorkflowManagement() {
                 </thead>
                 <tbody>
                   {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={9}>Loading workflow transitions for selected category...</EmptyRows>}
-                  {!isLoading && !isLoadingCategoryWorkflow && categoryWorkflowTransitions.length === 0 && <EmptyRows colSpan={9}>No workflow transitions are configured for this category yet. Create transitions and enable category rules to build this category workflow.</EmptyRows>}
-                  {!isLoading && !isLoadingCategoryWorkflow && categoryWorkflowTransitions.map((transition) => {
+                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryTransitions.length === 0 && <EmptyRows colSpan={9}>No workflow transitions are configured for this category yet. Create transitions and enable category rules to build this category workflow.</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryTransitions.map((transition) => {
                     const from = getStatusLabel(transition, "from");
                     const to = getStatusLabel(transition, "to");
                     const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
+                    const selectedCategoryRule = (categoryRulesByTransitionId[transition.id] || [])
+                      .find((rule) => String(rule.categoryId) === String(selectedCategoryId));
                     const roleRules = roleRulesByTransitionId[transition.id] || [];
                     const activeRoleRules = roleRules.filter((rule) => rule.active);
                     const protectedRecord = isProtectedTransition(transition);
@@ -2768,17 +2771,28 @@ export default function WorkflowManagement() {
                             >
                               Edit
                             </button>
-                            <button
-                              type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                requestTransitionStateChange(transition, !transition.active);
-                              }}
-                              disabled={protectedRecord}
-                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50"
-                            >
-                              {transition.active ? "Disable" : "Enable"}
-                            </button>
+	                            <button
+	                              type="button"
+	                              onClick={(event) => {
+	                                event.stopPropagation();
+	                                requestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: false });
+	                              }}
+	                              disabled={!selectedCategoryRule?.active || isSavingRule}
+	                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-200 px-3 py-2 text-xs font-extrabold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+	                            >
+	                              Disable Category Rule
+	                            </button>
+	                            <button
+	                              type="button"
+	                              onClick={(event) => {
+	                                event.stopPropagation();
+	                                requestTransitionStateChange(transition, !transition.active);
+	                              }}
+	                              disabled={protectedRecord}
+	                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50"
+	                            >
+	                              {transition.active ? "Disable Transition" : "Enable Transition"}
+	                            </button>
                           </div>
                         </BodyCell>
                       </tr>
@@ -3153,7 +3167,7 @@ export default function WorkflowManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {categoryWorkflowTransitions.map((transition) => {
+                    {selectedCategoryTransitions.map((transition) => {
                       const from = getStatusLabel(transition, "from");
                       const to = getStatusLabel(transition, "to");
                       return (
@@ -3170,7 +3184,7 @@ export default function WorkflowManagement() {
                         </tr>
                       );
                     })}
-                    {categoryWorkflowTransitions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No selected-category workflow transitions available for role rule matrix.</EmptyRows>}
+                    {selectedCategoryTransitions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No selected-category workflow transitions available for role rule matrix.</EmptyRows>}
                   </tbody>
                 </TableShell>
               </div>

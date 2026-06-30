@@ -781,6 +781,16 @@ function getWorkflowStory(statuses, transitions) {
   return { nodes, groups };
 }
 
+function statusMatchesTransition(status, transition) {
+  if (!status || !transition) return false;
+  const statusId = String(status.id);
+  const statusKey = String(status.statusKey || "").toUpperCase();
+  return String(transition.fromStatusId) === statusId
+    || String(transition.toStatusId) === statusId
+    || String(transition.fromStatusKey || transition.fromStatus || "").toUpperCase() === statusKey
+    || String(transition.toStatusKey || transition.toStatus || "").toUpperCase() === statusKey;
+}
+
 function WorkflowNode({ node, selected, onSelect }) {
   const tones = {
     blue: "border-blue-500 bg-blue-50 text-blue-950",
@@ -829,9 +839,14 @@ function WorkflowMapView({
   selectedItem,
   onSelectItem,
   selectedCategory,
+  isLegacyWorkflowMode,
+  isLoadingCategoryWorkflow,
 }) {
   const [activeFilter, setActiveFilter] = useState("all");
   const story = useMemo(() => getWorkflowStory(statuses, transitions), [statuses, transitions]);
+  useEffect(() => {
+    setActiveFilter("all");
+  }, [selectedCategory?.id]);
   const filterChips = [
     { id: "all", label: "All" },
     { id: "main", label: "Main Path" },
@@ -855,12 +870,22 @@ function WorkflowMapView({
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="space-y-5 overflow-hidden">
-        {configuredGroups.length === 0 && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-sm font-semibold text-amber-900">
-            No active configured workflow transitions are enabled for {selectedCategory?.displayName || "the selected category"}.
+        {isLoadingCategoryWorkflow && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-5 text-sm font-semibold text-blue-950">
+            Refreshing workflow details for {selectedCategory?.displayName || "the selected category"}...
           </div>
         )}
-        {configuredGroups.length > 0 && (
+        {!isLoadingCategoryWorkflow && isLegacyWorkflowMode && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-sm font-semibold text-amber-900">
+            This category is currently using the legacy fixed workflow. Configure and validate DB workflow before activation.
+          </div>
+        )}
+        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && configuredGroups.length === 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-sm font-semibold text-amber-900">
+            No workflow transitions are configured for this category yet. Create transitions and enable category rules to build this category workflow.
+          </div>
+        )}
+        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && configuredGroups.length > 0 && (
           <div className="flex flex-wrap gap-3">
             {filterChips.map((chip) => (
               <button
@@ -878,12 +903,12 @@ function WorkflowMapView({
             ))}
           </div>
         )}
-        {configuredGroups.length > 0 && visibleGroups.length === 0 && (
+        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && configuredGroups.length > 0 && visibleGroups.length === 0 && (
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-700">
             No active configured transitions match this filter for {selectedCategory?.displayName || "the selected category"}.
           </div>
         )}
-        {visibleGroups.map((group) => (
+        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && visibleGroups.map((group) => (
           <section
             key={group.id}
             className={`rounded-lg ${group.id === "main" ? "border border-transparent bg-white" : `border border-dashed px-3 py-3 ${sectionTone[group.tone] ?? sectionTone.blue}`}`}
@@ -931,6 +956,7 @@ function MapDetailPanel({
   selectedItem,
   selectedCategory,
   categoryWorkflowConfig,
+  isLegacyWorkflowMode,
   validationForSelectedCategory,
   readyToActivate,
   blockingIssueCount,
@@ -984,10 +1010,10 @@ function MapDetailPanel({
 
   if (!selectedItem) {
     const hasConfiguredTransitions = configuredTransitions.length > 0;
-    const defaultStatusLabel = hasConfiguredTransitions ? "In Progress" : "No configured status";
+    const defaultStatusLabel = isLegacyWorkflowMode ? "Legacy fixed workflow" : hasConfiguredTransitions ? "In Progress" : "No configured status";
     const defaultActions = hasConfiguredTransitions
       ? configuredActionsFromStatus("IN_PROGRESS")
-      : ["No configured workflow transitions"];
+      : [isLegacyWorkflowMode ? "Configure and validate DB workflow before activation" : "No configured workflow transitions"];
 
     return (
       <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
@@ -1010,6 +1036,7 @@ function MapDetailPanel({
 
         <MapPanelSection title="Rules Summary">
           <div className="flex flex-wrap gap-2">
+            <Badge tone={isLegacyWorkflowMode ? "yellow" : "blue"}>{isLegacyWorkflowMode ? "Legacy Fixed" : categoryWorkflowConfig?.workflowMode || "Not loaded"}</Badge>
             <Badge tone={readyToActivate ? "green" : "yellow"}>{readyToActivate ? "Ready to Activate" : "Validation Needed"}</Badge>
             <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>{blockingIssueCount} Blockers</Badge>
             <Badge tone={warningCount > 0 ? "yellow" : "slate"}>{warningCount} Warnings</Badge>
@@ -1362,6 +1389,7 @@ export default function WorkflowManagement() {
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const [isSavingTransition, setIsSavingTransition] = useState(false);
   const [isSavingWorkflowMode, setIsSavingWorkflowMode] = useState(false);
+  const [isLoadingCategoryWorkflow, setIsLoadingCategoryWorkflow] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
   const [drawerItem, setDrawerItem] = useState(null);
@@ -1388,38 +1416,45 @@ export default function WorkflowManagement() {
     [categoryRulesByTransitionId, selectedCategoryId, transitions]
   );
 
-  const configuredActionKeys = useMemo(
-    () => new Set(configuredTransitions.map((transition) => transition.actionKey)),
-    [configuredTransitions]
+  const isLegacyWorkflowMode = categoryWorkflowConfig?.workflowMode === "LEGACY_FIXED";
+  const categoryWorkflowTransitions = useMemo(
+    () => isLegacyWorkflowMode ? [] : configuredTransitions,
+    [configuredTransitions, isLegacyWorkflowMode]
   );
 
-  const configuredStatusIds = useMemo(() => {
+  const categoryWorkflowActionKeys = useMemo(
+    () => new Set(categoryWorkflowTransitions.map((transition) => transition.actionKey)),
+    [categoryWorkflowTransitions]
+  );
+
+  const categoryWorkflowStatusIds = useMemo(() => {
     const ids = new Set();
-    configuredTransitions.forEach((transition) => {
+    categoryWorkflowTransitions.forEach((transition) => {
       ids.add(String(transition.fromStatusId));
       ids.add(String(transition.toStatusId));
     });
     return ids;
-  }, [configuredTransitions]);
+  }, [categoryWorkflowTransitions]);
 
-  const configuredStatuses = useMemo(
-    () => statuses.filter((status) => configuredStatusIds.has(String(status.id))),
-    [configuredStatusIds, statuses]
+  const categoryWorkflowStatuses = useMemo(
+    () => statuses.filter((status) => categoryWorkflowStatusIds.has(String(status.id))
+      || categoryWorkflowTransitions.some((transition) => statusMatchesTransition(status, transition))),
+    [categoryWorkflowStatusIds, categoryWorkflowTransitions, statuses]
   );
 
   const configuredActionCount = useMemo(
-    () => configuredActionKeys.size,
-    [configuredActionKeys]
+    () => categoryWorkflowActionKeys.size,
+    [categoryWorkflowActionKeys]
   );
 
-  const configuredActions = useMemo(
-    () => actions.filter((action) => configuredActionKeys.has(action.actionKey)),
-    [actions, configuredActionKeys]
+  const categoryWorkflowActions = useMemo(
+    () => actions.filter((action) => categoryWorkflowActionKeys.has(action.actionKey)),
+    [actions, categoryWorkflowActionKeys]
   );
 
   const editableConfiguredTransitions = useMemo(
-    () => configuredTransitions.filter((transition) => !isProtectedTransition(transition)),
-    [configuredTransitions]
+    () => categoryWorkflowTransitions.filter((transition) => !isProtectedTransition(transition)),
+    [categoryWorkflowTransitions]
   );
 
   const actionByKey = useMemo(() => {
@@ -1443,31 +1478,30 @@ export default function WorkflowManagement() {
     [roles]
   );
 
-  const validationStatus = validationResult
+  const validationForSelectedCategory = validationResult && String(validationResult.categoryId) === String(selectedCategoryId);
+  const validationStatus = validationForSelectedCategory
     ? validationResult.readyToActivate || validationResult.valid
       ? "Ready"
       : "Not Ready"
     : "Not run";
-
-  const validationForSelectedCategory = validationResult && String(validationResult.categoryId) === String(selectedCategoryId);
   const blockingIssueCount = validationForSelectedCategory ? (validationResult.blockingIssues || validationResult.issues || []).length : 0;
   const warningCount = validationForSelectedCategory ? (validationResult.warnings || []).length : 0;
   const readyToActivate = Boolean(validationForSelectedCategory && validationResult.readyToActivate && blockingIssueCount === 0);
   const activationTargetConfig = { workflowMode: "DB_CONFIGURED", dbWorkflowEnabled: true, fixedActionsEnabled: false };
   const rollbackTargetConfig = { workflowMode: "LEGACY_FIXED", dbWorkflowEnabled: false, fixedActionsEnabled: true };
-  const workflowStory = useMemo(() => getWorkflowStory(configuredStatuses.length > 0 ? configuredStatuses : statuses, configuredTransitions), [configuredStatuses, configuredTransitions, statuses]);
-  const configuredTerminalStatus = configuredStatuses.find((status) => status.terminal);
-  const terminalStatusLabel = configuredTerminalStatus?.displayName || (configuredTransitions.length > 0 ? workflowStory.nodes.delivered.label : "Not configured");
+  const workflowStory = useMemo(() => getWorkflowStory(categoryWorkflowStatuses, categoryWorkflowTransitions), [categoryWorkflowStatuses, categoryWorkflowTransitions]);
+  const configuredTerminalStatus = categoryWorkflowStatuses.find((status) => status.terminal);
+  const terminalStatusLabel = configuredTerminalStatus?.displayName || (categoryWorkflowTransitions.length > 0 ? workflowStory.nodes.delivered.label : "Not configured");
   const workflowModeLabel = categoryWorkflowConfig?.workflowMode === "DB_CONFIGURED" || categoryWorkflowConfig?.dbWorkflowEnabled ? "DB Configured" : categoryWorkflowConfig?.workflowMode ? formatLabel(categoryWorkflowConfig.workflowMode) : "Not loaded";
-  const workflowStatusLabel = categoryWorkflowConfig?.workflowMode === "LEGACY_FIXED"
+  const workflowStatusLabel = isLegacyWorkflowMode
     ? "Legacy Fixed"
     : categoryWorkflowConfig?.dbWorkflowEnabled
-    ? configuredTransitions.length > 0 ? "Active in Test" : "No Active Paths"
+    ? categoryWorkflowTransitions.length > 0 ? "Active in Test" : "No Active Paths"
     : "Validation Needed";
   const summaryTiles = [
     { label: "Mode", value: workflowModeLabel, icon: Database, tone: "text-blue-600" },
-    { label: "Status", value: workflowStatusLabel, icon: CheckCircle2, tone: categoryWorkflowConfig?.dbWorkflowEnabled && configuredTransitions.length > 0 ? "text-emerald-600" : "text-amber-600" },
-    { label: "Total Statuses", value: configuredStatuses.length, icon: Layers3, tone: "text-violet-600" },
+    { label: "Status", value: workflowStatusLabel, icon: CheckCircle2, tone: categoryWorkflowConfig?.dbWorkflowEnabled && categoryWorkflowTransitions.length > 0 ? "text-emerald-600" : "text-amber-600" },
+    { label: "Total Statuses", value: categoryWorkflowStatuses.length, icon: Layers3, tone: "text-violet-600" },
     { label: "Total Actions", value: configuredActionCount, icon: Zap, tone: "text-blue-600" },
     { label: "Terminal Status", value: terminalStatusLabel, icon: Flag, tone: "text-orange-600" },
   ];
@@ -1647,16 +1681,15 @@ export default function WorkflowManagement() {
 
   const loadCategoryConfig = useCallback(async (categoryId) => {
     if (!categoryId) {
-      setCategoryWorkflowConfig(null);
-      return;
+      return null;
     }
 
     try {
       const response = await fetch(`/volt/ticket-categories/${categoryId}/workflow-config`, { headers: authHeaders() });
       if (!response.ok) throw new Error("Unable to load category workflow config.");
-      setCategoryWorkflowConfig(await response.json());
+      return await response.json();
     } catch {
-      setCategoryWorkflowConfig(null);
+      return null;
     }
   }, []);
 
@@ -1669,20 +1702,71 @@ export default function WorkflowManagement() {
   }, [loadBaseData]);
 
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => {
-      loadCategoryConfig(selectedCategoryId);
-      setValidationResult(null);
-      setPendingWorkflowModeChange(null);
-      setSelectedMapItem(null);
+    let ignore = false;
+    setCategoryWorkflowConfig(null);
+    setValidationResult(null);
+    setPendingWorkflowModeChange(null);
+    setPendingRuleChange(null);
+    setPendingTransitionChange(null);
+    setTransitionForm(null);
+    setSelectedMapItem(null);
+    setDrawerItem(null);
+    setError("");
+    setStatusMessage("");
+
+    const timeoutId = window.setTimeout(async () => {
+      setIsLoadingCategoryWorkflow(Boolean(selectedCategoryId));
+      const config = await loadCategoryConfig(selectedCategoryId);
+      if (!ignore) {
+        setCategoryWorkflowConfig(config);
+        setIsLoadingCategoryWorkflow(false);
+      }
     }, 0);
 
-    return () => window.clearTimeout(timeoutId);
+    return () => {
+      ignore = true;
+      window.clearTimeout(timeoutId);
+    };
   }, [loadCategoryConfig, selectedCategoryId]);
+
+  useEffect(() => {
+    if (!selectedMapItem) return;
+
+    if (selectedMapItem.type === "transition") {
+      const stillVisible = categoryWorkflowTransitions.some((transition) => String(transition.id) === String(selectedMapItem.data.id));
+      if (!stillVisible) setSelectedMapItem(null);
+      return;
+    }
+
+    if (selectedMapItem.type === "story-status") {
+      const statusId = selectedMapItem.data.status?.id;
+      const stillVisible = statusId && categoryWorkflowStatuses.some((status) => String(status.id) === String(statusId));
+      if (!stillVisible) setSelectedMapItem(null);
+    }
+  }, [categoryWorkflowStatuses, categoryWorkflowTransitions, selectedMapItem]);
+
+  useEffect(() => {
+    if (drawerItem?.type !== "transition") return;
+
+    const stillVisible = categoryWorkflowTransitions.some((transition) => String(transition.id) === String(drawerItem.data.id));
+    if (!stillVisible) setDrawerItem(null);
+  }, [categoryWorkflowTransitions, drawerItem]);
+
+  const changeSelectedCategory = (categoryId) => {
+    setSelectedCategoryId(categoryId);
+  };
+
+  useEffect(() => {
+    if (validationResult && String(validationResult.categoryId) !== String(selectedCategoryId)) {
+      setValidationResult(null);
+    }
+  }, [selectedCategoryId, validationResult]);
 
   const refreshData = async () => {
     setValidationResult(null);
     setStatusMessage("");
     await loadBaseData();
+    setCategoryWorkflowConfig(await loadCategoryConfig(selectedCategoryId));
   };
 
   const runValidation = async (categoryId = selectedCategoryId) => {
@@ -1954,7 +2038,8 @@ export default function WorkflowManagement() {
       }
 
       setCategoryWorkflowConfig(await response.json());
-      await Promise.all([loadBaseData(), loadCategoryConfig(categoryId), loadTransitionsAndRules()]);
+      const [, config] = await Promise.all([loadBaseData(), loadCategoryConfig(categoryId), loadTransitionsAndRules()]);
+      setCategoryWorkflowConfig(config);
       await runValidation(categoryId);
       setPendingWorkflowModeChange(null);
       setStatusMessage(activating ? "Selected category activated for DB configured workflow." : "Selected category rolled back to legacy fixed workflow.");
@@ -2043,13 +2128,13 @@ export default function WorkflowManagement() {
   });
 
   const visibleStatusKeys = useMemo(
-    () => new Set(configuredStatuses.map((status) => String(status.statusKey || "").trim().toUpperCase())),
-    [configuredStatuses]
+    () => new Set(categoryWorkflowStatuses.map((status) => String(status.statusKey || "").trim().toUpperCase())),
+    [categoryWorkflowStatuses]
   );
 
   const visibleActionKeys = useMemo(
-    () => new Set(configuredActions.map((action) => String(action.actionKey || "").trim().toUpperCase())),
-    [configuredActions]
+    () => new Set(categoryWorkflowActions.map((action) => String(action.actionKey || "").trim().toUpperCase())),
+    [categoryWorkflowActions]
   );
 
   const findDuplicateMetadata = (change) => {
@@ -2249,10 +2334,11 @@ export default function WorkflowManagement() {
     });
   };
 
-  const issueRows = validationResult
-    ? (validationResult.blockingIssues?.length || validationResult.warnings?.length)
-      ? [...(validationResult.blockingIssues || []), ...(validationResult.warnings || [])]
-      : validationResult.issues || []
+  const selectedValidationResult = validationForSelectedCategory ? validationResult : null;
+  const issueRows = selectedValidationResult
+    ? (selectedValidationResult.blockingIssues?.length || selectedValidationResult.warnings?.length)
+      ? [...(selectedValidationResult.blockingIssues || []), ...(selectedValidationResult.warnings || [])]
+      : selectedValidationResult.issues || []
     : [];
 
   const sidebarItems = [
@@ -2320,10 +2406,7 @@ export default function WorkflowManagement() {
                   Category
                   <select
                     value={selectedCategoryId}
-                    onChange={(event) => {
-                      setSelectedMapItem(null);
-                      setSelectedCategoryId(event.target.value);
-                    }}
+                    onChange={(event) => changeSelectedCategory(event.target.value)}
                     className="min-h-10 min-w-60 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950"
                   >
                     {categories.length === 0 && <option value="">No categories available</option>}
@@ -2350,6 +2433,12 @@ export default function WorkflowManagement() {
 
         {error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
         {statusMessage && <p className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">{statusMessage}</p>}
+        {isLoadingCategoryWorkflow && <p className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-950">Refreshing selected category workflow...</p>}
+        {!isLoadingCategoryWorkflow && isLegacyWorkflowMode && (
+          <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+            This category is currently using the legacy fixed workflow. Configure and validate DB workflow before activation.
+          </p>
+        )}
 
         <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5" aria-label="Workflow summary">
           {summaryTiles.map((tile) => {
@@ -2391,11 +2480,13 @@ export default function WorkflowManagement() {
             <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_22rem]">
               <div className="min-w-0 space-y-3">
                 <WorkflowMapView
-                  statuses={statuses}
-                  transitions={configuredTransitions}
+                  statuses={categoryWorkflowStatuses}
+                  transitions={categoryWorkflowTransitions}
                   selectedItem={selectedMapItem}
                   onSelectItem={setSelectedMapItem}
                   selectedCategory={selectedCategory}
+                  isLegacyWorkflowMode={isLegacyWorkflowMode}
+                  isLoadingCategoryWorkflow={isLoadingCategoryWorkflow}
                   actionByKey={actionByKey}
                   categoryRulesByTransitionId={categoryRulesByTransitionId}
                   selectedCategoryId={selectedCategoryId}
@@ -2414,6 +2505,7 @@ export default function WorkflowManagement() {
                 selectedItem={selectedMapItem}
                 selectedCategory={selectedCategory}
                 categoryWorkflowConfig={categoryWorkflowConfig}
+                isLegacyWorkflowMode={isLegacyWorkflowMode}
                 validationForSelectedCategory={validationForSelectedCategory}
                 readyToActivate={readyToActivate}
                 blockingIssueCount={blockingIssueCount}
@@ -2423,7 +2515,7 @@ export default function WorkflowManagement() {
                 roleRulesByTransitionId={roleRulesByTransitionId}
                 managedRoles={managedRoles}
                 actionByKey={actionByKey}
-                configuredTransitions={configuredTransitions}
+                configuredTransitions={categoryWorkflowTransitions}
                 onOpenStatusForm={openStatusForm}
                 onOpenTransitionForm={openTransitionForm}
                 onRequestMetadataStateChange={requestMetadataStateChange}
@@ -2465,18 +2557,18 @@ export default function WorkflowManagement() {
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Transitions</span></BodyCell>
-                  <BodyCell>{configuredTransitions.length} configured for selected category</BodyCell>
-                  <BodyCell><Badge tone={configuredTransitions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
+                  <BodyCell>{categoryWorkflowTransitions.length} configured for selected category</BodyCell>
+                  <BodyCell><Badge tone={categoryWorkflowTransitions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Statuses</span></BodyCell>
-                  <BodyCell>{configuredStatuses.length} configured for selected category</BodyCell>
-                  <BodyCell><Badge tone={configuredStatuses.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
+                  <BodyCell>{categoryWorkflowStatuses.length} configured for selected category</BodyCell>
+                  <BodyCell><Badge tone={categoryWorkflowStatuses.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Actions</span></BodyCell>
-                  <BodyCell>{configuredActions.length} configured for selected category</BodyCell>
-                  <BodyCell><Badge tone={configuredActions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
+                  <BodyCell>{categoryWorkflowActions.length} configured for selected category</BodyCell>
+                  <BodyCell><Badge tone={categoryWorkflowActions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Validation</span></BodyCell>
@@ -2517,9 +2609,9 @@ export default function WorkflowManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {isLoading && <EmptyRows colSpan={9}>Loading workflow transitions...</EmptyRows>}
-                  {!isLoading && configuredTransitions.length === 0 && <EmptyRows colSpan={9}>No configured transitions for the selected category.</EmptyRows>}
-                  {!isLoading && configuredTransitions.map((transition) => {
+                  {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={9}>Loading workflow transitions for selected category...</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && categoryWorkflowTransitions.length === 0 && <EmptyRows colSpan={9}>No workflow transitions are configured for this category yet. Create transitions and enable category rules to build this category workflow.</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && categoryWorkflowTransitions.map((transition) => {
                     const from = getStatusLabel(transition, "from");
                     const to = getStatusLabel(transition, "to");
                     const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
@@ -2601,9 +2693,9 @@ export default function WorkflowManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {isLoading && <EmptyRows colSpan={8}>Loading workflow statuses...</EmptyRows>}
-                  {!isLoading && configuredStatuses.length === 0 && <EmptyRows colSpan={8}>No configured statuses for the selected category.</EmptyRows>}
-                  {!isLoading && configuredStatuses.map((status) => {
+                  {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={8}>Loading workflow statuses for selected category...</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && categoryWorkflowStatuses.length === 0 && <EmptyRows colSpan={8}>No workflow statuses are used by the selected category workflow yet.</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && categoryWorkflowStatuses.map((status) => {
                     const protectedRecord = isProtectedStatus(status);
                     return (
                       <tr key={status.id ?? status.statusKey} onClick={() => openStatusDrawer(status)} className="cursor-pointer hover:bg-blue-50/50">
@@ -2650,6 +2742,48 @@ export default function WorkflowManagement() {
                   })}
                 </tbody>
               </TableShell>
+              <details className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Advanced Global Status Metadata</summary>
+                <p className="mt-2 text-sm font-semibold text-slate-600">Global workflow statuses can be created, edited, enabled, or disabled here. These records may belong to another category until a transition and category rule use them.</p>
+                <div className="mt-3">
+                  <TableShell minWidth="min-w-[1040px]">
+                    <thead>
+                      <tr>
+                        <HeaderCell>Display Name</HeaderCell>
+                        <HeaderCell>Status Key</HeaderCell>
+                        <HeaderCell>Active</HeaderCell>
+                        <HeaderCell>System/Protected</HeaderCell>
+                        <HeaderCell>Actions</HeaderCell>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {statuses.map((status) => {
+                        const protectedRecord = isProtectedStatus(status);
+                        return (
+                          <tr key={status.id ?? status.statusKey} onClick={() => openStatusDrawer(status)} className="cursor-pointer hover:bg-blue-50/50">
+                            <BodyCell><span className="font-bold text-blue-950">{status.displayName || formatLabel(status.statusKey)}</span></BodyCell>
+                            <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{status.statusKey || "UNKNOWN"}</span></BodyCell>
+                            <BodyCell><StateBadge enabled={status.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                            <BodyCell>
+                              <div className="flex flex-wrap gap-1.5">
+                                <Badge tone={status.systemStatus ? "blue" : "slate"}>{status.systemStatus ? "System" : "Custom"}</Badge>
+                                <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
+                              </div>
+                            </BodyCell>
+                            <BodyCell>
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={(event) => { event.stopPropagation(); openStatusForm(status); }} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Edit</button>
+                                <button type="button" onClick={(event) => { event.stopPropagation(); requestMetadataStateChange("status", status, !status.active); }} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50">{status.active ? "Disable" : "Enable"}</button>
+                              </div>
+                            </BodyCell>
+                          </tr>
+                        );
+                      })}
+                      {statuses.length === 0 && <EmptyRows colSpan={5}>No global workflow statuses loaded.</EmptyRows>}
+                    </tbody>
+                  </TableShell>
+                </div>
+              </details>
             </div>
           )}
 
@@ -2679,9 +2813,9 @@ export default function WorkflowManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {isLoading && <EmptyRows colSpan={8}>Loading workflow actions...</EmptyRows>}
-                  {!isLoading && configuredActions.length === 0 && <EmptyRows colSpan={8}>No configured actions for the selected category.</EmptyRows>}
-                  {!isLoading && configuredActions.map((action) => {
+                  {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={8}>Loading workflow actions for selected category...</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && categoryWorkflowActions.length === 0 && <EmptyRows colSpan={8}>No workflow actions are used by the selected category workflow yet.</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && categoryWorkflowActions.map((action) => {
                     const protectedRecord = isProtectedAction(action);
                     const metadata = accessKeyByKey[action.actionKey];
                     return (
@@ -2732,13 +2866,59 @@ export default function WorkflowManagement() {
                   })}
                 </tbody>
               </TableShell>
+              <details className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+                <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Advanced Global Action Metadata</summary>
+                <p className="mt-2 text-sm font-semibold text-slate-600">Global workflow actions can be created, edited, enabled, or disabled here. These records may belong to another category until a selected-category transition uses them.</p>
+                <div className="mt-3">
+                  <TableShell minWidth="min-w-[1120px]">
+                    <thead>
+                      <tr>
+                        <HeaderCell>Display Name</HeaderCell>
+                        <HeaderCell>Action Key / Access Key</HeaderCell>
+                        <HeaderCell>Active</HeaderCell>
+                        <HeaderCell>System/Protected</HeaderCell>
+                        <HeaderCell>Actions</HeaderCell>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {actions.map((action) => {
+                        const protectedRecord = isProtectedAction(action);
+                        const metadata = accessKeyByKey[action.actionKey];
+                        return (
+                          <tr key={action.id ?? action.actionKey} onClick={() => openActionDrawer(action)} className="cursor-pointer hover:bg-blue-50/50">
+                            <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
+                            <BodyCell>
+                              <BusinessKeyLabel label={metadata?.displayName || action.displayName} technicalKey={action.actionKey} subtle />
+                              <span className="mt-1 block text-xs font-semibold text-slate-600">{metadata ? "Access metadata linked" : "Access metadata pending"}</span>
+                            </BodyCell>
+                            <BodyCell><StateBadge enabled={action.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                            <BodyCell>
+                              <div className="flex flex-wrap gap-1.5">
+                                <Badge tone={action.systemAction ? "blue" : "slate"}>{action.systemAction ? "System" : "Custom"}</Badge>
+                                <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
+                              </div>
+                            </BodyCell>
+                            <BodyCell>
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={(event) => { event.stopPropagation(); openActionForm(action); }} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50">Edit</button>
+                                <button type="button" onClick={(event) => { event.stopPropagation(); requestMetadataStateChange("action", action, !action.active); }} disabled={protectedRecord} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50">{action.active ? "Disable" : "Enable"}</button>
+                              </div>
+                            </BodyCell>
+                          </tr>
+                        );
+                      })}
+                      {actions.length === 0 && <EmptyRows colSpan={5}>No global workflow actions loaded.</EmptyRows>}
+                    </tbody>
+                  </TableShell>
+                </div>
+              </details>
             </div>
           )}
 
           {activeTab === "roleAccess" && (
             <div className="space-y-5">
               <div>
-                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">role_access_rules</h2>
+                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">Selected Category Action Access</h2>
                 <TableShell minWidth="min-w-[900px]">
                   <thead>
                     <tr>
@@ -2747,7 +2927,7 @@ export default function WorkflowManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {actions.map((action) => (
+                    {categoryWorkflowActions.map((action) => (
                       <tr key={action.id ?? action.actionKey}>
                         <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
                         {roles.map((role) => (
@@ -2757,13 +2937,13 @@ export default function WorkflowManagement() {
                         ))}
                       </tr>
                     ))}
-                    {actions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No workflow actions available for role access matrix.</EmptyRows>}
+                    {categoryWorkflowActions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No selected-category workflow actions available for role access matrix.</EmptyRows>}
                   </tbody>
                 </TableShell>
               </div>
 
               <div>
-                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">workflow_transition_role_rules</h2>
+                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">Selected Category Transition Role Rules</h2>
                 <TableShell minWidth="min-w-[1040px]">
                   <thead>
                     <tr>
@@ -2772,7 +2952,7 @@ export default function WorkflowManagement() {
                     </tr>
                   </thead>
                   <tbody>
-                    {transitions.map((transition) => {
+                    {categoryWorkflowTransitions.map((transition) => {
                       const from = getStatusLabel(transition, "from");
                       const to = getStatusLabel(transition, "to");
                       return (
@@ -2789,7 +2969,7 @@ export default function WorkflowManagement() {
                         </tr>
                       );
                     })}
-                    {transitions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No workflow transitions available for role rule matrix.</EmptyRows>}
+                    {categoryWorkflowTransitions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No selected-category workflow transitions available for role rule matrix.</EmptyRows>}
                   </tbody>
                 </TableShell>
               </div>
@@ -2826,18 +3006,18 @@ export default function WorkflowManagement() {
                   </tr>
                 </thead>
                 <tbody>
-                  {!validationResult && <EmptyRows colSpan={4}>Validation has not been run for the selected category.</EmptyRows>}
-                  {validationResult && (
+                  {!selectedValidationResult && <EmptyRows colSpan={4}>Validation has not been run for the selected category.</EmptyRows>}
+                  {selectedValidationResult && (
                     <tr>
                       <BodyCell>
                         <span className="inline-flex items-center gap-2 font-bold text-blue-950">
-                          {(validationResult.readyToActivate || validationResult.valid) ? <CheckCircle2 size={17} className="text-green-600" aria-hidden="true" /> : <XCircle size={17} className="text-red-600" aria-hidden="true" />}
-                          {(validationResult.readyToActivate || validationResult.valid) ? "Ready" : "Not Ready"}
+                          {(selectedValidationResult.readyToActivate || selectedValidationResult.valid) ? <CheckCircle2 size={17} className="text-green-600" aria-hidden="true" /> : <XCircle size={17} className="text-red-600" aria-hidden="true" />}
+                          {(selectedValidationResult.readyToActivate || selectedValidationResult.valid) ? "Ready" : "Not Ready"}
                         </span>
                       </BodyCell>
                       <BodyCell>SUMMARY</BodyCell>
                       <BodyCell>
-                        Blocking issues: {(validationResult.blockingIssues || []).length}; Warnings: {(validationResult.warnings || []).length}
+                        Blocking issues: {(selectedValidationResult.blockingIssues || []).length}; Warnings: {(selectedValidationResult.warnings || []).length}
                       </BodyCell>
                       <BodyCell>All</BodyCell>
                     </tr>
@@ -2846,7 +3026,7 @@ export default function WorkflowManagement() {
                     const transition = transitions.find((item) => String(item.id) === String(issue.transitionId));
                     return (
                       <tr key={`${issue.code}-${issue.transitionId ?? "none"}-${index}`} className={transition ? "cursor-pointer hover:bg-blue-50/50" : ""} onClick={() => transition && openTransitionDrawer(transition)}>
-                        <BodyCell><Badge tone={(validationResult?.warnings || []).some((warning) => warning === issue) ? "yellow" : "red"}>{(validationResult?.warnings || []).some((warning) => warning === issue) ? "Warning" : "Blocking"}</Badge></BodyCell>
+                        <BodyCell><Badge tone={(selectedValidationResult?.warnings || []).some((warning) => warning === issue) ? "yellow" : "red"}>{(selectedValidationResult?.warnings || []).some((warning) => warning === issue) ? "Warning" : "Blocking"}</Badge></BodyCell>
                         <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{issue.code || "ISSUE"}</span></BodyCell>
                         <BodyCell>{issue.message || "Validation issue found"}</BodyCell>
                         <BodyCell>{issue.transitionId ? `#${issue.transitionId}` : "Not linked"}</BodyCell>

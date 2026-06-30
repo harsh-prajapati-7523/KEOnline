@@ -1378,11 +1378,6 @@ export default function WorkflowManagement() {
     [categories, selectedCategoryId]
   );
 
-  const activeTransitions = useMemo(
-    () => transitions.filter((transition) => transition.active),
-    [transitions]
-  );
-
   const configuredTransitions = useMemo(
     () => transitions.filter((transition) => {
       if (!transition.active || !selectedCategoryId) return false;
@@ -1390,6 +1385,11 @@ export default function WorkflowManagement() {
       return rules.some((rule) => String(rule.categoryId) === String(selectedCategoryId) && rule.active);
     }),
     [categoryRulesByTransitionId, selectedCategoryId, transitions]
+  );
+
+  const configuredActionKeys = useMemo(
+    () => new Set(configuredTransitions.map((transition) => transition.actionKey)),
+    [configuredTransitions]
   );
 
   const configuredStatusIds = useMemo(() => {
@@ -1407,13 +1407,18 @@ export default function WorkflowManagement() {
   );
 
   const configuredActionCount = useMemo(
-    () => new Set(configuredTransitions.map((transition) => transition.actionKey)).size,
-    [configuredTransitions]
+    () => configuredActionKeys.size,
+    [configuredActionKeys]
   );
 
-  const editableTransitions = useMemo(
-    () => transitions.filter((transition) => !isProtectedTransition(transition)),
-    [transitions]
+  const configuredActions = useMemo(
+    () => actions.filter((action) => configuredActionKeys.has(action.actionKey)),
+    [actions, configuredActionKeys]
+  );
+
+  const editableConfiguredTransitions = useMemo(
+    () => configuredTransitions.filter((transition) => !isProtectedTransition(transition)),
+    [configuredTransitions]
   );
 
   const actionByKey = useMemo(() => {
@@ -2519,18 +2524,18 @@ export default function WorkflowManagement() {
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Transitions</span></BodyCell>
-                  <BodyCell>{transitions.length} total, {activeTransitions.length} active</BodyCell>
-                  <BodyCell><Badge tone="blue">Transition management</Badge></BodyCell>
+                  <BodyCell>{configuredTransitions.length} configured for selected category</BodyCell>
+                  <BodyCell><Badge tone={configuredTransitions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Statuses</span></BodyCell>
-                  <BodyCell>{statuses.length} status records</BodyCell>
-                  <BodyCell><Badge tone="blue">Custom management</Badge></BodyCell>
+                  <BodyCell>{configuredStatuses.length} configured for selected category</BodyCell>
+                  <BodyCell><Badge tone={configuredStatuses.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Actions</span></BodyCell>
-                  <BodyCell>{actions.length} action records</BodyCell>
-                  <BodyCell><Badge tone="blue">Custom management</Badge></BodyCell>
+                  <BodyCell>{configuredActions.length} configured for selected category</BodyCell>
+                  <BodyCell><Badge tone={configuredActions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
                 </tr>
                 <tr>
                   <BodyCell><span className="font-bold text-blue-950">Validation</span></BodyCell>
@@ -2545,7 +2550,7 @@ export default function WorkflowManagement() {
             <div className="space-y-3">
               <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex flex-wrap gap-2">
-                  <Badge tone="blue">Custom editable: {editableTransitions.length}</Badge>
+                  <Badge tone="blue">Configured editable: {editableConfiguredTransitions.length}</Badge>
                   <Badge tone="slate">Safe options: {transitionOptions.length}</Badge>
                 </div>
                 <button
@@ -2572,8 +2577,8 @@ export default function WorkflowManagement() {
                 </thead>
                 <tbody>
                   {isLoading && <EmptyRows colSpan={9}>Loading workflow transitions...</EmptyRows>}
-                  {!isLoading && transitions.length === 0 && <EmptyRows colSpan={9}>No workflow transitions found.</EmptyRows>}
-                  {!isLoading && transitions.map((transition) => {
+                  {!isLoading && configuredTransitions.length === 0 && <EmptyRows colSpan={9}>No configured transitions for the selected category.</EmptyRows>}
+                  {!isLoading && configuredTransitions.map((transition) => {
                     const from = getStatusLabel(transition, "from");
                     const to = getStatusLabel(transition, "to");
                     const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
@@ -2656,8 +2661,8 @@ export default function WorkflowManagement() {
                 </thead>
                 <tbody>
                   {isLoading && <EmptyRows colSpan={8}>Loading workflow statuses...</EmptyRows>}
-                  {!isLoading && statuses.length === 0 && <EmptyRows colSpan={8}>No workflow statuses found.</EmptyRows>}
-                  {!isLoading && statuses.map((status) => {
+                  {!isLoading && configuredStatuses.length === 0 && <EmptyRows colSpan={8}>No configured statuses for the selected category.</EmptyRows>}
+                  {!isLoading && configuredStatuses.map((status) => {
                     const protectedRecord = isProtectedStatus(status);
                     return (
                       <tr key={status.id ?? status.statusKey} onClick={() => openStatusDrawer(status)} className="cursor-pointer hover:bg-blue-50/50">
@@ -2734,8 +2739,8 @@ export default function WorkflowManagement() {
                 </thead>
                 <tbody>
                   {isLoading && <EmptyRows colSpan={8}>Loading workflow actions...</EmptyRows>}
-                  {!isLoading && actions.length === 0 && <EmptyRows colSpan={8}>No workflow actions found.</EmptyRows>}
-                  {!isLoading && actions.map((action) => {
+                  {!isLoading && configuredActions.length === 0 && <EmptyRows colSpan={8}>No configured actions for the selected category.</EmptyRows>}
+                  {!isLoading && configuredActions.map((action) => {
                     const protectedRecord = isProtectedAction(action);
                     const metadata = accessKeyByKey[action.actionKey];
                     return (

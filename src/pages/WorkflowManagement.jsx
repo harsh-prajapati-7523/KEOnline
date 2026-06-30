@@ -692,18 +692,19 @@ function getWorkflowStory(statuses, transitions) {
     terminal,
   });
 
+  const labelFor = (status, fallback) => status?.displayName || fallback;
   const nodes = {
-    new: makeNode("new", "New", newStatus, "blue"),
-    inProgress: makeNode("inProgress", "In Progress", inProgress, "blue"),
-    repairCompleted: makeNode("repairCompleted", "Repair Completed", repairCompleted, "green"),
-    delivered: makeNode("delivered", "Delivered to Customer", delivered, "purple", true),
-    missingPart: makeNode("missingPart", "Missing Part", statusFor(["MISSING_PART"]), "blue"),
-    partAvailable: makeNode("partAvailable", "Part Available", statusFor(["PART_AVAILABLE"]), "blue"),
-    approvalPending: makeNode("approvalPending", "Customer Approval Pending", statusFor(["CUSTOMER_APPROVAL_PENDING"]), "orange"),
-    customerDeclined: makeNode("customerDeclined", "Customer Declined", statusFor(["CUSTOMER_DECLINED", "CUSTOMER_DECLINED_REPAIR"]), "orange"),
-    cancelledPending: makeNode("cancelledPending", "Cancelled Pending Delivery", statusFor(["CANCELLED_PENDING_DELIVERY"]), "orange"),
-    inWarranty: makeNode("inWarranty", "In Warranty", statusFor(["IN_WARRANTY"]), "green"),
-    warrantyLogged: makeNode("warrantyLogged", "Warranty Complaint Logged", statusFor(["WARRANTY_COMPLAINT_LOGGED"]), "green"),
+    new: makeNode("new", labelFor(newStatus, "New"), newStatus, "blue"),
+    inProgress: makeNode("inProgress", labelFor(inProgress, "In Progress"), inProgress, "blue"),
+    repairCompleted: makeNode("repairCompleted", labelFor(repairCompleted, "Repair Completed"), repairCompleted, "green"),
+    delivered: makeNode("delivered", labelFor(delivered, "Delivered to Customer"), delivered, "purple", true),
+    missingPart: makeNode("missingPart", labelFor(statusFor(["MISSING_PART"]), "Missing Part"), statusFor(["MISSING_PART"]), "blue"),
+    partAvailable: makeNode("partAvailable", labelFor(statusFor(["PART_AVAILABLE"]), "Part Available"), statusFor(["PART_AVAILABLE"]), "blue"),
+    approvalPending: makeNode("approvalPending", labelFor(statusFor(["CUSTOMER_APPROVAL_PENDING"]), "Customer Approval Pending"), statusFor(["CUSTOMER_APPROVAL_PENDING"]), "orange"),
+    customerDeclined: makeNode("customerDeclined", labelFor(statusFor(["CUSTOMER_DECLINED", "CUSTOMER_DECLINED_REPAIR"]), "Customer Declined"), statusFor(["CUSTOMER_DECLINED", "CUSTOMER_DECLINED_REPAIR"]), "orange"),
+    cancelledPending: makeNode("cancelledPending", labelFor(statusFor(["CANCELLED_PENDING_DELIVERY"]), "Cancelled Pending Delivery"), statusFor(["CANCELLED_PENDING_DELIVERY"]), "orange"),
+    inWarranty: makeNode("inWarranty", labelFor(statusFor(["IN_WARRANTY"]), "In Warranty"), statusFor(["IN_WARRANTY"]), "green"),
+    warrantyLogged: makeNode("warrantyLogged", labelFor(statusFor(["WARRANTY_COMPLAINT_LOGGED"]), "Warranty Complaint Logged"), statusFor(["WARRANTY_COMPLAINT_LOGGED"]), "green"),
   };
 
   const transitionFor = (from, to, fallbackLabel) => {
@@ -712,7 +713,7 @@ function getWorkflowStory(statuses, transitions) {
       id: `${from.id}-${to.id}`,
       from: from.id,
       to: to.id,
-      label: fallbackLabel,
+      label: transition?.displayName || fallbackLabel,
       transition,
     };
   };
@@ -826,6 +827,7 @@ function WorkflowMapView({
   transitions,
   selectedItem,
   onSelectItem,
+  selectedCategory,
 }) {
   const [activeFilter, setActiveFilter] = useState("all");
   const story = useMemo(() => getWorkflowStory(statuses, transitions), [statuses, transitions]);
@@ -837,7 +839,10 @@ function WorkflowMapView({
     { id: "warranty", label: "Warranty" },
     { id: "declined", label: "Declined" },
   ];
-  const visibleGroups = activeFilter === "all" ? story.groups.filter((group) => group.id !== "declined") : story.groups.filter((group) => group.id === activeFilter);
+  const configuredGroups = story.groups.filter((group) => group.edges.some((edge) => edge.transition));
+  const visibleGroups = activeFilter === "all"
+    ? configuredGroups.filter((group) => group.id !== "declined")
+    : configuredGroups.filter((group) => group.id === activeFilter);
   const isNodeSelected = (node) => selectedItem?.type === "story-status" && selectedItem.data.id === node.id;
   const isEdgeSelected = (edge) => selectedItem?.type === "transition" && edge.transition && String(selectedItem.data.id) === String(edge.transition.id);
   const sectionTone = {
@@ -865,6 +870,16 @@ function WorkflowMapView({
         ))}
       </div>
       <div className="space-y-5 overflow-hidden">
+        {configuredGroups.length === 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-sm font-semibold text-amber-900">
+            No active configured workflow transitions are enabled for {selectedCategory?.displayName || "the selected category"}.
+          </div>
+        )}
+        {configuredGroups.length > 0 && visibleGroups.length === 0 && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-700">
+            No active configured transitions match this filter for {selectedCategory?.displayName || "the selected category"}.
+          </div>
+        )}
         {visibleGroups.map((group) => (
           <section
             key={group.id}
@@ -922,6 +937,7 @@ function MapDetailPanel({
   roleRulesByTransitionId,
   managedRoles,
   actionByKey,
+  configuredTransitions,
   onOpenStatusForm,
   onOpenTransitionForm,
   onRequestMetadataStateChange,
@@ -933,6 +949,13 @@ function MapDetailPanel({
   isSavingRule,
   isSavingWorkflowMode,
 }) {
+  const configuredActionsFromStatus = (statusKey) => {
+    if (!statusKey) return [];
+    return configuredTransitions
+      .filter((transition) => String(transition.fromStatusKey || transition.fromStatus).toUpperCase() === String(statusKey).toUpperCase())
+      .map((transition) => transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey));
+  };
+
   const renderAdvancedWorkflowControls = () => (
     <MapDisclosureSection title="Advanced Controls">
       <div className="flex flex-col gap-2">
@@ -967,7 +990,7 @@ function MapDetailPanel({
 
         <MapPanelSection title="Available Next Actions">
           <ul className="space-y-3 text-sm font-semibold text-slate-700">
-            {["Mark Repair Completed", "Mark Missing Part", "Need Customer Approval", "Mark In Warranty"].map((action) => (
+            {(configuredActionsFromStatus("IN_PROGRESS").length > 0 ? configuredActionsFromStatus("IN_PROGRESS") : ["No configured next action"]).map((action) => (
               <li key={action} className="flex items-center gap-3">
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-600" aria-hidden="true" />
                 {action}
@@ -993,25 +1016,10 @@ function MapDetailPanel({
   if (selectedItem.type === "story-status") {
     const node = selectedItem.data;
     const status = node.status;
-    const visualActions = node.id === "inProgress"
-      ? ["Mark Repair Completed", "Mark Missing Part", "Need Customer Approval", "Mark In Warranty"]
-      : node.id === "repairCompleted"
-        ? ["Deliver To Customer"]
-        : node.id === "missingPart"
-          ? ["Mark Part Available"]
-          : node.id === "partAvailable"
-            ? ["Resume Work"]
-            : node.id === "approvalPending"
-              ? ["Customer Approved", "Customer Declined Repair"]
-              : node.id === "customerDeclined"
-                ? ["Cancel Pending Delivery"]
-                : node.id === "inWarranty"
-                  ? ["Log Warranty Complaint"]
-                : node.id === "warrantyLogged"
-                  ? ["Mark Repair Completed"]
-                  : node.terminal
-                    ? ["No next action"]
-                      : ["Select a connected transition"];
+    const visualActions = status?.statusKey
+      ? configuredActionsFromStatus(status.statusKey)
+      : [];
+    const displayActions = visualActions.length > 0 ? visualActions : [node.terminal ? "No next action" : "No configured next action"];
 
     return (
       <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
@@ -1023,7 +1031,7 @@ function MapDetailPanel({
 
         <MapPanelSection title="Available Next Actions">
           <ul className="space-y-3 text-sm font-semibold text-slate-700">
-            {visualActions.map((action) => (
+            {displayActions.map((action) => (
               <li key={action} className="flex items-center gap-3">
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-600" aria-hidden="true" />
                 {action}
@@ -1367,6 +1375,34 @@ export default function WorkflowManagement() {
     [transitions]
   );
 
+  const configuredTransitions = useMemo(
+    () => transitions.filter((transition) => {
+      if (!transition.active || !selectedCategoryId) return false;
+      const rules = categoryRulesByTransitionId[transition.id] || [];
+      return rules.some((rule) => String(rule.categoryId) === String(selectedCategoryId) && rule.active);
+    }),
+    [categoryRulesByTransitionId, selectedCategoryId, transitions]
+  );
+
+  const configuredStatusIds = useMemo(() => {
+    const ids = new Set();
+    configuredTransitions.forEach((transition) => {
+      ids.add(String(transition.fromStatusId));
+      ids.add(String(transition.toStatusId));
+    });
+    return ids;
+  }, [configuredTransitions]);
+
+  const configuredStatuses = useMemo(
+    () => statuses.filter((status) => configuredStatusIds.has(String(status.id))),
+    [configuredStatusIds, statuses]
+  );
+
+  const configuredActionCount = useMemo(
+    () => new Set(configuredTransitions.map((transition) => transition.actionKey)).size,
+    [configuredTransitions]
+  );
+
   const editableTransitions = useMemo(
     () => transitions.filter((transition) => !isProtectedTransition(transition)),
     [transitions]
@@ -1405,14 +1441,18 @@ export default function WorkflowManagement() {
   const readyToActivate = Boolean(validationForSelectedCategory && validationResult.readyToActivate && blockingIssueCount === 0);
   const activationTargetConfig = { workflowMode: "DB_CONFIGURED", dbWorkflowEnabled: true, fixedActionsEnabled: false };
   const rollbackTargetConfig = { workflowMode: "LEGACY_FIXED", dbWorkflowEnabled: false, fixedActionsEnabled: true };
-  const workflowStory = useMemo(() => getWorkflowStory(statuses, transitions), [statuses, transitions]);
-  const terminalStatusLabel = workflowStory.nodes.delivered.label;
+  const workflowStory = useMemo(() => getWorkflowStory(configuredStatuses.length > 0 ? configuredStatuses : statuses, configuredTransitions), [configuredStatuses, configuredTransitions, statuses]);
+  const configuredTerminalStatus = configuredStatuses.find((status) => status.terminal);
+  const terminalStatusLabel = configuredTerminalStatus?.displayName || (configuredTransitions.length > 0 ? workflowStory.nodes.delivered.label : "Not configured");
   const workflowModeLabel = categoryWorkflowConfig?.workflowMode === "DB_CONFIGURED" || categoryWorkflowConfig?.dbWorkflowEnabled ? "DB Configured" : categoryWorkflowConfig?.workflowMode ? formatLabel(categoryWorkflowConfig.workflowMode) : "Not loaded";
+  const workflowStatusLabel = categoryWorkflowConfig?.dbWorkflowEnabled
+    ? configuredTransitions.length > 0 ? "Active in Test" : "No Active Paths"
+    : "Validation Needed";
   const summaryTiles = [
     { label: "Mode", value: workflowModeLabel, icon: Database, tone: "text-blue-600" },
-    { label: "Status", value: categoryWorkflowConfig?.dbWorkflowEnabled ? "Active in Test" : "Validation Needed", icon: CheckCircle2, tone: categoryWorkflowConfig?.dbWorkflowEnabled ? "text-emerald-600" : "text-amber-600" },
-    { label: "Total Statuses", value: statuses.length || 11, icon: Layers3, tone: "text-violet-600" },
-    { label: "Total Actions", value: actions.length || 12, icon: Zap, tone: "text-blue-600" },
+    { label: "Status", value: workflowStatusLabel, icon: CheckCircle2, tone: categoryWorkflowConfig?.dbWorkflowEnabled && configuredTransitions.length > 0 ? "text-emerald-600" : "text-amber-600" },
+    { label: "Total Statuses", value: configuredStatuses.length, icon: Layers3, tone: "text-violet-600" },
+    { label: "Total Actions", value: configuredActionCount, icon: Zap, tone: "text-blue-600" },
     { label: "Terminal Status", value: terminalStatusLabel, icon: Flag, tone: "text-orange-600" },
   ];
 
@@ -1620,6 +1660,7 @@ export default function WorkflowManagement() {
       loadCategoryConfig(selectedCategoryId);
       setValidationResult(null);
       setPendingWorkflowModeChange(null);
+      setSelectedMapItem(null);
     }, 0);
 
     return () => window.clearTimeout(timeoutId);
@@ -2344,9 +2385,9 @@ export default function WorkflowManagement() {
               <div className="min-w-0 space-y-3">
                 <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex flex-wrap gap-2">
-                    <Badge tone="blue">{statuses.length} Statuses</Badge>
-                    <Badge tone="green">{actions.length} Actions</Badge>
-                    <Badge tone="yellow">{transitions.length} Transitions</Badge>
+                    <Badge tone="blue">{configuredStatuses.length} Configured Statuses</Badge>
+                    <Badge tone="green">{configuredActionCount} Configured Actions</Badge>
+                    <Badge tone="yellow">{configuredTransitions.length} Configured Transitions</Badge>
                     <Badge tone="slate">{roles.length} Roles</Badge>
                     <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>{blockingIssueCount} Blockers</Badge>
                     <Badge tone={warningCount > 0 ? "yellow" : "green"}>{warningCount} Warnings</Badge>
@@ -2392,9 +2433,10 @@ export default function WorkflowManagement() {
 
                 <WorkflowMapView
                   statuses={statuses}
-                  transitions={transitions}
+                  transitions={configuredTransitions}
                   selectedItem={selectedMapItem}
                   onSelectItem={setSelectedMapItem}
+                  selectedCategory={selectedCategory}
                   actionByKey={actionByKey}
                   categoryRulesByTransitionId={categoryRulesByTransitionId}
                   selectedCategoryId={selectedCategoryId}
@@ -2422,6 +2464,7 @@ export default function WorkflowManagement() {
                 roleRulesByTransitionId={roleRulesByTransitionId}
                 managedRoles={managedRoles}
                 actionByKey={actionByKey}
+                configuredTransitions={configuredTransitions}
                 onOpenStatusForm={openStatusForm}
                 onOpenTransitionForm={openTransitionForm}
                 onRequestMetadataStateChange={requestMetadataStateChange}

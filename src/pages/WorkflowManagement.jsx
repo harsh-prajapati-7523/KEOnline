@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  BarChart3,
   CheckCircle2,
-  ClipboardList,
   Database,
-  FileText,
   Flag,
-  GitBranch,
   Home,
   LayoutDashboard,
   Layers3,
-  Pencil,
   RefreshCw,
-  Settings,
   Users,
   Workflow,
   XCircle,
@@ -26,6 +20,8 @@ const tabs = [
   { id: "statuses", label: "Statuses" },
   { id: "actions", label: "Actions" },
   { id: "transitions", label: "Transitions" },
+  { id: "roleAccess", label: "Role Access" },
+  { id: "validation", label: "Validation" },
 ];
 
 const managedRoleKeys = ["SUPER_ADMIN", "ADMIN", "TECHNICIAN"];
@@ -1356,7 +1352,6 @@ export default function WorkflowManagement() {
   const [roleAccessByRoleId, setRoleAccessByRoleId] = useState({});
   const [validationResult, setValidationResult] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingCategory, setIsLoadingCategory] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isSavingRule, setIsSavingRule] = useState(false);
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
@@ -1650,15 +1645,12 @@ export default function WorkflowManagement() {
       return;
     }
 
-    setIsLoadingCategory(true);
     try {
       const response = await fetch(`/volt/ticket-categories/${categoryId}/workflow-config`, { headers: authHeaders() });
       if (!response.ok) throw new Error("Unable to load category workflow config.");
       setCategoryWorkflowConfig(await response.json());
     } catch {
       setCategoryWorkflowConfig(null);
-    } finally {
-      setIsLoadingCategory(false);
     }
   }, []);
 
@@ -2210,13 +2202,7 @@ export default function WorkflowManagement() {
   const sidebarItems = [
     { label: "Dashboard", icon: LayoutDashboard, onClick: () => navigate("/employee-dashboard") },
     { label: "Workflows", icon: Workflow, active: true },
-    { label: "Statuses", icon: ClipboardList, onClick: () => setActiveTab("statuses") },
-    { label: "Actions", icon: Pencil, onClick: () => setActiveTab("actions") },
-    { label: "Transitions", icon: GitBranch, onClick: () => setActiveTab("transitions") },
-    { label: "Reports", icon: BarChart3 },
-    { label: "Settings", icon: Settings },
     { label: "Users", icon: Users, onClick: () => navigate("/admin/employees") },
-    { label: "Audit Logs", icon: FileText },
   ];
 
   return (
@@ -2325,57 +2311,6 @@ export default function WorkflowManagement() {
           })}
         </section>
 
-        <details className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3" aria-label="Activation readiness">
-          <summary className="cursor-pointer list-none">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-extrabold uppercase text-slate-500">Activation Readiness</span>
-                <Badge tone="blue">Mode: {categoryWorkflowConfig?.workflowMode || "Not loaded"}</Badge>
-                {isLoadingCategory && <Badge tone="yellow">Loading config</Badge>}
-                <StateBadge enabled={Boolean(categoryWorkflowConfig?.dbWorkflowEnabled)} trueLabel="DB enabled" falseLabel="DB disabled" />
-                <Badge tone={readyToActivate ? "green" : "yellow"}>{readyToActivate ? "Ready" : "Validation Needed"}</Badge>
-                <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>{blockingIssueCount} Blockers</Badge>
-              </div>
-              <span className="text-xs font-bold text-slate-500">Open advanced controls</span>
-            </div>
-          </summary>
-          <div className="mt-3 flex flex-col gap-3 border-t border-slate-200 pt-3 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap gap-2">
-                <Badge tone="blue">Category: {selectedCategory?.displayName || "Select category"}</Badge>
-                <Badge tone="slate">Key: {selectedCategory?.categoryKey || "Not selected"}</Badge>
-                <StateBadge enabled={Boolean(categoryWorkflowConfig?.fixedActionsEnabled)} trueLabel="Fixed enabled" falseLabel="Fixed disabled" />
-                <Badge tone={readyToActivate ? "green" : "yellow"}>readyToActivate: {readyToActivate ? "true" : "false"}</Badge>
-                <Badge tone={warningCount > 0 ? "yellow" : "slate"}>Warnings: {warningCount}</Badge>
-              </div>
-              <p className="mt-2 text-xs font-semibold text-slate-600">
-                Updated: {formatDateTime(categoryWorkflowConfig?.workflowModeUpdatedAt)} / {categoryWorkflowConfig?.workflowModeUpdatedByEmployeeId || "Unknown"}
-              </p>
-              {!validationForSelectedCategory && (
-                <p className="mt-2 text-sm font-bold text-yellow-800">Run Validation before activation.</p>
-              )}
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
-              <button
-                type="button"
-                onClick={() => requestWorkflowModeChange(activationTargetConfig)}
-                disabled={!selectedCategoryId || !readyToActivate || categoryWorkflowConfig?.workflowMode === "DB_CONFIGURED" || isSavingWorkflowMode}
-                className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
-              >
-                Activate DB Workflow
-              </button>
-              <button
-                type="button"
-                onClick={() => requestWorkflowModeChange(rollbackTargetConfig)}
-                disabled={!selectedCategoryId || !categoryWorkflowConfig || categoryWorkflowConfig.workflowMode === "LEGACY_FIXED" || isSavingWorkflowMode}
-                className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
-              >
-                Rollback to Legacy
-              </button>
-            </div>
-          </div>
-        </details>
-
         <nav className="mt-4 overflow-x-auto border-b border-slate-200" aria-label="Workflow tabs">
           <div className="flex min-w-max items-end gap-6">
             {tabs.map((tab) => (
@@ -2392,8 +2327,6 @@ export default function WorkflowManagement() {
                 {tab.label}
               </button>
             ))}
-            <button type="button" onClick={() => setActiveTab("roleAccess")} className="sr-only">Role Access</button>
-            <button type="button" onClick={() => setActiveTab("validation")} className="sr-only">Validation</button>
           </div>
         </nav>
 
@@ -2401,54 +2334,6 @@ export default function WorkflowManagement() {
           {activeTab === "map" && (
             <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_22rem]">
               <div className="min-w-0 space-y-3">
-                <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge tone="blue">{configuredStatuses.length} Configured Statuses</Badge>
-                    <Badge tone="green">{configuredActionCount} Configured Actions</Badge>
-                    <Badge tone="yellow">{configuredTransitions.length} Configured Transitions</Badge>
-                    <Badge tone="slate">{roles.length} Roles</Badge>
-                    <Badge tone={blockingIssueCount > 0 ? "red" : "green"}>{blockingIssueCount} Blockers</Badge>
-                    <Badge tone={warningCount > 0 ? "yellow" : "green"}>{warningCount} Warnings</Badge>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("transitions")}
-                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
-                    >
-                      Manage Transitions
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("statuses")}
-                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
-                    >
-                      Manage Statuses
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("actions")}
-                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
-                    >
-                      Manage Actions
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("validation")}
-                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
-                    >
-                      Validation
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("roleAccess")}
-                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
-                    >
-                      Role Access
-                    </button>
-                  </div>
-                </div>
-
                 <WorkflowMapView
                   statuses={statuses}
                   transitions={configuredTransitions}

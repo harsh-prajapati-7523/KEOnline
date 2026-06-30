@@ -374,7 +374,7 @@ function EntityFormModal({ formState, onCancel, onChange, onSubmit, isSaving, er
   );
 }
 
-function TransitionFormModal({ formState, statuses, actions, selectedCategory, onCancel, onChange, onSubmit, isSaving }) {
+function TransitionFormModal({ formState, statuses, actions, selectedCategory, onCancel, onChange, onSubmit, isSaving, error }) {
   if (!formState) return null;
 
   const { mode, values, original } = formState;
@@ -389,6 +389,12 @@ function TransitionFormModal({ formState, statuses, actions, selectedCategory, o
           <p className="text-xs font-extrabold uppercase text-slate-500">Workflow Transition</p>
           <h2 className="mt-1 text-lg font-extrabold text-blue-950">{isCreate ? "Create Custom Transition" : "Edit Transition Metadata"}</h2>
         </div>
+
+        {error && (
+          <div className="mx-5 mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-800">
+            {error}
+          </div>
+        )}
 
         <div className="grid gap-4 px-5 py-4 sm:grid-cols-2">
           {isCreate ? (
@@ -1407,6 +1413,7 @@ export default function WorkflowManagement() {
   const [metadataFormError, setMetadataFormError] = useState("");
   const [pendingMetadataChange, setPendingMetadataChange] = useState(null);
   const [transitionForm, setTransitionForm] = useState(null);
+  const [transitionFormError, setTransitionFormError] = useState("");
   const [pendingTransitionChange, setPendingTransitionChange] = useState(null);
   const [pendingWorkflowModeChange, setPendingWorkflowModeChange] = useState(null);
   const [selectedMapItem, setSelectedMapItem] = useState(null);
@@ -1723,6 +1730,7 @@ export default function WorkflowManagement() {
     setPendingRuleChange(null);
     setPendingTransitionChange(null);
     setTransitionForm(null);
+    setTransitionFormError("");
     setSelectedMapItem(null);
     setDrawerItem(null);
     setError("");
@@ -1881,6 +1889,7 @@ export default function WorkflowManagement() {
   const openTransitionForm = (transition = null) => {
     if (transition && isProtectedTransition(transition)) return;
     setError("");
+    setTransitionFormError("");
     setStatusMessage("");
     setTransitionForm({
       mode: transition ? "edit" : "create",
@@ -1899,6 +1908,7 @@ export default function WorkflowManagement() {
   };
 
   const updateTransitionForm = (field, value) => {
+    setTransitionFormError("");
     setTransitionForm((current) => current ? {
       ...current,
       values: {
@@ -1908,11 +1918,47 @@ export default function WorkflowManagement() {
     } : current);
   };
 
-  const hasDuplicateTransition = (values) => transitions.some((transition) => (
+  const findDuplicateTransition = (values) => transitions.find((transition) => (
     String(transition.fromStatusId) === String(values.fromStatusId)
       && String(transition.toStatusId) === String(values.toStatusId)
       && transition.actionKey === values.actionKey
   ));
+
+  const attachExistingTransitionToSelectedCategory = async (transition) => {
+    if (!transition?.id || !selectedCategory?.id) return false;
+
+    const categoryName = selectedCategory.displayName || selectedCategory.categoryKey || "the selected category";
+    const existingRule = (categoryRulesByTransitionId[transition.id] || [])
+      .find((rule) => String(rule.categoryId) === String(selectedCategory.id));
+
+    if (existingRule?.active) {
+      setTransitionFormError(`This transition already exists and is already enabled for ${categoryName}. Use the Selected Category Transitions list to edit it.`);
+      return false;
+    }
+
+    const endpoint = `/volt/workflow/transitions/${transition.id}/category-rules`;
+    const response = existingRule
+      ? await fetch(`${endpoint}/${existingRule.id}`, {
+          method: "PATCH",
+          headers: authHeaders(true),
+          body: JSON.stringify({ active: true }),
+        })
+      : await fetch(endpoint, {
+          method: "POST",
+          headers: authHeaders(true),
+          body: JSON.stringify({ categoryId: Number(selectedCategory.id), active: true }),
+        });
+
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Transition already exists, but the category rule could not be enabled."));
+    }
+
+    setTransitionForm(null);
+    setPendingTransitionChange(null);
+    await refreshTransitionsAndValidate(`Existing workflow transition enabled for ${categoryName}. Validation refreshed.`);
+    openTransitionDrawer(transition);
+    return true;
+  };
 
   const buildTransitionPayload = (values, includeCreateOnly) => ({
     ...(includeCreateOnly ? {
@@ -1927,15 +1973,33 @@ export default function WorkflowManagement() {
 
   const saveTransitionForm = async (change = transitionForm) => {
     if (!change) return;
+    if (isSavingTransition) return;
     const isCreate = change.mode === "create";
+    const duplicateTransition = isCreate ? findDuplicateTransition(change.values) : null;
 
-    if (isCreate && hasDuplicateTransition(change.values)) {
-      setError("Workflow transition already exists for the selected source status, action, and target status.");
+    if (duplicateTransition) {
+      if (!change.values.enableForSelectedCategory || !selectedCategory?.id) {
+        setTransitionFormError("This workflow transition already exists. Use the Available / Global Transitions section to enable it for the selected category instead of creating a duplicate.");
+        return;
+      }
+
+      setIsSavingTransition(true);
+      setError("");
+      setTransitionFormError("");
+      setStatusMessage("");
+      try {
+        await attachExistingTransitionToSelectedCategory(duplicateTransition);
+      } catch (saveError) {
+        setTransitionFormError(saveError.message || "Transition already exists, but the category rule could not be enabled.");
+      } finally {
+        setIsSavingTransition(false);
+      }
       return;
     }
 
     setIsSavingTransition(true);
     setError("");
+    setTransitionFormError("");
     setStatusMessage("");
     try {
       const response = await fetch(isCreate ? "/volt/workflow/transitions" : `/volt/workflow/transitions/${change.original.id}`, {
@@ -1980,7 +2044,7 @@ export default function WorkflowManagement() {
         openTransitionDrawer(savedTransition);
       }
     } catch (saveError) {
-      setError(saveError.message || "Unable to save workflow transition.");
+      setTransitionFormError(saveError.message || "Unable to save workflow transition.");
       try {
         await loadTransitionsAndRules();
       } catch {
@@ -1994,6 +2058,7 @@ export default function WorkflowManagement() {
   const submitTransitionForm = (event) => {
     event.preventDefault();
     if (!transitionForm) return;
+    if (isSavingTransition) return;
     saveTransitionForm(transitionForm);
   };
 
@@ -3212,10 +3277,14 @@ export default function WorkflowManagement() {
         statuses={statuses}
         actions={actions}
         selectedCategory={selectedCategory}
-        onCancel={() => setTransitionForm(null)}
+        onCancel={() => {
+          setTransitionForm(null);
+          setTransitionFormError("");
+        }}
         onChange={updateTransitionForm}
         onSubmit={submitTransitionForm}
         isSaving={isSavingTransition}
+        error={transitionFormError}
       />
       <ConfirmTransitionChangeDialog
         pendingChange={pendingTransitionChange}

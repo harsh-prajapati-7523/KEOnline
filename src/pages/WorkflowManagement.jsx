@@ -853,26 +853,28 @@ function WorkflowMapView({
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-5 flex flex-wrap gap-3">
-        {filterChips.map((chip) => (
-          <button
-            key={chip.id}
-            type="button"
-            onClick={() => setActiveFilter(chip.id)}
-            className={`min-h-10 rounded-lg border px-4 py-2 text-sm font-bold transition ${
-              activeFilter === chip.id
-                ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-700"
-            }`}
-          >
-            {chip.label}
-          </button>
-        ))}
-      </div>
       <div className="space-y-5 overflow-hidden">
         {configuredGroups.length === 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-sm font-semibold text-amber-900">
             No active configured workflow transitions are enabled for {selectedCategory?.displayName || "the selected category"}.
+          </div>
+        )}
+        {configuredGroups.length > 0 && (
+          <div className="flex flex-wrap gap-3">
+            {filterChips.map((chip) => (
+              <button
+                key={chip.id}
+                type="button"
+                onClick={() => setActiveFilter(chip.id)}
+                className={`min-h-10 rounded-lg border px-4 py-2 text-sm font-bold transition ${
+                  activeFilter === chip.id
+                    ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-700"
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
           </div>
         )}
         {configuredGroups.length > 0 && visibleGroups.length === 0 && (
@@ -1445,7 +1447,9 @@ export default function WorkflowManagement() {
   const configuredTerminalStatus = configuredStatuses.find((status) => status.terminal);
   const terminalStatusLabel = configuredTerminalStatus?.displayName || (configuredTransitions.length > 0 ? workflowStory.nodes.delivered.label : "Not configured");
   const workflowModeLabel = categoryWorkflowConfig?.workflowMode === "DB_CONFIGURED" || categoryWorkflowConfig?.dbWorkflowEnabled ? "DB Configured" : categoryWorkflowConfig?.workflowMode ? formatLabel(categoryWorkflowConfig.workflowMode) : "Not loaded";
-  const workflowStatusLabel = categoryWorkflowConfig?.dbWorkflowEnabled
+  const workflowStatusLabel = categoryWorkflowConfig?.workflowMode === "LEGACY_FIXED"
+    ? "Legacy Fixed"
+    : categoryWorkflowConfig?.dbWorkflowEnabled
     ? configuredTransitions.length > 0 ? "Active in Test" : "No Active Paths"
     : "Validation Needed";
   const summaryTiles = [

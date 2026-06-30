@@ -796,6 +796,78 @@ function getWorkflowStory(statuses, transitions) {
   return { nodes, groups };
 }
 
+function getGenericWorkflowStory(statuses, transitions, actionByKey = {}) {
+  const statusMap = new Map();
+  statuses.forEach((status) => {
+    if (status?.id != null) statusMap.set(String(status.id), status);
+  });
+
+  transitions.forEach((transition) => {
+    if (!statusMap.has(String(transition.fromStatusId))) {
+      statusMap.set(String(transition.fromStatusId), {
+        id: transition.fromStatusId,
+        statusKey: transition.fromStatusKey || transition.fromStatus,
+        displayName: transition.fromStatusDisplayName || formatLabel(transition.fromStatusKey || transition.fromStatus),
+        terminal: false,
+      });
+    }
+    if (!statusMap.has(String(transition.toStatusId))) {
+      statusMap.set(String(transition.toStatusId), {
+        id: transition.toStatusId,
+        statusKey: transition.toStatusKey || transition.toStatus,
+        displayName: transition.toStatusDisplayName || formatLabel(transition.toStatusKey || transition.toStatus),
+        terminal: Boolean(transition.toStatusTerminal),
+      });
+    }
+  });
+
+  const incomingIds = new Set(transitions.map((transition) => String(transition.toStatusId)));
+  const outgoingIds = new Set(transitions.map((transition) => String(transition.fromStatusId)));
+  const statusOrder = [...statusMap.values()].sort((first, second) => {
+    const firstIsStart = outgoingIds.has(String(first.id)) && !incomingIds.has(String(first.id));
+    const secondIsStart = outgoingIds.has(String(second.id)) && !incomingIds.has(String(second.id));
+    if (firstIsStart !== secondIsStart) return firstIsStart ? -1 : 1;
+    return (first.sortOrder ?? 999) - (second.sortOrder ?? 999) || String(first.statusKey || first.id).localeCompare(String(second.statusKey || second.id));
+  });
+
+  const nodes = statusOrder.map((status, index) => ({
+    id: `generic-${status.id ?? status.statusKey ?? index}`,
+    label: status.displayName || formatLabel(status.statusKey),
+    status,
+    tone: status.terminal ? "purple" : index === statusOrder.length - 1 ? "green" : "blue",
+    terminal: Boolean(status.terminal),
+  }));
+
+  const edgesByFromId = new Map();
+  transitions.forEach((transition) => {
+    const edge = {
+      id: `generic-edge-${transition.id ?? `${transition.fromStatusId}-${transition.actionKey}-${transition.toStatusId}`}`,
+      from: String(transition.fromStatusId),
+      to: String(transition.toStatusId),
+      label: transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey),
+      transition,
+    };
+    const current = edgesByFromId.get(edge.from) || [];
+    current.push(edge);
+    edgesByFromId.set(edge.from, current);
+  });
+
+  const orderedEdges = nodes.slice(0, -1).map((node, index) => {
+    const nextNode = nodes[index + 1];
+    const edges = edgesByFromId.get(String(node.status?.id)) || [];
+    return edges.find((edge) => edge.to === String(nextNode?.status?.id)) || edges[0] || null;
+  });
+
+  return {
+    groups: [{
+      id: "configured",
+      label: "Configured Workflow",
+      nodes,
+      edges: orderedEdges,
+    }],
+  };
+}
+
 function statusMatchesTransition(status, transition) {
   if (!status || !transition) return false;
   const statusId = String(status.id);
@@ -852,6 +924,7 @@ function WorkflowMapView({
   statuses,
   transitions,
   configuredTransitionCount,
+  actionByKey,
   selectedItem,
   onSelectItem,
   selectedCategory,
@@ -860,6 +933,7 @@ function WorkflowMapView({
 }) {
   const [activeFilter, setActiveFilter] = useState("all");
   const story = useMemo(() => getWorkflowStory(statuses, transitions), [statuses, transitions]);
+  const genericStory = useMemo(() => getGenericWorkflowStory(statuses, transitions, actionByKey), [actionByKey, statuses, transitions]);
   useEffect(() => {
     setActiveFilter("all");
   }, [selectedCategory?.id]);
@@ -872,9 +946,11 @@ function WorkflowMapView({
     { id: "declined", label: "Declined" },
   ];
   const configuredGroups = story.groups.filter((group) => group.edges.some((edge) => edge.transition));
+  const mapGroups = configuredGroups.length > 0 ? configuredGroups : genericStory.groups.filter((group) => group.nodes.length > 0);
+  const isGenericMap = configuredGroups.length === 0 && mapGroups.length > 0;
   const visibleGroups = activeFilter === "all"
-    ? configuredGroups.filter((group) => group.id !== "declined")
-    : configuredGroups.filter((group) => group.id === activeFilter);
+    ? mapGroups.filter((group) => group.id !== "declined")
+    : mapGroups.filter((group) => group.id === activeFilter);
   const isNodeSelected = (node) => selectedItem?.type === "story-status" && selectedItem.data.id === node.id;
   const isEdgeSelected = (edge) => selectedItem?.type === "transition" && edge.transition && String(selectedItem.data.id) === String(edge.transition.id);
   const sectionTone = {
@@ -896,12 +972,12 @@ function WorkflowMapView({
             This category is currently LEGACY_FIXED. {configuredTransitionCount > 0 ? `${configuredTransitionCount} configured category transition${configuredTransitionCount === 1 ? " is" : "s are"} available for setup/review in the tabs. ` : ""}The active DB workflow map will be available after DB workflow activation.
           </div>
         )}
-        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && configuredGroups.length === 0 && (
+        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && mapGroups.length === 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-5 text-sm font-semibold text-amber-900">
             No workflow transitions are configured for this category yet. Create transitions and enable category rules to build this category workflow.
           </div>
         )}
-        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && configuredGroups.length > 0 && (
+        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && mapGroups.length > 0 && !isGenericMap && (
           <div className="flex flex-wrap gap-3">
             {filterChips.map((chip) => (
               <button
@@ -919,7 +995,12 @@ function WorkflowMapView({
             ))}
           </div>
         )}
-        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && configuredGroups.length > 0 && visibleGroups.length === 0 && (
+        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && mapGroups.length > 0 && isGenericMap && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-950">
+            Showing configured category workflow path from active selected-category transitions.
+          </div>
+        )}
+        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && mapGroups.length > 0 && visibleGroups.length === 0 && (
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-700">
             No active configured transitions match this filter for {selectedCategory?.displayName || "the selected category"}.
           </div>
@@ -2628,12 +2709,12 @@ export default function WorkflowManagement() {
                   statuses={categoryWorkflowStatuses}
                   transitions={categoryWorkflowTransitions}
                   configuredTransitionCount={selectedCategoryConfiguredTransitions.length}
+                  actionByKey={actionByKey}
                   selectedItem={selectedMapItem}
                   onSelectItem={setSelectedMapItem}
                   selectedCategory={selectedCategory}
                   isLegacyWorkflowMode={isLegacyWorkflowMode}
                   isLoadingCategoryWorkflow={isLoadingCategoryWorkflow}
-                  actionByKey={actionByKey}
                   categoryRulesByTransitionId={categoryRulesByTransitionId}
                   selectedCategoryId={selectedCategoryId}
                 />

@@ -982,17 +982,23 @@ function MapDetailPanel({
   );
 
   if (!selectedItem) {
+    const hasConfiguredTransitions = configuredTransitions.length > 0;
+    const defaultStatusLabel = hasConfiguredTransitions ? "In Progress" : "No configured status";
+    const defaultActions = hasConfiguredTransitions
+      ? configuredActionsFromStatus("IN_PROGRESS")
+      : ["No configured workflow transitions"];
+
     return (
       <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
         <MapPanelSection title="Status Details">
           <div className="rounded-lg border border-blue-300 bg-blue-50 px-3 py-4 text-sm font-bold text-blue-950">
-            Status: <span className="text-blue-700">In Progress</span>
+            Status: <span className="text-blue-700">{defaultStatusLabel}</span>
           </div>
         </MapPanelSection>
 
         <MapPanelSection title="Available Next Actions">
           <ul className="space-y-3 text-sm font-semibold text-slate-700">
-            {(configuredActionsFromStatus("IN_PROGRESS").length > 0 ? configuredActionsFromStatus("IN_PROGRESS") : ["No configured next action"]).map((action) => (
+            {(defaultActions.length > 0 ? defaultActions : ["No configured next action"]).map((action) => (
               <li key={action} className="flex items-center gap-3">
                 <span className="h-1.5 w-1.5 rounded-full bg-blue-600" aria-hidden="true" />
                 {action}
@@ -2267,7 +2273,10 @@ export default function WorkflowManagement() {
                   Category
                   <select
                     value={selectedCategoryId}
-                    onChange={(event) => setSelectedCategoryId(event.target.value)}
+                    onChange={(event) => {
+                      setSelectedMapItem(null);
+                      setSelectedCategoryId(event.target.value);
+                    }}
                     className="min-h-10 min-w-60 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950"
                   >
                     {categories.length === 0 && <option value="">No categories available</option>}

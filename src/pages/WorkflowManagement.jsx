@@ -263,7 +263,7 @@ function textInputClass() {
   return "min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950 disabled:bg-slate-100 disabled:text-slate-500";
 }
 
-function EntityFormModal({ formState, onCancel, onChange, onSubmit, isSaving }) {
+function EntityFormModal({ formState, onCancel, onChange, onSubmit, isSaving, error }) {
   if (!formState) return null;
 
   const { entityType, mode, values, original } = formState;
@@ -280,6 +280,11 @@ function EntityFormModal({ formState, onCancel, onChange, onSubmit, isSaving }) 
         </div>
 
         <div className="grid gap-4 px-5 py-4 sm:grid-cols-2">
+          {error && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 sm:col-span-2" role="alert">
+              {error}
+            </div>
+          )}
           {isStatus ? (
             <>
               <FormField label="Display Name">
@@ -1362,6 +1367,7 @@ export default function WorkflowManagement() {
   const [drawerItem, setDrawerItem] = useState(null);
   const [pendingRuleChange, setPendingRuleChange] = useState(null);
   const [metadataForm, setMetadataForm] = useState(null);
+  const [metadataFormError, setMetadataFormError] = useState("");
   const [pendingMetadataChange, setPendingMetadataChange] = useState(null);
   const [transitionForm, setTransitionForm] = useState(null);
   const [pendingTransitionChange, setPendingTransitionChange] = useState(null);
@@ -1962,6 +1968,7 @@ export default function WorkflowManagement() {
   const openStatusForm = (status = null) => {
     if (status && isProtectedStatus(status)) return;
     setError("");
+    setMetadataFormError("");
     setStatusMessage("");
     setMetadataForm({
       entityType: "status",
@@ -1983,6 +1990,7 @@ export default function WorkflowManagement() {
   const openActionForm = (action = null) => {
     if (action && isProtectedAction(action)) return;
     setError("");
+    setMetadataFormError("");
     setStatusMessage("");
     setMetadataForm({
       entityType: "action",
@@ -2004,6 +2012,7 @@ export default function WorkflowManagement() {
   };
 
   const updateMetadataForm = (field, value) => {
+    setMetadataFormError("");
     setMetadataForm((current) => current ? {
       ...current,
       values: {
@@ -2033,10 +2042,54 @@ export default function WorkflowManagement() {
     confirmationRequired: Boolean(values.confirmationRequired),
   });
 
+  const visibleStatusKeys = useMemo(
+    () => new Set(configuredStatuses.map((status) => String(status.statusKey || "").trim().toUpperCase())),
+    [configuredStatuses]
+  );
+
+  const visibleActionKeys = useMemo(
+    () => new Set(configuredActions.map((action) => String(action.actionKey || "").trim().toUpperCase())),
+    [configuredActions]
+  );
+
+  const findDuplicateMetadata = (change) => {
+    if (!change || change.mode !== "create") return null;
+    const isStatus = change.entityType === "status";
+    const keyField = isStatus ? "statusKey" : "actionKey";
+    const requestedKey = normalizeKey(change.values[keyField]).trim().toUpperCase();
+    if (!requestedKey) return null;
+
+    const records = isStatus ? statuses : actions;
+    const duplicate = records.find((record) => String(record[keyField] || "").trim().toUpperCase() === requestedKey);
+    if (!duplicate) return null;
+
+    const visibleKeys = isStatus ? visibleStatusKeys : visibleActionKeys;
+    const isVisible = visibleKeys.has(requestedKey);
+    const isEditable = isStatus ? !isProtectedStatus(duplicate) : !isProtectedAction(duplicate);
+    const recordName = isStatus ? "status" : "action";
+    const listName = isStatus ? "Statuses" : "Actions";
+    const baseMessage = isStatus
+      ? "This status key already exists. Search the Statuses list and edit or enable the existing status instead of creating a duplicate."
+      : "This action key already exists. Search the Actions list and edit or enable the existing action instead of creating a duplicate.";
+    const inactiveMessage = `This ${recordName} key already exists but is inactive. Enable the existing custom ${recordName} instead of creating a duplicate.`;
+    const hiddenMessage = ` This key already exists in workflow metadata. It may not be visible in the current category view. Use the full ${listName} list or enable the existing record if available.`;
+
+    return {
+      duplicate,
+      message: `${!duplicate.active && isEditable ? inactiveMessage : baseMessage}${isVisible ? "" : hiddenMessage}`,
+    };
+  };
+
   const saveMetadataForm = async (change = metadataForm) => {
-    if (!change) return;
+    if (!change || isSavingMetadata) return;
     const isStatus = change.entityType === "status";
     const isCreate = change.mode === "create";
+    const duplicate = findDuplicateMetadata(change);
+    if (duplicate) {
+      setMetadataFormError(duplicate.message);
+      setError("");
+      return;
+    }
     const endpoint = isStatus ? "/volt/workflow/statuses" : "/volt/workflow/actions";
     const payload = isStatus
       ? buildStatusPayload(change.values, isCreate)
@@ -2044,6 +2097,7 @@ export default function WorkflowManagement() {
 
     setIsSavingMetadata(true);
     setError("");
+    setMetadataFormError("");
     setStatusMessage("");
     try {
       const response = await fetch(isCreate ? endpoint : `${endpoint}/${change.original.id}`, {
@@ -2060,7 +2114,9 @@ export default function WorkflowManagement() {
       setPendingMetadataChange(null);
       await refreshMetadataAndValidate(`Workflow ${isStatus ? "status" : "action"} ${isCreate ? "created" : "updated"} and validation refreshed.`);
     } catch (saveError) {
-      setError(saveError.message || `Unable to save workflow ${isStatus ? "status" : "action"}.`);
+      const message = saveError.message || `Unable to save workflow ${isStatus ? "status" : "action"}.`;
+      setMetadataFormError(message);
+      setError("");
     } finally {
       setIsSavingMetadata(false);
     }
@@ -2068,7 +2124,7 @@ export default function WorkflowManagement() {
 
   const submitMetadataForm = (event) => {
     event.preventDefault();
-    if (!metadataForm) return;
+    if (!metadataForm || isSavingMetadata) return;
 
     const { entityType, mode, original, values } = metadataForm;
     if (entityType === "status" && mode === "edit") {
@@ -2827,6 +2883,7 @@ export default function WorkflowManagement() {
         onChange={updateMetadataForm}
         onSubmit={submitMetadataForm}
         isSaving={isSavingMetadata}
+        error={metadataFormError}
       />
       <ConfirmMetadataChangeDialog
         pendingChange={pendingMetadataChange}

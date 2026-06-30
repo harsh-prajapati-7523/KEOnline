@@ -1,0 +1,72 @@
+{
+  "steps": [
+    "Logged in as SUPER_ADMIN_001"
+  ],
+  "badResponses": [
+    {
+      "status": 500,
+      "method": "POST",
+      "url": "https://test.kumar-electricals.com/volt/tickets"
+    }
+  ],
+  "result": {
+    "cat": {
+      "id": 1,
+      "categoryKey": "REPAIR_WORKFLOW_TEST",
+      "displayName": "Repair Workflow Test",
+      "active": true,
+      "systemCategory": false,
+      "sortOrder": 100,
+      "createdAt": "2026-06-29T20:27:53.425212Z",
+      "updatedAt": "2026-06-30T04:39:15.902295Z"
+    },
+    "validation": {
+      "categoryId": 1,
+      "categoryKey": "REPAIR_WORKFLOW_TEST",
+      "valid": true,
+      "issues": [],
+      "readyToActivate": true,
+      "blockingIssues": [],
+      "warnings": [
+        {
+          "code": "MISSING_ROLE_TRANSITION_SCOPE_COVERAGE",
+          "message": "Active transition is not scoped to any role",
+          "transitionId": 1
+        },
+        {
+          "code": "MISSING_ROLE_TRANSITION_SCOPE_COVERAGE",
+          "message": "Active transition is not scoped to any role",
+          "transitionId": 2
+        }
+      ]
+    },
+    "config": {
+      "categoryId": 1,
+      "categoryKey": "REPAIR_WORKFLOW_TEST",
+      "categoryDisplayName": "Repair Workflow Test",
+      "workflowMode": "DB_CONFIGURED",
+      "dbWorkflowEnabled": true,
+      "fixedActionsEnabled": false,
+      "workflowModeUpdatedAt": "2026-06-30T04:39:15.895776Z",
+      "workflowModeUpdatedByEmployeeId": "SUPER_ADMIN_001"
+    },
+    "ticketPayload": {
+      "customerName": "AUTO API WORKFLOW 2026-06-30T04:51:48.952Z",
+      "mobileNumber": "9988882309",
+      "villageOrArea": "QA Area",
+      "productType": "QA Pump",
+      "categoryId": 1,
+      "complaintDescription": "API workflow cycle verification",
+      "dynamicValues": []
+    },
+    "created": {
+      "ok": false,
+      "status": 500,
+      "json": {
+        "message": "Workflow status metadata missing for ticket status NEW",
+        "correlationId": "91f9521b-4c92-4f96-8f16-b32794310e1b"
+      },
+      "text": ""
+    }
+  }
+}

@@ -133,7 +133,8 @@ export default function CreateTicket() {
       const response = await fetch("/volt/ticket-categories", { headers: authHeaders() });
       if (!response.ok) throw new Error("Category request failed");
       const data = await response.json();
-      setCategories(Array.isArray(data) ? data.filter((category) => category.active) : []);
+      const nextCategories = Array.isArray(data) ? data : Array.isArray(data?.categories) ? data.categories : [];
+      setCategories(nextCategories.filter((category) => category.active));
     } catch {
       setCategories([]);
       setCategoryError("Unable to load ticket categories. Please try again.");

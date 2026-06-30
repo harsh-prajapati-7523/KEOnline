@@ -1459,6 +1459,11 @@ export default function WorkflowManagement() {
     [categoryWorkflowTransitions]
   );
 
+  const availableGlobalTransitions = useMemo(() => {
+    const selectedTransitionIds = new Set(categoryWorkflowTransitions.map((transition) => String(transition.id)));
+    return transitions.filter((transition) => !selectedTransitionIds.has(String(transition.id)));
+  }, [categoryWorkflowTransitions, transitions]);
+
   const actionByKey = useMemo(() => {
     const next = {};
     actions.forEach((action) => {
@@ -1750,9 +1755,9 @@ export default function WorkflowManagement() {
   useEffect(() => {
     if (drawerItem?.type !== "transition") return;
 
-    const stillVisible = categoryWorkflowTransitions.some((transition) => String(transition.id) === String(drawerItem.data.id));
+    const stillVisible = transitions.some((transition) => String(transition.id) === String(drawerItem.data.id));
     if (!stillVisible) setDrawerItem(null);
-  }, [categoryWorkflowTransitions, drawerItem]);
+  }, [drawerItem, transitions]);
 
   const changeSelectedCategory = (categoryId) => {
     setSelectedCategoryId(categoryId);
@@ -1936,9 +1941,15 @@ export default function WorkflowManagement() {
         throw new Error(await readApiError(response, "Unable to save workflow transition."));
       }
 
+      const savedTransition = await response.json();
       setTransitionForm(null);
       setPendingTransitionChange(null);
-      await refreshTransitionsAndValidate(`Workflow transition ${isCreate ? "created" : "updated"} and validation refreshed.`);
+      await refreshTransitionsAndValidate(isCreate
+        ? `Workflow transition created as workflow metadata. To use it in ${selectedCategory?.displayName || selectedCategory?.categoryKey || "the selected category"}, enable the category rule for this transition.`
+        : "Workflow transition updated and validation refreshed.");
+      if (isCreate && savedTransition?.id) {
+        openTransitionDrawer(savedTransition);
+      }
     } catch (saveError) {
       setError(saveError.message || "Unable to save workflow transition.");
       try {
@@ -2594,21 +2605,24 @@ export default function WorkflowManagement() {
 
           {activeTab === "transitions" && (
             <div className="space-y-3">
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  <Badge tone="blue">Configured editable: {editableConfiguredTransitions.length}</Badge>
-                  <Badge tone="slate">Safe options: {transitionOptions.length}</Badge>
-                </div>
+	              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+	                <div className="flex flex-wrap gap-2">
+	                  <Badge tone="blue">Configured editable: {editableConfiguredTransitions.length}</Badge>
+	                  <Badge tone="slate">Available global: {availableGlobalTransitions.length}</Badge>
+	                  <Badge tone="slate">Safe options: {transitionOptions.length}</Badge>
+	                </div>
                 <button
                   type="button"
                   onClick={() => openTransitionForm()}
                   className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900"
                 >
-                  Create Transition
-                </button>
-              </div>
-              <TableShell minWidth="min-w-[1180px]">
-                <thead>
+	                  Create Transition
+	                </button>
+	              </div>
+	              <div>
+	                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">Selected Category Transitions</h2>
+	              <TableShell minWidth="min-w-[1180px]">
+	                <thead>
                   <tr>
                     <HeaderCell>From Status</HeaderCell>
                     <HeaderCell>Action</HeaderCell>
@@ -2676,10 +2690,89 @@ export default function WorkflowManagement() {
                       </tr>
                     );
                   })}
-                </tbody>
-              </TableShell>
-            </div>
-          )}
+	                </tbody>
+	              </TableShell>
+	              </div>
+	              {!isLoading && !isLoadingCategoryWorkflow && (
+	              <details className="rounded-lg border border-slate-200 bg-white px-4 py-3" open>
+	                <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Available / Global Transitions</summary>
+	                <p className="mt-2 text-sm font-semibold text-slate-600">These transitions exist as workflow metadata but are not enabled for the selected category yet. Enable the category rule to include one in this category workflow and map.</p>
+	                <div className="mt-3">
+	                  <TableShell minWidth="min-w-[1180px]">
+	                    <thead>
+	                      <tr>
+	                        <HeaderCell>From Status</HeaderCell>
+	                        <HeaderCell>Action</HeaderCell>
+	                        <HeaderCell>To Status</HeaderCell>
+	                        <HeaderCell>Category Rule</HeaderCell>
+	                        <HeaderCell>Active</HeaderCell>
+	                        <HeaderCell>Protected/System</HeaderCell>
+	                        <HeaderCell>Actions</HeaderCell>
+	                      </tr>
+	                    </thead>
+	                    <tbody>
+	                      {availableGlobalTransitions.length === 0 && <EmptyRows colSpan={7}>No available global transitions outside the selected category workflow.</EmptyRows>}
+	                      {availableGlobalTransitions.map((transition) => {
+	                        const from = getStatusLabel(transition, "from");
+	                        const to = getStatusLabel(transition, "to");
+	                        const rules = categoryRulesByTransitionId[transition.id] || [];
+	                        const selectedCategoryRule = rules.find((rule) => String(rule.categoryId) === String(selectedCategoryId));
+	                        const categoryState = getRuleVisualState(selectedCategoryRule);
+	                        const protectedRecord = isProtectedTransition(transition);
+	                        return (
+	                          <tr key={transition.id} onClick={() => openTransitionDrawer(transition)} className="cursor-pointer hover:bg-blue-50/50">
+	                            <BodyCell><BusinessKeyLabel label={from.label} technicalKey={from.key} subtle /></BodyCell>
+	                            <BodyCell><BusinessKeyLabel label={transition.displayName || actionByKey[transition.actionKey]?.displayName} technicalKey={transition.actionKey} /></BodyCell>
+	                            <BodyCell><BusinessKeyLabel label={to.label} technicalKey={to.key} subtle /></BodyCell>
+	                            <BodyCell>
+	                              <div className="space-y-1">
+	                                <Badge tone={categoryState.tone}>{categoryState.label}</Badge>
+	                                {!selectedCategoryRule?.active && <p className="text-xs font-semibold text-slate-600">Not enabled for this category yet.</p>}
+	                              </div>
+	                            </BodyCell>
+	                            <BodyCell><StateBadge enabled={transition.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+	                            <BodyCell>
+	                              <div className="flex flex-wrap gap-1.5">
+	                                <Badge tone={transition.systemTransition ? "blue" : "slate"}>{transition.systemTransition ? "System" : "Custom"}</Badge>
+	                                <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
+	                              </div>
+	                            </BodyCell>
+	                            <BodyCell>
+	                              <div className="flex flex-wrap gap-2">
+	                                <button
+	                                  type="button"
+	                                  onClick={(event) => {
+	                                    event.stopPropagation();
+	                                    requestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: true });
+	                                  }}
+	                                  disabled={!selectedCategory || selectedCategoryRule?.active || isSavingRule}
+	                                  className="inline-flex min-h-9 items-center justify-center rounded-lg bg-blue-950 px-3 py-2 text-xs font-extrabold text-white hover:bg-blue-900 disabled:opacity-50"
+	                                >
+	                                  Enable Category Rule
+	                                </button>
+	                                <button
+	                                  type="button"
+	                                  onClick={(event) => {
+	                                    event.stopPropagation();
+	                                    openTransitionForm(transition);
+	                                  }}
+	                                  disabled={protectedRecord}
+	                                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+	                                >
+	                                  Edit
+	                                </button>
+	                              </div>
+	                            </BodyCell>
+	                          </tr>
+	                        );
+	                      })}
+	                    </tbody>
+	                  </TableShell>
+	                </div>
+	              </details>
+	              )}
+	            </div>
+	          )}
 
           {activeTab === "statuses" && (
             <div className="space-y-3">

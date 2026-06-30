@@ -657,10 +657,6 @@ function matchesStatus(status, terms) {
   return terms.some((term) => text.includes(term));
 }
 
-function compactActionLabel(transition, actionByKey) {
-  return transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey);
-}
-
 function findStatusByPriority(statuses, priorities) {
   for (const priority of priorities) {
     const exact = statuses.find((status) => String(status.statusKey || "").toUpperCase() === priority);
@@ -693,7 +689,7 @@ function getWorkflowStory(statuses, transitions) {
     label,
     status,
     tone,
-    terminal: terminal || Boolean(status?.terminal),
+    terminal,
   });
 
   const nodes = {
@@ -716,7 +712,7 @@ function getWorkflowStory(statuses, transitions) {
       id: `${from.id}-${to.id}`,
       from: from.id,
       to: to.id,
-      label: transition ? compactActionLabel(transition, {}) : fallbackLabel,
+      label: fallbackLabel,
       transition,
     };
   };
@@ -735,9 +731,9 @@ function getWorkflowStory(statuses, transitions) {
     {
       id: "missing",
       label: "Missing Part",
+      entryLabel: "Mark Missing Part",
       nodes: [nodes.missingPart, nodes.partAvailable, nodes.inProgress],
       edges: [
-        transitionFor(nodes.inProgress, nodes.missingPart, "Mark Missing Part"),
         transitionFor(nodes.missingPart, nodes.partAvailable, "Mark Part Available"),
         transitionFor(nodes.partAvailable, nodes.inProgress, "Resume Work"),
       ],
@@ -746,9 +742,9 @@ function getWorkflowStory(statuses, transitions) {
     {
       id: "approval",
       label: "Customer Approval",
+      entryLabel: "Need Customer Approval",
       nodes: [nodes.approvalPending, nodes.customerDeclined, nodes.cancelledPending, nodes.delivered],
       edges: [
-        transitionFor(nodes.inProgress, nodes.approvalPending, "Need Customer Approval"),
         transitionFor(nodes.approvalPending, nodes.customerDeclined, "Customer Declined Repair"),
         transitionFor(nodes.customerDeclined, nodes.cancelledPending, "Cancel Pending Delivery"),
         transitionFor(nodes.cancelledPending, nodes.delivered, "Deliver To Customer"),
@@ -758,9 +754,9 @@ function getWorkflowStory(statuses, transitions) {
     {
       id: "warranty",
       label: "Warranty",
+      entryLabel: "Mark In Warranty",
       nodes: [nodes.inWarranty, nodes.warrantyLogged, nodes.repairCompleted, nodes.delivered],
       edges: [
-        transitionFor(nodes.inProgress, nodes.inWarranty, "Mark In Warranty"),
         transitionFor(nodes.inWarranty, nodes.warrantyLogged, "Log Warranty Complaint"),
         transitionFor(nodes.warrantyLogged, nodes.repairCompleted, "Mark Repair Completed"),
         transitionFor(nodes.repairCompleted, nodes.delivered, "Deliver To Customer"),
@@ -876,8 +872,13 @@ function WorkflowMapView({
           >
             {group.id !== "main" && <h3 className="mb-3 text-xs font-extrabold">{group.label}</h3>}
             <div className="flex min-h-20 items-center gap-0 overflow-hidden">
+              {group.entryLabel && (
+                <span className="mr-3 hidden shrink-0 rounded-md border border-slate-200 bg-white px-2 py-1 text-[0.68rem] font-bold text-slate-700 shadow-sm min-[1280px]:inline-flex">
+                  {group.entryLabel}
+                </span>
+              )}
               {group.nodes.map((node, index) => (
-                <div key={`${group.id}-${node.id}-${index}`} className="flex min-w-0 flex-1 items-center">
+                <div key={`${group.id}-${node.id}-${index}`} className={`flex min-w-0 items-center ${index === group.nodes.length - 1 ? "shrink-0" : "flex-1"}`}>
                   <WorkflowNode node={node} selected={isNodeSelected(node)} onSelect={onSelectItem} />
                   {group.edges[index] && <WorkflowEdge edge={group.edges[index]} selected={isEdgeSelected(group.edges[index])} onSelect={onSelectItem} />}
                 </div>

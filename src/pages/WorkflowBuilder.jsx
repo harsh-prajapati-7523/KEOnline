@@ -113,8 +113,18 @@ function createRow(seed = {}) {
     fromStatus: seed.fromStatus || "",
     action: seed.action || "",
     toStatus: seed.toStatus || "",
-    toStatusTerminal: false,
+    toStatusTerminal: Boolean(seed.toStatusTerminal),
   };
+}
+
+function createRowFromTransition(transition, actionByKey = {}) {
+  const action = actionByKey[transition.actionKey];
+  return createRow({
+    fromStatus: transition.fromStatusDisplayName || formatLabel(transition.fromStatusKey || transition.fromStatus),
+    action: action?.displayName || transition.displayName || formatLabel(transition.actionKey),
+    toStatus: transition.toStatusDisplayName || formatLabel(transition.toStatusKey || transition.toStatus),
+    toStatusTerminal: Boolean(transition.toStatusTerminal),
+  });
 }
 
 const rowStateStyles = {
@@ -202,6 +212,7 @@ export default function WorkflowBuilder() {
   const [rows, setRows] = useState([createRow()]);
   const [rowSaveStates, setRowSaveStates] = useState({});
   const [rowErrors, setRowErrors] = useState({});
+  const [seededCategoryId, setSeededCategoryId] = useState("");
   const [startStatus, setStartStatus] = useState("New");
   const [terminalSelections, setTerminalSelections] = useState({});
   const [showDetails, setShowDetails] = useState(false);
@@ -242,6 +253,24 @@ export default function WorkflowBuilder() {
     })),
     [actions]
   );
+
+  const actionByKey = useMemo(() => {
+    const next = {};
+    actions.forEach((action) => {
+      if (action.actionKey) next[action.actionKey] = action;
+    });
+    return next;
+  }, [actions]);
+
+  const selectedCategoryTransitions = useMemo(() => {
+    if (!selectedCategoryId) return [];
+    return transitions
+      .filter((transition) => {
+        const rules = categoryRulesByTransitionId[transition.id] || [];
+        return rules.some((rule) => String(rule.categoryId) === String(selectedCategoryId) && rule.active);
+      })
+      .sort((first, second) => (first.sortOrder ?? 999) - (second.sortOrder ?? 999) || (first.id ?? 0) - (second.id ?? 0));
+  }, [categoryRulesByTransitionId, selectedCategoryId, transitions]);
 
   const resolveStatus = useCallback((value) => {
     const lookup = value.trim().toLowerCase();
@@ -420,6 +449,25 @@ export default function WorkflowBuilder() {
   useEffect(() => {
     loadBuilderData();
   }, [loadBuilderData]);
+
+  useEffect(() => {
+    if (isLoading || !selectedCategoryId || seededCategoryId === String(selectedCategoryId)) return;
+
+    if (selectedCategoryTransitions.length === 0) {
+      setRows([createRow()]);
+      setRowSaveStates({});
+      setRowErrors({});
+      setSeededCategoryId(String(selectedCategoryId));
+      return;
+    }
+
+    const nextRows = selectedCategoryTransitions.map((transition) => createRowFromTransition(transition, actionByKey));
+    setRows(nextRows);
+    setRowSaveStates(Object.fromEntries(nextRows.map((row) => [row.id, "Already exists"])));
+    setRowErrors({});
+    setStartStatus(nextRows[0]?.fromStatus || startStatus);
+    setSeededCategoryId(String(selectedCategoryId));
+  }, [actionByKey, isLoading, seededCategoryId, selectedCategoryId, selectedCategoryTransitions, startStatus]);
 
   useEffect(() => {
     if (!selectedCategoryId) {

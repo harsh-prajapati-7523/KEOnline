@@ -1,5 +1,28 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Calendar, ChevronDown, ChevronRight, Eye, MapPin, Phone, PhoneCall, Plus, UserPlus } from "lucide-react";
+import {
+  ArrowLeft,
+  Box,
+  Calendar,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardCheck,
+  Clock3,
+  History,
+  IndianRupee,
+  ListChecks,
+  MapPin,
+  MessageCircle,
+  Phone,
+  PhoneCall,
+  Play,
+  Plus,
+  ShieldCheck,
+  Trash2,
+  User,
+  Users,
+  Wrench,
+} from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { hasAccess } from "../utils/access";
 
@@ -41,6 +64,16 @@ function formatCurrency(value) {
     currency: "INR",
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function formatCompactCurrency(value) {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "₹0";
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    maximumFractionDigits: amount % 1 === 0 ? 0 : 2,
   }).format(amount);
 }
 
@@ -162,6 +195,73 @@ function InfoItem({ label, children, className = "" }) {
   );
 }
 
+function IconBubble({ icon: Icon, tone = "slate", className = "" }) {
+  const toneClassName = {
+    blue: "bg-blue-50 text-blue-950",
+    green: "bg-green-50 text-green-700",
+    red: "bg-red-50 text-red-700",
+    yellow: "bg-yellow-100 text-yellow-900",
+    slate: "bg-slate-100 text-slate-900",
+  }[tone] || "bg-slate-100 text-slate-900";
+
+  return (
+    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${toneClassName} ${className}`}>
+      <Icon size={22} aria-hidden="true" />
+    </span>
+  );
+}
+
+function StatusPill({ status, label }) {
+  const normalizedStatus = String(status || "").toUpperCase();
+  const statusClassName = normalizedStatus === "COMPLETED"
+    ? "bg-green-600 text-white"
+    : normalizedStatus === "CANCELLED"
+      ? "bg-red-600 text-white"
+      : normalizedStatus === "PICKED"
+        ? "bg-violet-600 text-white"
+        : normalizedStatus === "IN_PROGRESS"
+          ? "bg-blue-600 text-white"
+          : "bg-white/15 text-white";
+
+  return (
+    <span className={`inline-flex max-w-full items-center gap-1.5 rounded-full px-3 py-1 text-xs font-extrabold ${statusClassName}`}>
+      {normalizedStatus === "COMPLETED" && <CheckCircle2 size={14} aria-hidden="true" />}
+      {normalizedStatus === "CANCELLED" && <Trash2 size={14} aria-hidden="true" />}
+      {normalizedStatus === "PICKED" && <span className="h-2 w-2 rounded-full bg-white" aria-hidden="true" />}
+      {label}
+    </span>
+  );
+}
+
+function DetailRow({ icon: Icon, label, value, actionLabel, onClick, tone = "slate" }) {
+  const content = (
+    <>
+      <IconBubble icon={Icon} tone={tone} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-semibold text-slate-900">{label}</span>
+      </span>
+      <span className="min-w-0 max-w-[45%] break-words text-right text-sm font-bold text-blue-950">
+        {actionLabel || value || "Not available"}
+      </span>
+      {onClick && <ChevronRight className="shrink-0 text-blue-700" size={20} aria-hidden="true" />}
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} className="flex min-h-14 w-full items-center gap-3 border-t border-blue-100 py-2.5 text-left first:border-t-0">
+        {content}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex min-h-14 items-center gap-3 border-t border-blue-100 py-2.5 first:border-t-0">
+      {content}
+    </div>
+  );
+}
+
 function TicketDetailSkeleton() {
   return (
     <div className="mt-4 min-w-0 space-y-4" aria-hidden="true">
@@ -236,7 +336,9 @@ export default function TicketDetail() {
   const [showWorkflowHistory, setShowWorkflowHistory] = useState(false);
   const [expandedWorkflowHistoryId, setExpandedWorkflowHistoryId] = useState(null);
   const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
+  const [showCompleteConfirmation, setShowCompleteConfirmation] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
+  const [activeDetailView, setActiveDetailView] = useState("ticket");
   const [assignableEmployees, setAssignableEmployees] = useState([]);
   const [assignableEmployeesLoading, setAssignableEmployeesLoading] = useState(false);
   const [assignableEmployeesError, setAssignableEmployeesError] = useState("");
@@ -398,7 +500,9 @@ export default function TicketDetail() {
     setShowWorkflowHistory(false);
     setExpandedWorkflowHistoryId(null);
     setShowCancelConfirmation(false);
+    setShowCompleteConfirmation(false);
     setShowAssignDialog(false);
+    setActiveDetailView("ticket");
     setAssignForm({ employeeId: "", note: "" });
     setAssignError("");
     setPendingDeleteChargeId(null);
@@ -521,6 +625,11 @@ export default function TicketDetail() {
   const confirmCancelTicket = async () => {
     setShowCancelConfirmation(false);
     await runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.");
+  };
+
+  const confirmCompleteTicket = async () => {
+    setShowCompleteConfirmation(false);
+    await runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.");
   };
 
   const loadAssignableEmployees = async () => {
@@ -815,354 +924,598 @@ export default function TicketDetail() {
   const dynamicActions = Array.isArray(availableActions?.dynamicActions) ? availableActions.dynamicActions : [];
   const hasDynamicActions = dynamicActions.length > 0;
   const hasLoadedAvailableActions = Boolean(availableActions) && !availableActionsLoading && !availableActionsError;
-  const renderWorkflowActions = (prominent = false) => {
-    const hasNoActions = hasLoadedAvailableActions && !hasVisibleWorkflowAction && !hasDynamicActions;
-    const isCompletedNoActions = hasNoActions && ticket?.status === "COMPLETED";
-    const actionsPending = availableActionsLoading || (!availableActions && !availableActionsError);
-    const actionSectionClassName = prominent && !isCompletedNoActions
-      ? "rounded-2xl border-2 border-yellow-300 bg-yellow-50 p-4 shadow-sm sm:p-5"
-      : "rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5";
+  const ticketStatusLabel = ticket ? getTicketStatusLabel(ticket) : "Not available";
+  const totalAmount = ticket?.totalCharge ?? chargeTotal;
+  const sanitizedMobileNumber = ticket?.mobileNumber ? String(ticket.mobileNumber).replace(/[^\d+]/g, "") : "";
+  const problemSummary = ticket?.complaintDescription || formatEnumDisplay(ticket?.category);
+  const historySummary = hasLoadedWorkflowHistory
+    ? `${workflowHistory.length} event${workflowHistory.length === 1 ? "" : "s"}`
+    : "View";
+  const previousTicketSummary = hasLoadedCustomerHistory
+    ? customerHistoryCount > 0 ? `${customerHistoryCount} ticket${customerHistoryCount === 1 ? "" : "s"}` : "No previous tickets"
+    : "View";
+
+  const openWorkItemsView = async () => {
+    setActiveDetailView("workItems");
+    setShowCharges(true);
+    setShowAddChargeForm(false);
+    if (canViewCharges) await loadCharges();
+  };
+
+  const openCustomerHistoryView = async () => {
+    setActiveDetailView("customerHistory");
+    setShowCustomerHistory(true);
+    if (!hasLoadedCustomerHistory) await loadCustomerHistory();
+  };
+
+  const openTimelineView = async () => {
+    setActiveDetailView("timeline");
+    setShowWorkflowHistory(true);
+    if (!hasLoadedWorkflowHistory && !workflowHistoryLoading) await loadWorkflowHistory(0, true);
+  };
+
+  const openStatusView = () => {
+    setActiveDetailView("status");
+    setShowStatusDetails(true);
+  };
+
+  const getActionLabel = (label, actionKey = "") => {
+    if (actionKey === "PICK_TICKET" || label === "Pick Ticket") return ticket?.status === "PICKED" ? "Take Ownership" : "Take This Ticket";
+    if (actionKey === "COMPLETE_TICKET" || label === "Complete Ticket") return "Mark Completed";
+    return label;
+  };
+
+  const renderActionButton = ({ key, label, icon: Icon, onClick, disabled, tone = "primary", full = false }) => {
+    const toneClassName = tone === "yellow"
+      ? "ke-accent-action text-black"
+      : tone === "danger"
+        ? "border border-red-500 bg-white text-red-700"
+        : tone === "outline"
+          ? "border border-blue-200 bg-white text-blue-950"
+          : "ke-primary-action text-white";
 
     return (
-    <section className={`min-h-32 min-w-0 ${actionSectionClassName}`} aria-busy={actionsPending}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h2 className="text-lg font-bold text-blue-950">{isCompletedNoActions ? "No Actions Available" : prominent ? "Available Actions" : "More Actions"}</h2>
-          {prominent && !isCompletedNoActions && (
-            <p className="mt-1 text-sm font-semibold text-yellow-800">Use these workflow actions for this ticket.</p>
-          )}
-          {isCompletedNoActions && (
-            <p className="mt-1 text-sm font-semibold text-gray-600">This ticket is already completed.</p>
-          )}
-        </div>
-        {prominent && !isCompletedNoActions && <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-yellow-900">Workflow</span>}
-      </div>
-      {availableActionsError && (
-        <p className="mt-4 rounded-xl bg-yellow-100 px-4 py-3 text-sm font-semibold text-yellow-900">
-          {availableActionsError}
-        </p>
-      )}
-      <div className={`mt-4 flex min-h-12 flex-col gap-2 ${prominent ? "sm:gap-3" : ""}`}>
-        {actionsPending && (
-          <div className="rounded-xl bg-white/70 px-3 py-3 text-sm font-semibold text-gray-600">
-            Loading actions...
-          </div>
-        )}
-        {canStartWork && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`start-${ticketId}`]} className="ke-primary-action min-h-12 rounded-2xl px-4 py-3 font-bold disabled:opacity-60">{processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work"}</button>}
-        {canPickTicket && ticket.status === "NEW" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className={`${canStartWork ? "min-h-11 border border-blue-950 bg-white text-blue-950" : "ke-accent-action min-h-12"} rounded-2xl px-4 py-2 font-semibold disabled:opacity-60`}>{processingKeys[`pick-${ticketId}`] ? "Picking..." : "Pick Ticket"}</button>}
-        {canPickTicket && ticket.status === "PICKED" && <button type="button" onClick={() => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`pick-${ticketId}`]} className="min-h-11 rounded-2xl border border-blue-950 bg-white px-4 py-2 font-semibold text-blue-950 disabled:opacity-60">{processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take Ownership"}</button>}
-        {canComplete && <button type="button" onClick={() => runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.")} disabled={processingKeys[`complete-${ticketId}`]} className="min-h-11 rounded-2xl bg-green-600 px-4 py-2 font-semibold text-white disabled:opacity-60">{processingKeys[`complete-${ticketId}`] ? "Completing..." : "Complete Ticket"}</button>}
-        {hasNoActions && !isCompletedNoActions && (
-          <p className="text-sm text-gray-600">No workflow actions are currently available for this ticket.</p>
-        )}
-        {canCancel && (
-          <div className="mt-2 border-t border-red-100 pt-3">
-            <p className="mb-2 text-xs font-bold uppercase text-red-700">Danger zone</p>
-            <button type="button" onClick={() => setShowCancelConfirmation(true)} disabled={processingKeys[`cancel-${ticketId}`]} className="min-h-11 w-full rounded-2xl border border-red-500 bg-white px-4 py-2 font-semibold text-red-700 disabled:opacity-60">{processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket"}</button>
-          </div>
-        )}
-      </div>
-      {hasDynamicActions && (
-        <div className="mt-5 border-t border-slate-200 pt-4">
-          <h3 className="text-sm font-bold text-slate-700">Additional Workflow Actions</h3>
-          <div className="mobile-full-width-actions mt-3 flex flex-wrap items-center gap-2">
-            {dynamicActions.map((action) => (
-              <button
-                key={`${action.transitionId}-${action.actionKey}-${prominent ? "top" : "bottom"}`}
-                type="button"
-                data-transition-id={action.transitionId}
-                onClick={() => runDynamicWorkflowAction(action)}
-                disabled={processingKeys[`dynamic-${action.transitionId}`]}
-                className="min-h-11 rounded-2xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-blue-950 hover:bg-slate-50 disabled:opacity-60"
-              >
-                {processingKeys[`dynamic-${action.transitionId}`] ? "Processing..." : action.displayName}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </section>
+      <button
+        key={key}
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        className={`${toneClassName} inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold disabled:opacity-60 ${full ? "w-full" : "w-full sm:w-auto sm:flex-1"}`}
+      >
+        {Icon && <Icon size={20} aria-hidden="true" />}
+        {label}
+      </button>
     );
   };
+
+  const getWorkflowActionGroups = () => {
+    const primaryActions = [];
+    const secondaryActions = [];
+    const dangerActions = [];
+
+    if (canStartWork && ticket.status === "PICKED") {
+      primaryActions.push({
+        key: `start-${ticketId}`,
+        label: processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work",
+        icon: Play,
+        onClick: () => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again."),
+        disabled: processingKeys[`start-${ticketId}`],
+      });
+    }
+
+    if (canComplete) {
+      primaryActions.push({
+        key: `complete-${ticketId}`,
+        label: processingKeys[`complete-${ticketId}`] ? "Completing..." : "Mark Completed",
+        icon: Check,
+        onClick: () => setShowCompleteConfirmation(true),
+        disabled: processingKeys[`complete-${ticketId}`],
+      });
+    }
+
+    if (canPickTicket && ticket.status === "NEW") {
+      secondaryActions.push({
+        key: `pick-${ticketId}`,
+        label: processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take This Ticket",
+        icon: User,
+        onClick: () => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again."),
+        disabled: processingKeys[`pick-${ticketId}`],
+        tone: primaryActions.length > 0 ? "outline" : "primary",
+      });
+    }
+
+    if (canPickTicket && ticket.status === "PICKED") {
+      secondaryActions.push({
+        key: `pick-${ticketId}`,
+        label: processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take Ownership",
+        icon: User,
+        onClick: () => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again."),
+        disabled: processingKeys[`pick-${ticketId}`],
+        tone: "outline",
+      });
+    }
+
+    if (canAssignTicket) {
+      secondaryActions.push({
+        key: "assign",
+        label: "Assign Ticket",
+        icon: Users,
+        onClick: openAssignDialog,
+        disabled: false,
+        tone: "outline",
+      });
+    }
+
+    dynamicActions.forEach((action) => {
+      secondaryActions.push({
+        key: `dynamic-${action.transitionId}`,
+        label: processingKeys[`dynamic-${action.transitionId}`] ? "Processing..." : getActionLabel(action.displayName, action.actionKey),
+        icon: ClipboardCheck,
+        onClick: () => runDynamicWorkflowAction(action),
+        disabled: processingKeys[`dynamic-${action.transitionId}`],
+        tone: "outline",
+      });
+    });
+
+    if (canCancel) {
+      dangerActions.push({
+        key: `cancel-${ticketId}`,
+        label: processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket",
+        icon: Trash2,
+        onClick: () => setShowCancelConfirmation(true),
+        disabled: processingKeys[`cancel-${ticketId}`],
+        tone: "danger",
+        full: true,
+      });
+    }
+
+    return { primaryActions, secondaryActions, dangerActions };
+  };
+
+  const renderWorkflowActions = () => {
+    const hasNoActions = hasLoadedAvailableActions && !hasVisibleWorkflowAction && !hasDynamicActions;
+    const actionsPending = availableActionsLoading || (!availableActions && !availableActionsError);
+    const { primaryActions, secondaryActions, dangerActions } = getWorkflowActionGroups();
+
+    return (
+      <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm" aria-busy={actionsPending}>
+        <h2 className="text-lg font-extrabold text-blue-950">Next Action</h2>
+        {availableActionsError && (
+          <p className="mt-3 rounded-xl bg-yellow-100 px-4 py-3 text-sm font-semibold text-yellow-900">
+            {availableActionsError}
+          </p>
+        )}
+        {actionsPending && (
+          <p className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-sm font-semibold text-slate-600">Loading actions...</p>
+        )}
+        {hasNoActions && ticket?.status === "COMPLETED" && (
+          <div className="mt-3 flex items-center gap-4">
+            <IconBubble icon={CheckCircle2} tone="green" className="h-14 w-14" />
+            <div>
+              <p className="text-lg font-extrabold text-green-700">No Action Needed</p>
+              <p className="mt-1 text-sm font-semibold text-slate-700">This ticket is completed.</p>
+            </div>
+          </div>
+        )}
+        {hasNoActions && ticket?.status !== "COMPLETED" && !actionsPending && (
+          <p className="mt-3 rounded-xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-600">No workflow actions are currently available.</p>
+        )}
+        {primaryActions.length > 0 && (
+          <div className="mt-4 grid gap-2">
+            {primaryActions.map((action) => renderActionButton({ ...action, full: true }))}
+          </div>
+        )}
+        {secondaryActions.length > 0 && (
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {secondaryActions.map((action) => renderActionButton(action))}
+          </div>
+        )}
+        {dangerActions.length > 0 && (
+          <div className="mt-3 border-t border-red-100 pt-3">
+            {dangerActions.map((action) => renderActionButton(action))}
+          </div>
+        )}
+      </section>
+    );
+  };
+
+  const renderTicketSummary = () => (
+    <header className="rounded-2xl bg-blue-950 p-4 text-white shadow-lg">
+      <div className="flex items-start justify-between gap-3">
+        <h1 className="min-w-0 break-words text-3xl font-extrabold">{ticket.ticketNumber ?? "Not available"}</h1>
+        <StatusPill status={ticket.status} label={ticketStatusLabel} />
+      </div>
+      <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="min-w-0 border-white/20 sm:border-r sm:pr-4">
+          <p className="flex items-center gap-2 text-xs font-semibold text-blue-100"><User size={17} aria-hidden="true" /> Customer</p>
+          <p className="mt-1 truncate text-base font-extrabold">{ticket.customerName ?? "Not available"}</p>
+        </div>
+        <div className="min-w-0 border-white/20 sm:border-r sm:pr-4">
+          <p className="flex items-center gap-2 text-xs font-semibold text-blue-100"><Box size={17} aria-hidden="true" /> Product</p>
+          <p className="mt-1 truncate text-base font-extrabold">{ticket.productType ?? "Not available"}</p>
+        </div>
+        <div className="min-w-0 border-white/20 sm:border-r sm:pr-4">
+          <p className="flex items-center gap-2 text-xs font-semibold text-blue-100"><MessageCircle size={17} aria-hidden="true" /> Problem</p>
+          <p className="mt-1 line-clamp-2 text-base font-extrabold">{problemSummary}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="flex items-center gap-2 text-xs font-semibold text-blue-100"><IndianRupee size={17} aria-hidden="true" /> Total</p>
+          <p className="mt-1 truncate text-base font-extrabold">{formatCompactCurrency(totalAmount)}</p>
+        </div>
+      </div>
+    </header>
+  );
+
+  const renderCustomerSection = () => (
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <h2 className="text-lg font-extrabold text-blue-950">Customer</h2>
+      <div className="mt-3 divide-y divide-blue-100">
+        <div className="flex min-h-16 flex-wrap items-center gap-3 py-2.5">
+          <IconBubble icon={Phone} />
+          <div className="min-w-[8.5rem] flex-1">
+            <p className="text-xs font-semibold text-slate-700">Mobile Number</p>
+            <p className="whitespace-nowrap text-base font-extrabold text-blue-950 sm:text-lg">{ticket.mobileNumber ?? "Not available"}</p>
+          </div>
+          {sanitizedMobileNumber && (
+            <a href={`tel:${sanitizedMobileNumber}`} className="ke-primary-action ml-auto inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-extrabold sm:px-4">
+              <PhoneCall size={20} aria-hidden="true" /> Call Customer
+            </a>
+          )}
+        </div>
+        <div className="flex min-h-14 items-center gap-3 py-2.5">
+          <IconBubble icon={MapPin} />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-700">Area</p>
+            <p className="break-words text-base font-extrabold text-blue-950">{ticket.villageOrArea ?? "Not available"}</p>
+          </div>
+        </div>
+        <div className="flex min-h-14 items-center gap-3 py-2.5">
+          <IconBubble icon={Box} />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-700">Product</p>
+            <p className="break-words text-base font-extrabold text-blue-950">{ticket.productType ?? "Not available"}</p>
+          </div>
+        </div>
+        <div className="flex min-h-14 items-center gap-3 py-2.5">
+          <IconBubble icon={MessageCircle} />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-700">Complaint</p>
+            <p className="break-words text-base font-extrabold text-blue-950">{ticket.complaintDescription ?? "Not available"}</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+
+  const renderWorkItemsSection = () => (
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <h2 className="text-lg font-extrabold text-blue-950">Work Items</h2>
+      <div className="mt-3">
+        {canViewCharges && <DetailRow icon={IndianRupee} label="Charges" value={formatCompactCurrency(totalAmount)} actionLabel="View" onClick={openWorkItemsView} tone={Number(totalAmount) > 0 ? "green" : "slate"} />}
+        <DetailRow icon={Wrench} label="Missing Parts" value="Not added" />
+        <DetailRow icon={ShieldCheck} label="Warranty" value="Not marked" />
+      </div>
+    </section>
+  );
+
+  const renderMoreDetailsSection = () => (
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <h2 className="text-lg font-extrabold text-blue-950">More Details</h2>
+      <div className="mt-3">
+        {canViewCustomerHistory && <DetailRow icon={ListChecks} label="Previous Tickets" value={previousTicketSummary} onClick={openCustomerHistoryView} />}
+        <DetailRow icon={History} label="Ticket Timeline" value={historySummary} onClick={openTimelineView} />
+        <DetailRow icon={ClipboardCheck} label="Status Details" value={ticketStatusLabel} onClick={openStatusView} tone={ticket?.status === "COMPLETED" ? "green" : "slate"} />
+      </div>
+    </section>
+  );
+
+  const renderStickyActions = () => {
+    const { primaryActions } = getWorkflowActionGroups();
+    const mainAction = primaryActions[0];
+
+    if (!sanitizedMobileNumber && !mainAction && !canAddCharge) return null;
+
+    return (
+      <div className="fixed inset-x-0 bottom-[calc(var(--ke-bottom-nav-height)+env(safe-area-inset-bottom))] z-30 border-t border-blue-100 bg-white/95 px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden">
+        <div className="mx-auto grid max-w-md grid-cols-2 gap-2">
+          {sanitizedMobileNumber && (
+            <a href={`tel:${sanitizedMobileNumber}`} className="ke-primary-action inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-extrabold">
+              <PhoneCall size={20} aria-hidden="true" /> Call Customer
+            </a>
+          )}
+          {mainAction
+            ? renderActionButton({ ...mainAction, tone: "yellow", full: true })
+            : canAddCharge && renderActionButton({ key: "sticky-add-charge", label: "Add Charge", icon: Plus, tone: "yellow", full: true, onClick: openWorkItemsView })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderChargeControls = () => (
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-extrabold text-blue-950">Charges</h2>
+          <p className="mt-1 text-sm font-semibold text-slate-600">Total</p>
+          <p className="text-3xl font-extrabold text-green-700">{formatCompactCurrency(totalAmount)}</p>
+        </div>
+        {canAddCharge && (
+          <button type="button" onClick={openAddCharge} className="ke-accent-action inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-extrabold">
+            <Plus size={19} aria-hidden="true" /> Add Charge
+          </button>
+        )}
+      </div>
+
+      <div className="mt-4 space-y-3">
+        {chargeLoading && <p className="text-sm font-semibold text-gray-600">Loading charges...</p>}
+        {chargeError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{chargeError}</p>}
+
+        {!chargeLoading && !chargeError && showAddChargeForm && (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <h3 className="text-sm font-bold text-slate-900">Add Charge</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm font-semibold text-slate-700">
+                Description
+                <Suspense fallback={<input name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" autoComplete="off" />}>
+                  <SuggestionInput endpoint="/volt/suggestions/charge-descriptions" name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
+                </Suspense>
+                {chargeFormErrors.description && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.description}</span>}
+              </label>
+              <label className="block text-sm font-semibold text-slate-700">
+                Amount
+                <input name="amount" type="number" min="0.01" max="999999.99" step="0.01" value={chargeForm.amount} onChange={handleChargeInput} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
+                {chargeFormErrors.amount && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.amount}</span>}
+              </label>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button type="button" onClick={cancelAddCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="min-h-11 rounded-xl border border-blue-950 px-3 py-2 text-sm font-bold text-blue-950 disabled:opacity-60">
+                Cancel
+              </button>
+              <button type="button" onClick={addCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="ke-accent-action min-h-11 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-60">
+                {processingKeys[`add-charge-${ticketId}`] ? "Saving..." : "Save"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!chargeLoading && !chargeError && chargeItems.length === 0 && (
+          <p className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-600">No charge items found.</p>
+        )}
+
+        {!chargeLoading && !chargeError && chargeItems.length > 0 && (
+          <div className="overflow-hidden rounded-xl border border-blue-100">
+            {chargeItems.map((item) => (
+              <div key={item.id} className="flex min-h-14 items-center gap-3 border-t border-blue-100 px-3 py-2 first:border-t-0">
+                <IconBubble icon={ClipboardCheck} />
+                <p className="min-w-0 flex-1 break-words text-sm font-bold text-blue-950">{item.description}</p>
+                <span className="shrink-0 text-sm font-extrabold text-slate-900">{formatCompactCurrency(item.amount)}</span>
+                {canDeleteCharge && ticket.status !== "CANCELLED" && (
+                  <button type="button" onClick={() => setPendingDeleteChargeId(item.id)} disabled={processingKeys[`delete-charge-${item.id}`]} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-red-700 hover:bg-red-50 disabled:opacity-60" aria-label={`Delete ${item.description}`}>
+                    <Trash2 size={18} aria-hidden="true" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {chargeActionMessage && chargeActionMessage.startsWith("Unable") && (
+          <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{chargeActionMessage}</p>
+        )}
+      </div>
+    </section>
+  );
+
+  const renderDetailHeader = (title, subtitle = "") => (
+    <>
+      <button type="button" onClick={() => setActiveDetailView("ticket")} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 text-base font-semibold text-blue-950">
+        <ArrowLeft size={18} aria-hidden="true" /> Back to Ticket
+      </button>
+      <div className="mt-6">
+        <h1 className="break-words text-3xl font-extrabold text-blue-950 sm:text-4xl">{title}</h1>
+        {subtitle && <p className="mt-2 break-words text-base font-semibold text-slate-600">{subtitle}</p>}
+      </div>
+    </>
+  );
+
+  const renderCustomerHistoryView = () => (
+    <div className="min-w-0 space-y-5">
+      {renderDetailHeader("Previous Tickets", `${ticket.customerName ?? "Customer"}${ticket.mobileNumber ? ` • ${ticket.mobileNumber}` : ""}`)}
+      <section className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <ListChecks className="text-blue-700" size={24} aria-hidden="true" />
+            <p className="font-bold text-slate-700">{customerHistoryLoading ? "Loading..." : `${customerHistoryCount} ticket${customerHistoryCount === 1 ? "" : "s"} found`}</p>
+          </div>
+        </div>
+      </section>
+      {customerHistoryError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{customerHistoryError}</p>}
+      {!customerHistoryLoading && !customerHistoryError && customerHistory.length === 0 && (
+        <p className="rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No previous tickets found.</p>
+      )}
+      <div className="divide-y divide-blue-100">
+        {customerHistory.map((historyTicket) => (
+          <button key={historyTicket.id ?? historyTicket.ticketNumber} type="button" onClick={() => navigate(`/tickets/${historyTicket.id}${location.search}`)} className="flex min-h-24 w-full items-center gap-4 py-4 text-left">
+            <IconBubble icon={Box} className="h-14 w-14" />
+            <span className="min-w-0 flex-1">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-xl font-extrabold text-blue-950">{historyTicket.ticketNumber ?? "Not available"}</span>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${historyTicket.status === "COMPLETED" ? "bg-green-100 text-green-700" : historyTicket.status === "CANCELLED" ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
+                  {formatLabel(historyTicket.status)}
+                </span>
+              </span>
+              <span className="mt-1 block break-words text-sm font-semibold text-slate-900">{historyTicket.complaintDescription || formatLabel(historyTicket.category)}</span>
+              <span className="mt-1 block text-sm font-semibold text-slate-600">{formatDate(historyTicket.createdAt)}</span>
+            </span>
+            <span className="shrink-0 text-xl font-extrabold text-blue-950">{formatCompactCurrency(historyTicket.totalCharge)}</span>
+            <ChevronRight className="shrink-0 text-blue-700" size={22} aria-hidden="true" />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
+  const renderTimelineView = () => (
+    <div className="min-w-0 space-y-5">
+      {renderDetailHeader("Ticket Timeline", `${ticket.ticketNumber ?? "Ticket"} • ${workflowHistory.length} event${workflowHistory.length === 1 ? "" : "s"}`)}
+      <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-sm font-extrabold text-green-700">
+        <CheckCircle2 size={18} aria-hidden="true" /> {workflowHistoryLoading ? "Loading events..." : `${workflowHistory.length} events loaded`}
+      </span>
+      {workflowHistoryError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{workflowHistoryError}</p>}
+      {!workflowHistoryLoading && !workflowHistoryError && workflowHistory.length === 0 && (
+        <p className="rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No workflow history yet.</p>
+      )}
+      <div className="ml-6 space-y-0">
+        {workflowHistory.map((historyItem, index) => {
+          const itemId = historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`;
+          const isLast = index === workflowHistory.length - 1;
+          return (
+            <article key={itemId} className={`relative min-w-0 border-l-2 ${isLast ? "border-transparent" : "border-blue-200"} pb-8 pl-8 last:pb-0`}>
+              <span className={`absolute -left-[13px] top-0 flex h-6 w-6 items-center justify-center rounded-full ${isLast && ticket.status === "COMPLETED" ? "bg-green-600 text-white" : "bg-blue-100 text-blue-600"}`} aria-hidden="true">
+                {isLast && ticket.status === "COMPLETED" ? <Check size={16} /> : <span className="h-3 w-3 rounded-full bg-blue-500" />}
+              </span>
+              <h2 className={`break-words text-xl font-extrabold ${isLast && ticket.status === "COMPLETED" ? "text-green-700" : "text-blue-950"}`}>{historyItem.actionDisplayName || formatLabel(historyItem.actionKey)}</h2>
+              <p className="mt-2 text-sm font-semibold text-slate-600">{formatDateTime(historyItem.createdAt)}</p>
+              <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-900"><User size={18} aria-hidden="true" /> {getHistoryActor(historyItem)}</p>
+              {historyItem.comment && <p className="mt-4 rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm text-slate-800"><span className="font-bold text-green-700">Comment:</span> {historyItem.comment}</p>}
+            </article>
+          );
+        })}
+      </div>
+      {!workflowHistoryLast && (
+        <button type="button" onClick={() => loadWorkflowHistory(workflowHistoryPage + 1, false)} disabled={workflowHistoryLoadingMore} className="rounded-xl bg-blue-50 px-4 py-2 font-semibold text-blue-950 hover:bg-blue-100 disabled:opacity-60">
+          {workflowHistoryLoadingMore ? "Loading..." : "Load More"}
+        </button>
+      )}
+    </div>
+  );
+
+  const renderStatusView = () => (
+    <div className="min-w-0 space-y-6">
+      {renderDetailHeader("Status Details")}
+      <section className="rounded-2xl border border-green-100 bg-green-50 p-4">
+        <div className="flex items-center gap-4">
+          <IconBubble icon={CheckCircle2} tone={ticket.status === "COMPLETED" ? "green" : "blue"} className="h-14 w-14" />
+          <div>
+            <p className="text-sm font-semibold text-slate-900">{ticket.status === "COMPLETED" ? "Completed by" : "Current status"}</p>
+            <p className="mt-1 break-words text-xl font-extrabold text-green-700">{ticket.status === "COMPLETED" ? ticket.completedByEmployeeId || "Not available" : ticketStatusLabel}</p>
+          </div>
+        </div>
+      </section>
+      <section className="space-y-3">
+        <p className="text-sm font-extrabold uppercase tracking-wide text-slate-600">Ticket Status</p>
+        <DetailRow icon={ClipboardCheck} label="Status" value={ticketStatusLabel} tone={ticket.status === "COMPLETED" ? "green" : "slate"} />
+        <p className="pt-3 text-sm font-extrabold uppercase tracking-wide text-slate-600">Ownership</p>
+        <DetailRow icon={User} label="Current Owner" value={getCurrentOwnerLabel(ticket)} />
+        <DetailRow icon={Calendar} label="Created Date" value={formatDate(ticket.createdAt ?? ticket.createdDate)} />
+        {ticket.status === "COMPLETED" && (
+          <>
+            <p className="pt-3 text-sm font-extrabold uppercase tracking-wide text-slate-600">Completion</p>
+            <DetailRow icon={User} label="Completed By" value={ticket.completedByEmployeeId} />
+            <DetailRow icon={Clock3} label="Completed At" value={formatDateTime(ticket.completedAt)} />
+            <DetailRow icon={MessageCircle} label="Completion Remark" value={ticket.completionRemark} />
+          </>
+        )}
+        {ticket.status === "CANCELLED" && (
+          <>
+            <p className="pt-3 text-sm font-extrabold uppercase tracking-wide text-slate-600">Cancellation</p>
+            <DetailRow icon={User} label="Cancelled By" value={ticket.cancelledByEmployeeId} />
+            <DetailRow icon={Clock3} label="Cancelled At" value={formatDateTime(ticket.cancelledAt)} />
+            <DetailRow icon={MessageCircle} label="Cancellation Reason" value={ticket.cancellationReason} />
+          </>
+        )}
+      </section>
+    </div>
+  );
+
+  const renderWorkItemsView = () => (
+    <div className="min-w-0 space-y-5">
+      {renderDetailHeader("Work Items", "Overview of charges, missing parts and warranty details.")}
+      <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
+        <DetailRow icon={IndianRupee} label="Charges" value={formatCompactCurrency(totalAmount)} tone={Number(totalAmount) > 0 ? "green" : "slate"} />
+        <DetailRow icon={Wrench} label="Missing Parts" value="Not added" />
+        <DetailRow icon={ShieldCheck} label="Warranty" value="Not marked" />
+      </section>
+      {canViewCharges && renderChargeControls()}
+      <section className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <IconBubble icon={Wrench} />
+            <h2 className="text-lg font-extrabold text-blue-950">Missing Parts</h2>
+          </div>
+          <span className="text-sm font-bold text-slate-500">Future</span>
+        </div>
+        <p className="mt-3 text-sm font-semibold text-slate-600">Missing parts tracking is not added yet.</p>
+      </section>
+      <section className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <IconBubble icon={ShieldCheck} />
+            <h2 className="text-lg font-extrabold text-blue-950">Warranty</h2>
+          </div>
+          <span className="text-sm font-bold text-slate-500">Future</span>
+        </div>
+        <p className="mt-3 text-sm font-semibold text-slate-600">Warranty details are not marked yet.</p>
+      </section>
+    </div>
+  );
+
+  const renderTicketHome = () => (
+    <div className="mt-4 min-w-0 space-y-4 pb-24 sm:pb-0">
+      {renderTicketSummary()}
+      {statusMessage && (
+        <p className={`rounded-xl px-4 py-3 text-sm font-semibold ${statusMessage.startsWith("Unable") || statusMessage.startsWith("Please") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
+          {statusMessage}
+        </p>
+      )}
+      {renderWorkflowActions()}
+      {renderCustomerSection()}
+      {renderWorkItemsSection()}
+      {renderMoreDetailsSection()}
+      {renderStickyActions()}
+    </div>
+  );
 
   return (
     <main className="ke-page-main ticket-detail-page bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-4xl">
-        <button type="button" onClick={() => navigate(`/tickets/find${location.search}`)} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 font-semibold text-blue-950">
-          <ArrowLeft size={18} aria-hidden="true" /> Back to Find Tickets
-        </button>
+        {activeDetailView === "ticket" && (
+          <button type="button" onClick={() => navigate(`/tickets/find${location.search}`)} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 text-base font-semibold text-blue-950">
+            <ArrowLeft size={18} aria-hidden="true" /> Back to Find Tickets
+          </button>
+        )}
 
         {isLoading && <TicketDetailSkeleton />}
         {error && <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
 
         {!isLoading && !error && ticket && (
-          <div className="mt-4 min-w-0 space-y-4">
-            <header className="rounded-2xl bg-blue-950 p-4 text-white shadow-lg sm:rounded-3xl sm:p-7">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <h1 className="min-w-0 break-words text-2xl font-extrabold sm:text-3xl">{ticket.ticketNumber ?? "Not available"}</h1>
-                <span className="max-w-full break-words rounded-full bg-white/15 px-3 py-1 text-xs font-bold">{getTicketStatusLabel(ticket)}</span>
-              </div>
-              <p className="mt-3 break-words text-sm font-bold text-blue-100">{formatEnumDisplay(ticket.category)}</p>
-              <p className="mt-1 break-words text-base font-semibold">{ticket.customerName ?? "Customer not available"}</p>
-            </header>
-
-            {statusMessage && (
-              <p className={`rounded-xl px-4 py-3 text-sm font-semibold ${statusMessage.startsWith("Unable") || statusMessage.startsWith("Please") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
-                {statusMessage}
-              </p>
-            )}
-
-            <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <h2 className="text-lg font-bold text-blue-950">Ticket Information</h2>
-              <dl className="mt-4 grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-                <InfoItem label="Customer Name">{ticket.customerName}</InfoItem>
-                <InfoItem label="Mobile Number">
-                  {ticket.mobileNumber ? (
-                    <span className="flex min-w-0 flex-wrap items-center gap-2">
-                      <a href={`tel:${String(ticket.mobileNumber).replace(/[^\d+]/g, "")}`} className="inline-flex min-w-0 items-center gap-2 break-words font-semibold text-blue-950 hover:underline">
-                        <Phone size={15} aria-hidden="true" /> {ticket.mobileNumber}
-                      </a>
-                      <a href={`tel:${String(ticket.mobileNumber).replace(/[^\d+]/g, "")}`} className="inline-flex min-h-9 items-center gap-1.5 rounded-xl bg-blue-950 px-3 py-1.5 text-xs font-bold text-white hover:bg-blue-900">
-                        <PhoneCall size={14} aria-hidden="true" /> Call
-                      </a>
-                    </span>
-                  ) : "Not available"}
-                </InfoItem>
-                <InfoItem label="Village / Area" className="sm:col-span-2"><span className="inline-flex min-w-0 items-center gap-2 break-words"><MapPin size={15} aria-hidden="true" /> {ticket.villageOrArea ?? "Not available"}</span></InfoItem>
-                <InfoItem label="Product Type">{ticket.productType}</InfoItem>
-                <InfoItem label="Category">{formatEnumDisplay(ticket.category)}</InfoItem>
-                <InfoItem label="Amount">{formatCurrency(ticket.totalCharge)}</InfoItem>
-                <InfoItem label="Created Date"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
-                <InfoItem label="Current Owner">{getCurrentOwnerLabel(ticket)}</InfoItem>
-                <InfoItem label="Complaint Description" className="sm:col-span-2">{ticket.complaintDescription}</InfoItem>
-              </dl>
-              {canAssignTicket && (
-                <button type="button" onClick={openAssignDialog} className="ke-primary-action mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold">
-                  <UserPlus size={16} aria-hidden="true" /> Assign Ticket
-                </button>
-              )}
-            </section>
-
-            {renderWorkflowActions(true)}
-
-            {canViewCustomerHistory && <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-bold text-blue-950">
-                  Customer History{hasLoadedCustomerHistory ? ` (${customerHistoryCount})` : ""}
-                </h2>
-                <button type="button" onClick={toggleCustomerHistory} className="rounded-2xl bg-blue-50 px-4 py-2 font-semibold text-blue-950 hover:bg-blue-100">
-                  <span className="inline-flex items-center gap-2"><Eye size={16} aria-hidden="true" /> {showCustomerHistory ? "Hide" : "View"}</span>
-                </button>
-              </div>
-
-              {showCustomerHistory && (
-                <div className="mt-4 space-y-3">
-                  {customerHistoryLoading && <p className="text-sm font-semibold text-gray-600">Loading customer history...</p>}
-                  {customerHistoryError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{customerHistoryError}</p>}
-                  {!customerHistoryLoading && !customerHistoryError && customerHistory.length === 0 && (
-                    <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">No previous tickets found.</p>
-                  )}
-                  {!customerHistoryLoading && !customerHistoryError && customerHistory.map((historyTicket) => (
-                    <article key={historyTicket.id ?? historyTicket.ticketNumber} className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-extrabold text-blue-950">{historyTicket.ticketNumber ?? "Not available"}</h3>
-                          <p className="mt-1 text-sm text-slate-700">{historyTicket.customerName ?? "Not available"}</p>
-                        </div>
-                        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-950">{formatLabel(historyTicket.status)}</span>
-                      </div>
-                      <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                        <InfoItem label="Product">{historyTicket.productType}</InfoItem>
-                        <InfoItem label="Category">{formatLabel(historyTicket.category)}</InfoItem>
-                        <InfoItem label="Created">{formatDate(historyTicket.createdAt)}</InfoItem>
-                        <InfoItem label="Total Charge">{formatCurrency(historyTicket.totalCharge)}</InfoItem>
-                      </dl>
-                      <button type="button" onClick={() => navigate(`/tickets/${historyTicket.id}${location.search}`)} className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-950 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-900">
-                        <Eye size={15} aria-hidden="true" /> View Details
-                      </button>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </section>}
-
-            <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <button type="button" onClick={() => setShowStatusDetails((current) => !current)} className="flex w-full items-center justify-between gap-3 text-left">
-                <span>
-                  <span className="block text-lg font-bold text-blue-950">Status / Workflow Details</span>
-                  <span className="mt-1 block text-sm font-semibold text-gray-600">
-                    {getTicketStatusLabel(ticket)}
-                    {ticket.status === "COMPLETED" && ticket.completedByEmployeeId ? ` by ${ticket.completedByEmployeeId}` : ""}
-                  </span>
-                </span>
-                {showStatusDetails ? <ChevronDown className="shrink-0 text-blue-950" size={20} aria-hidden="true" /> : <ChevronRight className="shrink-0 text-blue-950" size={20} aria-hidden="true" />}
-              </button>
-              {showStatusDetails && (
-                <dl className="mt-4 grid grid-cols-1 gap-3 border-t border-blue-100 pt-4 text-sm sm:grid-cols-2">
-                  <InfoItem label="Status">{getTicketStatusLabel(ticket)}</InfoItem>
-                  <InfoItem label="Current Owner">{getCurrentOwnerLabel(ticket)}</InfoItem>
-                  <InfoItem label="Created Date"><span className="inline-flex min-w-0 items-center gap-2 break-words"><Calendar size={15} aria-hidden="true" /> {formatDate(ticket.createdAt ?? ticket.createdDate)}</span></InfoItem>
-                  {ticket.status === "COMPLETED" && <InfoItem label="Completed By">{ticket.completedByEmployeeId}</InfoItem>}
-                  {ticket.status === "COMPLETED" && <InfoItem label="Completed At">{formatDateTime(ticket.completedAt)}</InfoItem>}
-                  {ticket.status === "COMPLETED" && ticket.completionRemark && <InfoItem label="Completion Remark" className="sm:col-span-2">{ticket.completionRemark}</InfoItem>}
-                  {ticket.status === "CANCELLED" && <InfoItem label="Cancelled By">{ticket.cancelledByEmployeeId}</InfoItem>}
-                  {ticket.status === "CANCELLED" && <InfoItem label="Cancelled At">{formatDateTime(ticket.cancelledAt)}</InfoItem>}
-                  {ticket.status === "CANCELLED" && <InfoItem label="Cancellation Reason" className="sm:col-span-2">{ticket.cancellationReason}</InfoItem>}
-                </dl>
-              )}
-            </section>
-
-            <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <button type="button" onClick={toggleWorkflowHistory} className="flex w-full items-center justify-between gap-3 text-left">
-                <span>
-                  <span className="block text-lg font-bold text-blue-950">Workflow History</span>
-                  <span className="mt-1 block text-sm font-semibold text-gray-600">
-                    {workflowHistory.length > 0 ? `${workflowHistory.length} event${workflowHistory.length === 1 ? "" : "s"} loaded` : "Tap to view timeline"}
-                  </span>
-                </span>
-                {showWorkflowHistory ? <ChevronDown className="shrink-0 text-blue-950" size={20} aria-hidden="true" /> : <ChevronRight className="shrink-0 text-blue-950" size={20} aria-hidden="true" />}
-              </button>
-
-              {showWorkflowHistory && <div className="mt-4 space-y-3 border-t border-blue-100 pt-4">
-                {workflowHistoryLoading && <p className="text-sm font-semibold text-gray-600">Loading workflow history...</p>}
-                {workflowHistoryError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{workflowHistoryError}</p>}
-                {!workflowHistoryLoading && !workflowHistoryError && workflowHistory.length === 0 && (
-                  <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">No workflow history yet.</p>
-                )}
-                {!workflowHistoryLoading && workflowHistory.length > 0 && (
-                  <>
-                    <div className="space-y-0">
-                      {workflowHistory.map((historyItem) => (
-                        <article key={historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`} className="relative min-w-0 border-l-2 border-blue-100 pb-4 pl-4 last:pb-0">
-                          <span className="absolute -left-[7px] top-1 h-3 w-3 rounded-full bg-blue-950" aria-hidden="true" />
-                          <button
-                            type="button"
-                            onClick={() => setExpandedWorkflowHistoryId((current) => current === (historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`) ? null : (historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`))}
-                            className="w-full text-left"
-                          >
-                            <div className="flex min-w-0 items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <h3 className="break-words font-extrabold leading-tight text-blue-950">{historyItem.actionDisplayName || formatLabel(historyItem.actionKey)}</h3>
-                                <p className="mt-1 text-sm font-semibold text-slate-700">
-                                  {(historyItem.fromStatusDisplayName || formatLabel(historyItem.fromStatus))} to {(historyItem.toStatusDisplayName || formatLabel(historyItem.toStatus))}
-                                </p>
-                                <p className="mt-1 text-xs font-semibold text-slate-500">
-                                  {formatDateTime(historyItem.createdAt)} - {getHistoryActor(historyItem)}
-                                </p>
-                              </div>
-                              {expandedWorkflowHistoryId === (historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`) ? <ChevronDown className="shrink-0 text-blue-950" size={18} aria-hidden="true" /> : <ChevronRight className="shrink-0 text-blue-950" size={18} aria-hidden="true" />}
-                            </div>
-                          </button>
-
-                          {expandedWorkflowHistoryId === (historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`) && <dl className="mt-3 grid grid-cols-1 gap-2 rounded-xl bg-slate-50 p-3 text-sm sm:grid-cols-2">
-                            <InfoItem label="Executed By">{getHistoryActor(historyItem)}</InfoItem>
-                            {hasOwnerChange(historyItem) && (
-                              <InfoItem label="Owner Change">
-                                {(historyItem.previousOwnerEmployeeId || "Unassigned")} to {(historyItem.newOwnerEmployeeId || "Unassigned")}
-                              </InfoItem>
-                            )}
-                            {historyItem.comment && <InfoItem label="Comment" className="sm:col-span-2">{historyItem.comment}</InfoItem>}
-                            {historyItem.reason && <InfoItem label="Reason" className="sm:col-span-2">{historyItem.reason}</InfoItem>}
-                          </dl>}
-                        </article>
-                      ))}
-                    </div>
-
-                    {!workflowHistoryLast && (
-                      <button
-                        type="button"
-                        onClick={() => loadWorkflowHistory(workflowHistoryPage + 1, false)}
-                        disabled={workflowHistoryLoadingMore}
-                        className="rounded-2xl bg-blue-50 px-4 py-2 font-semibold text-blue-950 hover:bg-blue-100 disabled:opacity-60"
-                      >
-                        {workflowHistoryLoadingMore ? "Loading..." : "Load More"}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>}
-            </section>
-
-            {canViewCharges && <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h2 className="text-lg font-bold text-blue-950">Charges</h2>
-                  <p className="mt-1 text-xl font-extrabold text-blue-950">{formatCurrency(ticket.totalCharge ?? chargeTotal)}</p>
-                </div>
-                <button type="button" onClick={toggleCharges} className="rounded-xl bg-blue-50 px-3 py-2 text-sm font-bold text-blue-950 hover:bg-blue-100">
-                  <span className="inline-flex items-center gap-2"><Eye size={15} aria-hidden="true" /> {showCharges ? "Hide" : "View"}</span>
-                </button>
-              </div>
-
-              {showCharges && (
-                <div className="mt-4 space-y-4">
-                  {chargeLoading && <p className="text-sm font-semibold text-gray-600">Loading charges...</p>}
-                  {chargeError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{chargeError}</p>}
-                  {!chargeLoading && !chargeError && (
-                    <>
-                      {canAddCharge && (
-                        showAddChargeForm ? (
-                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                            <h3 className="text-sm font-bold text-slate-900">Add Charge</h3>
-                            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                              <label className="block text-sm font-semibold text-slate-700">
-                                Description
-                                <Suspense fallback={<input name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" autoComplete="off" />}>
-                                  <SuggestionInput endpoint="/volt/suggestions/charge-descriptions" name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
-                                </Suspense>
-                                {chargeFormErrors.description && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.description}</span>}
-                              </label>
-                              <label className="block text-sm font-semibold text-slate-700">
-                                Amount
-                                <input name="amount" type="number" min="0.01" max="999999.99" step="0.01" value={chargeForm.amount} onChange={handleChargeInput} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
-                                {chargeFormErrors.amount && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.amount}</span>}
-                              </label>
-                            </div>
-                            <div className="mobile-full-width-actions mt-3 flex flex-wrap gap-2">
-                              <button type="button" onClick={addCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="ke-accent-action rounded-xl px-3 py-2 text-sm font-semibold disabled:opacity-60">
-                                {processingKeys[`add-charge-${ticketId}`] ? "Saving..." : "Save"}
-                              </button>
-                              <button type="button" onClick={cancelAddCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="rounded-xl bg-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-300 disabled:opacity-60">
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button type="button" onClick={openAddCharge} className="ke-accent-action inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold">
-                            <Plus size={16} aria-hidden="true" /> Add Charge
-                          </button>
-                        )
-                      )}
-
-                      {chargeItems.length === 0 ? (
-                        <p className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">No charge items found.</p>
-                      ) : (
-                        <div className="divide-y divide-slate-200 border-y border-slate-200">
-                          {chargeItems.map((item) => (
-                            <div key={item.id} className="py-2 sm:flex sm:items-center sm:justify-between sm:gap-4">
-                              <p className="min-w-0 break-words text-sm text-slate-800">{item.description}</p>
-                              <div className="mt-1 flex shrink-0 items-center justify-between gap-3 sm:mt-0">
-                                <span className="text-sm font-semibold text-slate-900">{formatCurrency(item.amount)}</span>
-                                {canDeleteCharge && ticket.status !== "CANCELLED" && (
-                                  <button type="button" onClick={() => setPendingDeleteChargeId(item.id)} disabled={processingKeys[`delete-charge-${item.id}`]} className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-60">
-                                    {processingKeys[`delete-charge-${item.id}`] ? "Deleting..." : "Delete"}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                      {chargeActionMessage && chargeActionMessage.startsWith("Unable") && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{chargeActionMessage}</p>}
-                    </>
-                  )}
-                </div>
-              )}
-            </section>}
+          <div className="mt-4 min-w-0">
+            {activeDetailView === "ticket" && renderTicketHome()}
+            {activeDetailView === "customerHistory" && renderCustomerHistoryView()}
+            {activeDetailView === "timeline" && renderTimelineView()}
+            {activeDetailView === "status" && renderStatusView()}
+            {activeDetailView === "workItems" && renderWorkItemsView()}
 
             {chargeActionMessage && !chargeActionMessage.startsWith("Unable") && (
               <div className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white shadow-2xl sm:bottom-4" role="status">
                 {chargeActionMessage}
+              </div>
+            )}
+
+            {showCompleteConfirmation && (
+              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="complete-ticket-title">
+                <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl">
+                  <h2 id="complete-ticket-title" className="text-lg font-extrabold text-blue-950">Mark this ticket completed?</h2>
+                  <p className="mt-2 text-sm font-semibold text-gray-600">Use this only after the customer work is finished.</p>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => setShowCompleteConfirmation(false)} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50">
+                      Go Back
+                    </button>
+                    <button type="button" onClick={confirmCompleteTicket} disabled={processingKeys[`complete-${ticketId}`]} className="ke-primary-action min-h-11 rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60">
+                      Mark Completed
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 

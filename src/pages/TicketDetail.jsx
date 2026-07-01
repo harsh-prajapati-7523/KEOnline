@@ -1038,17 +1038,6 @@ export default function TicketDetail() {
       });
     }
 
-    if (canAssignTicket && !["COMPLETED", "CANCELLED"].includes(ticket.status)) {
-      secondaryActions.push({
-        key: "assign",
-        label: "Assign Ticket",
-        icon: Users,
-        onClick: openAssignDialog,
-        disabled: false,
-        tone: "outline",
-      });
-    }
-
     dynamicActions.forEach((action) => {
       secondaryActions.push({
         key: `dynamic-${action.transitionId}`,
@@ -1160,8 +1149,8 @@ export default function TicketDetail() {
             <p className="whitespace-nowrap text-base font-extrabold text-blue-950">{ticket.mobileNumber ?? "Not available"}</p>
           </div>
           {sanitizedMobileNumber && (
-            <a href={`tel:${sanitizedMobileNumber}`} className="ke-primary-action ml-auto inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold sm:px-4">
-              <PhoneCall size={20} aria-hidden="true" /> Call Customer
+            <a href={`tel:${sanitizedMobileNumber}`} aria-label="Call Customer" title="Call Customer" className="ke-primary-action ml-auto inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl">
+              <PhoneCall size={21} aria-hidden="true" />
             </a>
           )}
         </div>
@@ -1195,6 +1184,7 @@ export default function TicketDetail() {
       <h2 className="text-lg font-extrabold leading-tight text-blue-950">Work Items</h2>
       <div className="mt-3">
         {canViewCharges && <DetailRow icon={IndianRupee} label="Charges" value={formatCompactCurrency(totalAmount)} actionLabel="View" onClick={openChargesView} tone={Number(totalAmount) > 0 ? "green" : "slate"} />}
+        {canAssignTicket && !["COMPLETED", "CANCELLED"].includes(ticket.status) && <DetailRow icon={Users} label="Assign Ticket" actionLabel="Assign" onClick={openAssignDialog} />}
         <DetailRow icon={Wrench} label="Missing Parts" value="Not added" />
         <DetailRow icon={ShieldCheck} label="Warranty" value="Not marked" />
       </div>

@@ -18,6 +18,7 @@ import {
   Play,
   Plus,
   ShieldCheck,
+  SlidersHorizontal,
   Trash2,
   User,
   Users,
@@ -205,8 +206,8 @@ function IconBubble({ icon: Icon, tone = "slate", className = "" }) {
   }[tone] || "bg-slate-100 text-slate-900";
 
   return (
-    <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${toneClassName} ${className}`}>
-      <Icon size={22} aria-hidden="true" />
+    <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${toneClassName} ${className}`}>
+      <Icon size={20} aria-hidden="true" />
     </span>
   );
 }
@@ -249,14 +250,14 @@ function DetailRow({ icon: Icon, label, value, actionLabel, onClick, tone = "sla
 
   if (onClick) {
     return (
-      <button type="button" onClick={onClick} className="flex min-h-14 w-full items-center gap-3 border-t border-blue-100 py-2.5 text-left first:border-t-0">
+      <button type="button" onClick={onClick} className="flex min-h-12 w-full items-center gap-3 border-t border-blue-100 py-2 text-left first:border-t-0">
         {content}
       </button>
     );
   }
 
   return (
-    <div className="flex min-h-14 items-center gap-3 border-t border-blue-100 py-2.5 first:border-t-0">
+    <div className="flex min-h-12 items-center gap-3 border-t border-blue-100 py-2 first:border-t-0">
       {content}
     </div>
   );
@@ -960,7 +961,7 @@ export default function TicketDetail() {
   };
 
   const getActionLabel = (label, actionKey = "") => {
-    if (actionKey === "PICK_TICKET" || label === "Pick Ticket") return ticket?.status === "PICKED" ? "Take Ownership" : "Take This Ticket";
+    if (actionKey === "PICK_TICKET" || label === "Pick Ticket") return "Take This Ticket";
     if (actionKey === "COMPLETE_TICKET" || label === "Complete Ticket") return "Mark Completed";
     return label;
   };
@@ -980,7 +981,7 @@ export default function TicketDetail() {
         type="button"
         onClick={onClick}
         disabled={disabled}
-        className={`${toneClassName} inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-extrabold disabled:opacity-60 ${full ? "w-full" : "w-full sm:w-auto sm:flex-1"}`}
+        className={`${toneClassName} inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60 ${full ? "w-full" : "w-full sm:w-auto sm:flex-1"}`}
       >
         {Icon && <Icon size={20} aria-hidden="true" />}
         {label}
@@ -1027,7 +1028,7 @@ export default function TicketDetail() {
     if (canPickTicket && ticket.status === "PICKED") {
       secondaryActions.push({
         key: `pick-${ticketId}`,
-        label: processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take Ownership",
+        label: processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take This Ticket",
         icon: User,
         onClick: () => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again."),
         disabled: processingKeys[`pick-${ticketId}`],
@@ -1035,7 +1036,7 @@ export default function TicketDetail() {
       });
     }
 
-    if (canAssignTicket) {
+    if (canAssignTicket && !["COMPLETED", "CANCELLED"].includes(ticket.status)) {
       secondaryActions.push({
         key: "assign",
         label: "Assign Ticket",
@@ -1078,8 +1079,8 @@ export default function TicketDetail() {
     const { primaryActions, secondaryActions, dangerActions } = getWorkflowActionGroups();
 
     return (
-      <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm" aria-busy={actionsPending}>
-        <h2 className="text-lg font-extrabold text-blue-950">Next Action</h2>
+      <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm" aria-busy={actionsPending}>
+        <h2 className="text-lg font-extrabold leading-tight text-blue-950">Next Action</h2>
         {availableActionsError && (
           <p className="mt-3 rounded-xl bg-yellow-100 px-4 py-3 text-sm font-semibold text-yellow-900">
             {availableActionsError}
@@ -1089,11 +1090,11 @@ export default function TicketDetail() {
           <p className="mt-3 rounded-xl bg-blue-50 px-4 py-3 text-sm font-semibold text-slate-600">Loading actions...</p>
         )}
         {hasNoActions && ticket?.status === "COMPLETED" && (
-          <div className="mt-3 flex items-center gap-4">
-            <IconBubble icon={CheckCircle2} tone="green" className="h-14 w-14" />
+          <div className="mt-3 flex items-center gap-3">
+            <IconBubble icon={CheckCircle2} tone="green" className="h-12 w-12" />
             <div>
-              <p className="text-lg font-extrabold text-green-700">No Action Needed</p>
-              <p className="mt-1 text-sm font-semibold text-slate-700">This ticket is completed.</p>
+              <p className="text-base font-extrabold text-green-700">No Action Needed</p>
+              <p className="mt-0.5 text-sm font-semibold text-slate-700">This ticket is completed.</p>
             </div>
           </div>
         )}
@@ -1106,7 +1107,7 @@ export default function TicketDetail() {
           </div>
         )}
         {secondaryActions.length > 0 && (
-          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             {secondaryActions.map((action) => renderActionButton(action))}
           </div>
         )}
@@ -1120,63 +1121,63 @@ export default function TicketDetail() {
   };
 
   const renderTicketSummary = () => (
-    <header className="rounded-2xl bg-blue-950 p-4 text-white shadow-lg">
+    <header className="rounded-2xl bg-blue-950 p-3.5 text-white shadow-lg">
       <div className="flex items-start justify-between gap-3">
-        <h1 className="min-w-0 break-words text-3xl font-extrabold">{ticket.ticketNumber ?? "Not available"}</h1>
+        <h1 className="min-w-0 break-words text-3xl font-extrabold leading-none">{ticket.ticketNumber ?? "Not available"}</h1>
         <StatusPill status={ticket.status} label={ticketStatusLabel} />
       </div>
-      <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="min-w-0 border-white/20 sm:border-r sm:pr-4">
-          <p className="flex items-center gap-2 text-xs font-semibold text-blue-100"><User size={17} aria-hidden="true" /> Customer</p>
-          <p className="mt-1 truncate text-base font-extrabold">{ticket.customerName ?? "Not available"}</p>
+      <div className="mt-4 grid grid-cols-4 gap-0 divide-x divide-white/25">
+        <div className="min-w-0 px-2 first:pl-0">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><User size={15} aria-hidden="true" /> Customer</p>
+          <p className="mt-1 truncate text-sm font-extrabold">{ticket.customerName ?? "Not available"}</p>
         </div>
-        <div className="min-w-0 border-white/20 sm:border-r sm:pr-4">
-          <p className="flex items-center gap-2 text-xs font-semibold text-blue-100"><Box size={17} aria-hidden="true" /> Product</p>
-          <p className="mt-1 truncate text-base font-extrabold">{ticket.productType ?? "Not available"}</p>
+        <div className="min-w-0 px-2">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><Box size={15} aria-hidden="true" /> Product</p>
+          <p className="mt-1 truncate text-sm font-extrabold">{ticket.productType ?? "Not available"}</p>
         </div>
-        <div className="min-w-0 border-white/20 sm:border-r sm:pr-4">
-          <p className="flex items-center gap-2 text-xs font-semibold text-blue-100"><MessageCircle size={17} aria-hidden="true" /> Problem</p>
-          <p className="mt-1 line-clamp-2 text-base font-extrabold">{problemSummary}</p>
+        <div className="min-w-0 px-2">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><MessageCircle size={15} aria-hidden="true" /> Problem</p>
+          <p className="mt-1 line-clamp-2 text-sm font-extrabold leading-tight">{problemSummary}</p>
         </div>
-        <div className="min-w-0">
-          <p className="flex items-center gap-2 text-xs font-semibold text-blue-100"><IndianRupee size={17} aria-hidden="true" /> Total</p>
-          <p className="mt-1 truncate text-base font-extrabold">{formatCompactCurrency(totalAmount)}</p>
+        <div className="min-w-0 px-2 pr-0">
+          <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><IndianRupee size={15} aria-hidden="true" /> Total</p>
+          <p className="mt-1 truncate text-sm font-extrabold">{formatCompactCurrency(totalAmount)}</p>
         </div>
       </div>
     </header>
   );
 
   const renderCustomerSection = () => (
-    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-extrabold text-blue-950">Customer</h2>
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
+      <h2 className="text-lg font-extrabold leading-tight text-blue-950">Customer</h2>
       <div className="mt-3 divide-y divide-blue-100">
-        <div className="flex min-h-16 flex-wrap items-center gap-3 py-2.5">
+        <div className="flex min-h-14 flex-wrap items-center gap-3 py-2">
           <IconBubble icon={Phone} />
           <div className="min-w-[8.5rem] flex-1">
             <p className="text-xs font-semibold text-slate-700">Mobile Number</p>
-            <p className="whitespace-nowrap text-base font-extrabold text-blue-950 sm:text-lg">{ticket.mobileNumber ?? "Not available"}</p>
+            <p className="whitespace-nowrap text-base font-extrabold text-blue-950">{ticket.mobileNumber ?? "Not available"}</p>
           </div>
           {sanitizedMobileNumber && (
-            <a href={`tel:${sanitizedMobileNumber}`} className="ke-primary-action ml-auto inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-extrabold sm:px-4">
+            <a href={`tel:${sanitizedMobileNumber}`} className="ke-primary-action ml-auto inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold sm:px-4">
               <PhoneCall size={20} aria-hidden="true" /> Call Customer
             </a>
           )}
         </div>
-        <div className="flex min-h-14 items-center gap-3 py-2.5">
+        <div className="flex min-h-12 items-center gap-3 py-2">
           <IconBubble icon={MapPin} />
           <div className="min-w-0">
             <p className="text-xs font-semibold text-slate-700">Area</p>
             <p className="break-words text-base font-extrabold text-blue-950">{ticket.villageOrArea ?? "Not available"}</p>
           </div>
         </div>
-        <div className="flex min-h-14 items-center gap-3 py-2.5">
+        <div className="flex min-h-12 items-center gap-3 py-2">
           <IconBubble icon={Box} />
           <div className="min-w-0">
             <p className="text-xs font-semibold text-slate-700">Product</p>
             <p className="break-words text-base font-extrabold text-blue-950">{ticket.productType ?? "Not available"}</p>
           </div>
         </div>
-        <div className="flex min-h-14 items-center gap-3 py-2.5">
+        <div className="flex min-h-12 items-center gap-3 py-2">
           <IconBubble icon={MessageCircle} />
           <div className="min-w-0">
             <p className="text-xs font-semibold text-slate-700">Complaint</p>
@@ -1188,8 +1189,8 @@ export default function TicketDetail() {
   );
 
   const renderWorkItemsSection = () => (
-    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-extrabold text-blue-950">Work Items</h2>
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
+      <h2 className="text-lg font-extrabold leading-tight text-blue-950">Work Items</h2>
       <div className="mt-3">
         {canViewCharges && <DetailRow icon={IndianRupee} label="Charges" value={formatCompactCurrency(totalAmount)} actionLabel="View" onClick={openWorkItemsView} tone={Number(totalAmount) > 0 ? "green" : "slate"} />}
         <DetailRow icon={Wrench} label="Missing Parts" value="Not added" />
@@ -1199,8 +1200,8 @@ export default function TicketDetail() {
   );
 
   const renderMoreDetailsSection = () => (
-    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
-      <h2 className="text-lg font-extrabold text-blue-950">More Details</h2>
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
+      <h2 className="text-lg font-extrabold leading-tight text-blue-950">More Details</h2>
       <div className="mt-3">
         {canViewCustomerHistory && <DetailRow icon={ListChecks} label="Previous Tickets" value={previousTicketSummary} onClick={openCustomerHistoryView} />}
         <DetailRow icon={History} label="Ticket Timeline" value={historySummary} onClick={openTimelineView} />
@@ -1216,10 +1217,10 @@ export default function TicketDetail() {
     if (!sanitizedMobileNumber && !mainAction && !canAddCharge) return null;
 
     return (
-      <div className="fixed inset-x-0 bottom-[calc(var(--ke-bottom-nav-height)+env(safe-area-inset-bottom))] z-30 border-t border-blue-100 bg-white/95 px-3 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(var(--ke-bottom-nav-height)+env(safe-area-inset-bottom))] z-30 border-t border-blue-100 bg-white/95 px-3 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden">
         <div className="mx-auto grid max-w-md grid-cols-2 gap-2">
           {sanitizedMobileNumber && (
-            <a href={`tel:${sanitizedMobileNumber}`} className="ke-primary-action inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-extrabold">
+            <a href={`tel:${sanitizedMobileNumber}`} className="ke-primary-action inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold">
               <PhoneCall size={20} aria-hidden="true" /> Call Customer
             </a>
           )}
@@ -1232,15 +1233,15 @@ export default function TicketDetail() {
   };
 
   const renderChargeControls = () => (
-    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-extrabold text-blue-950">Charges</h2>
           <p className="mt-1 text-sm font-semibold text-slate-600">Total</p>
-          <p className="text-3xl font-extrabold text-green-700">{formatCompactCurrency(totalAmount)}</p>
+          <p className="text-2xl font-extrabold text-green-700">{formatCompactCurrency(totalAmount)}</p>
         </div>
         {canAddCharge && (
-          <button type="button" onClick={openAddCharge} className="ke-accent-action inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-extrabold">
+          <button type="button" onClick={openAddCharge} className="ke-accent-action inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold">
             <Plus size={19} aria-hidden="true" /> Add Charge
           </button>
         )}
@@ -1311,9 +1312,9 @@ export default function TicketDetail() {
       <button type="button" onClick={() => setActiveDetailView("ticket")} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 text-base font-semibold text-blue-950">
         <ArrowLeft size={18} aria-hidden="true" /> Back to Ticket
       </button>
-      <div className="mt-6">
-        <h1 className="break-words text-3xl font-extrabold text-blue-950 sm:text-4xl">{title}</h1>
-        {subtitle && <p className="mt-2 break-words text-base font-semibold text-slate-600">{subtitle}</p>}
+      <div className="mt-5">
+        <h1 className="break-words text-3xl font-extrabold leading-tight text-blue-950 sm:text-4xl">{title}</h1>
+        {subtitle && <p className="mt-1.5 break-words text-base font-semibold text-slate-600">{subtitle}</p>}
       </div>
     </>
   );
@@ -1321,12 +1322,15 @@ export default function TicketDetail() {
   const renderCustomerHistoryView = () => (
     <div className="min-w-0 space-y-5">
       {renderDetailHeader("Previous Tickets", `${ticket.customerName ?? "Customer"}${ticket.mobileNumber ? ` • ${ticket.mobileNumber}` : ""}`)}
-      <section className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <ListChecks className="text-blue-700" size={24} aria-hidden="true" />
-            <p className="font-bold text-slate-700">{customerHistoryLoading ? "Loading..." : `${customerHistoryCount} ticket${customerHistoryCount === 1 ? "" : "s"} found`}</p>
+            <p className="font-semibold text-slate-700">{customerHistoryLoading ? "Loading..." : `${customerHistoryCount} ticket${customerHistoryCount === 1 ? "" : "s"} found`}</p>
           </div>
+          <button type="button" className="inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-sm font-semibold text-blue-700">
+            <SlidersHorizontal size={20} aria-hidden="true" /> Filter
+          </button>
         </div>
       </section>
       {customerHistoryError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{customerHistoryError}</p>}
@@ -1335,8 +1339,8 @@ export default function TicketDetail() {
       )}
       <div className="divide-y divide-blue-100">
         {customerHistory.map((historyTicket) => (
-          <button key={historyTicket.id ?? historyTicket.ticketNumber} type="button" onClick={() => navigate(`/tickets/${historyTicket.id}${location.search}`)} className="flex min-h-24 w-full items-center gap-4 py-4 text-left">
-            <IconBubble icon={Box} className="h-14 w-14" />
+          <button key={historyTicket.id ?? historyTicket.ticketNumber} type="button" onClick={() => navigate(`/tickets/${historyTicket.id}${location.search}`)} className="flex min-h-20 w-full items-center gap-4 py-3 text-left">
+            <IconBubble icon={Box} className="h-12 w-12" />
             <span className="min-w-0 flex-1">
               <span className="flex flex-wrap items-center gap-2">
                 <span className="text-xl font-extrabold text-blue-950">{historyTicket.ticketNumber ?? "Not available"}</span>
@@ -1358,25 +1362,25 @@ export default function TicketDetail() {
   const renderTimelineView = () => (
     <div className="min-w-0 space-y-5">
       {renderDetailHeader("Ticket Timeline", `${ticket.ticketNumber ?? "Ticket"} • ${workflowHistory.length} event${workflowHistory.length === 1 ? "" : "s"}`)}
-      <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-4 py-2 text-sm font-extrabold text-green-700">
+      <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3.5 py-2 text-sm font-extrabold text-green-700">
         <CheckCircle2 size={18} aria-hidden="true" /> {workflowHistoryLoading ? "Loading events..." : `${workflowHistory.length} events loaded`}
       </span>
       {workflowHistoryError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{workflowHistoryError}</p>}
       {!workflowHistoryLoading && !workflowHistoryError && workflowHistory.length === 0 && (
         <p className="rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm font-semibold text-slate-600">No workflow history yet.</p>
       )}
-      <div className="ml-6 space-y-0">
+      <div className="ml-5 space-y-0">
         {workflowHistory.map((historyItem, index) => {
           const itemId = historyItem.id ?? `${historyItem.actionKey}-${historyItem.createdAt}`;
           const isLast = index === workflowHistory.length - 1;
           return (
-            <article key={itemId} className={`relative min-w-0 border-l-2 ${isLast ? "border-transparent" : "border-blue-200"} pb-8 pl-8 last:pb-0`}>
+            <article key={itemId} className={`relative min-w-0 border-l-2 ${isLast ? "border-transparent" : "border-blue-200"} pb-7 pl-7 last:pb-0`}>
               <span className={`absolute -left-[13px] top-0 flex h-6 w-6 items-center justify-center rounded-full ${isLast && ticket.status === "COMPLETED" ? "bg-green-600 text-white" : "bg-blue-100 text-blue-600"}`} aria-hidden="true">
                 {isLast && ticket.status === "COMPLETED" ? <Check size={16} /> : <span className="h-3 w-3 rounded-full bg-blue-500" />}
               </span>
               <h2 className={`break-words text-xl font-extrabold ${isLast && ticket.status === "COMPLETED" ? "text-green-700" : "text-blue-950"}`}>{historyItem.actionDisplayName || formatLabel(historyItem.actionKey)}</h2>
-              <p className="mt-2 text-sm font-semibold text-slate-600">{formatDateTime(historyItem.createdAt)}</p>
-              <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-900"><User size={18} aria-hidden="true" /> {getHistoryActor(historyItem)}</p>
+              <p className="mt-1.5 text-sm font-semibold text-slate-600">{formatDateTime(historyItem.createdAt)}</p>
+              <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-slate-900"><User size={18} aria-hidden="true" /> {getHistoryActor(historyItem)}</p>
               {historyItem.comment && <p className="mt-4 rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm text-slate-800"><span className="font-bold text-green-700">Comment:</span> {historyItem.comment}</p>}
             </article>
           );
@@ -1391,11 +1395,11 @@ export default function TicketDetail() {
   );
 
   const renderStatusView = () => (
-    <div className="min-w-0 space-y-6">
+    <div className="min-w-0 space-y-5">
       {renderDetailHeader("Status Details")}
-      <section className="rounded-2xl border border-green-100 bg-green-50 p-4">
+      <section className="rounded-2xl border border-green-100 bg-green-50 p-3.5">
         <div className="flex items-center gap-4">
-          <IconBubble icon={CheckCircle2} tone={ticket.status === "COMPLETED" ? "green" : "blue"} className="h-14 w-14" />
+          <IconBubble icon={CheckCircle2} tone={ticket.status === "COMPLETED" ? "green" : "blue"} className="h-12 w-12" />
           <div>
             <p className="text-sm font-semibold text-slate-900">{ticket.status === "COMPLETED" ? "Completed by" : "Current status"}</p>
             <p className="mt-1 break-words text-xl font-extrabold text-green-700">{ticket.status === "COMPLETED" ? ticket.completedByEmployeeId || "Not available" : ticketStatusLabel}</p>
@@ -1437,7 +1441,7 @@ export default function TicketDetail() {
         <DetailRow icon={ShieldCheck} label="Warranty" value="Not marked" />
       </section>
       {canViewCharges && renderChargeControls()}
-      <section className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <IconBubble icon={Wrench} />
@@ -1447,7 +1451,7 @@ export default function TicketDetail() {
         </div>
         <p className="mt-3 text-sm font-semibold text-slate-600">Missing parts tracking is not added yet.</p>
       </section>
-      <section className="rounded-2xl border border-blue-100 bg-white p-4 shadow-sm">
+      <section className="rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <IconBubble icon={ShieldCheck} />
@@ -1461,7 +1465,7 @@ export default function TicketDetail() {
   );
 
   const renderTicketHome = () => (
-    <div className="mt-4 min-w-0 space-y-4 pb-24 sm:pb-0">
+    <div className="mt-3.5 min-w-0 space-y-3.5 pb-24 sm:pb-0">
       {renderTicketSummary()}
       {statusMessage && (
         <p className={`rounded-xl px-4 py-3 text-sm font-semibold ${statusMessage.startsWith("Unable") || statusMessage.startsWith("Please") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>

@@ -241,6 +241,69 @@ textarea {
   padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 24px);
 }
 
+.ticket-detail-page {
+  --ticket-mobile-card-radius: 1rem;
+}
+
+.ticket-detail-page .rounded-2xl {
+  border-radius: var(--ticket-mobile-card-radius);
+}
+
+.ticket-detail-page .font-extrabold {
+  font-weight: 750;
+}
+
+.ticket-detail-page .font-bold {
+  font-weight: 700;
+}
+
+.ticket-detail-page h1,
+.ticket-detail-page h2,
+.ticket-detail-page h3,
+.ticket-detail-page p,
+.ticket-detail-page span,
+.ticket-detail-page button,
+.ticket-detail-page a {
+  letter-spacing: 0;
+}
+
+@media (max-width: 639px) {
+  .ticket-detail-page {
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+  }
+
+  .ticket-detail-page .text-sm {
+    font-size: 0.78rem !important;
+    line-height: 1.28 !important;
+  }
+
+  .ticket-detail-page .text-base {
+    font-size: 0.88rem !important;
+    line-height: 1.28 !important;
+  }
+
+  .ticket-detail-page .text-lg {
+    font-size: 0.98rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .ticket-detail-page .text-xl {
+    font-size: 1.08rem !important;
+    line-height: 1.22 !important;
+  }
+
+  .ticket-detail-page .text-2xl {
+    font-size: 1.28rem !important;
+    line-height: 1.15 !important;
+  }
+
+  .ticket-detail-page .text-3xl {
+    font-size: 1.55rem !important;
+    line-height: 1.1 !important;
+  }
+}
+
 .ke-app-header {
   background: var(--ke-primary);
   border-bottom: 1px solid rgba(255, 204, 0, 0.22);

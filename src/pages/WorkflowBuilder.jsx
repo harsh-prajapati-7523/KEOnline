@@ -16,10 +16,22 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
-function authHeaders() {
+const createNewBlockedMessage = "Creating new statuses/actions will be available in a later phase. For Phase C, please select existing statuses/actions only.";
+
+function authHeaders(includeContentType = false) {
   return {
+    ...(includeContentType ? { "Content-Type": "application/json" } : {}),
     Authorization: `Bearer ${localStorage.getItem("token")}`,
   };
+}
+
+async function readApiError(response, fallback) {
+  try {
+    const body = await response.json();
+    return typeof body.message === "string" && body.message.length <= 180 ? body.message : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function normalizeArray(data, key) {
@@ -39,6 +51,14 @@ function createRow(seed = {}) {
     toStatus: seed.toStatus || "",
   };
 }
+
+const rowStateStyles = {
+  Unsaved: "border-slate-200 bg-slate-100 text-slate-700",
+  Saving: "border-blue-200 bg-blue-50 text-blue-950",
+  Saved: "border-green-200 bg-green-50 text-green-700",
+  "Already exists": "border-blue-200 bg-blue-50 text-blue-950",
+  Failed: "border-red-200 bg-red-50 text-red-700",
+};
 
 function Badge({ children, tone = "slate" }) {
   const tones = {
@@ -93,7 +113,7 @@ function SearchableInput({ label, value, onChange, options, listId, placeholder 
           </option>
         ))}
       </datalist>
-      {showCreateHint && <p className="mt-1 text-xs font-semibold text-amber-700">Create new suggestion</p>}
+      {showCreateHint && <p className="mt-1 text-xs font-semibold text-amber-700">{createNewBlockedMessage}</p>}
     </label>
   );
 }
@@ -111,13 +131,20 @@ export default function WorkflowBuilder() {
   const [statuses, setStatuses] = useState([]);
   const [actions, setActions] = useState([]);
   const [transitions, setTransitions] = useState([]);
+  const [categoryRulesByTransitionId, setCategoryRulesByTransitionId] = useState({});
   const [rows, setRows] = useState([createRow()]);
+  const [rowSaveStates, setRowSaveStates] = useState({});
+  const [rowErrors, setRowErrors] = useState({});
   const [startStatus, setStartStatus] = useState("New");
   const [terminalSelections, setTerminalSelections] = useState({});
   const [showDetails, setShowDetails] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [validationResult, setValidationResult] = useState(null);
+  const [validationStale, setValidationStale] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [statusMessage, setStatusMessage] = useState("");
 
   const selectedCategory = useMemo(
     () => categories.find((category) => String(category.id) === String(requestedCategoryId)) || categories[0] || null,
@@ -149,11 +176,79 @@ export default function WorkflowBuilder() {
     [actions]
   );
 
+  const resolveStatus = useCallback((value) => {
+    const lookup = value.trim().toLowerCase();
+    if (!lookup) return null;
+    return statuses.find((status) => {
+      const displayName = status.displayName || formatLabel(status.statusKey);
+      return String(status.statusKey || "").toLowerCase() === lookup
+        || String(displayName || "").toLowerCase() === lookup;
+    }) || null;
+  }, [statuses]);
+
+  const resolveAction = useCallback((value) => {
+    const lookup = value.trim().toLowerCase();
+    if (!lookup) return null;
+    return actions.find((action) => {
+      const displayName = action.displayName || formatLabel(action.actionKey);
+      return String(action.actionKey || "").toLowerCase() === lookup
+        || String(displayName || "").toLowerCase() === lookup;
+    }) || null;
+  }, [actions]);
+
+  const resolvedRows = useMemo(() => rows.map((row) => ({
+    row,
+    fromStatus: resolveStatus(row.fromStatus),
+    action: resolveAction(row.action),
+    toStatus: resolveStatus(row.toStatus),
+  })), [resolveAction, resolveStatus, rows]);
+
+  const rowValidation = useMemo(() => {
+    const duplicateKeys = new Map();
+    resolvedRows.forEach(({ fromStatus, action, toStatus }) => {
+      if (!fromStatus || !action || !toStatus) return;
+      const key = `${fromStatus.id}|${action.actionKey}|${toStatus.id}`;
+      duplicateKeys.set(key, (duplicateKeys.get(key) || 0) + 1);
+    });
+
+    const byRowId = {};
+    resolvedRows.forEach(({ row, fromStatus, action, toStatus }) => {
+      const issues = [];
+      if (!selectedCategory?.id) issues.push("Selected category is required.");
+      if (!row.fromStatus.trim() || !row.action.trim() || !row.toStatus.trim()) {
+        issues.push("From Status, Action, and To Status are required.");
+      } else if (!fromStatus || !action || !toStatus) {
+        issues.push(createNewBlockedMessage);
+      }
+      if (fromStatus && !fromStatus.active) issues.push("From Status is inactive.");
+      if (action && !action.active) issues.push("Action is inactive.");
+      if (toStatus && !toStatus.active) issues.push("To Status is inactive.");
+      if (fromStatus?.terminal) issues.push("Terminal status cannot be used as From Status.");
+      if (fromStatus && action && toStatus) {
+        const key = `${fromStatus.id}|${action.actionKey}|${toStatus.id}`;
+        if ((duplicateKeys.get(key) || 0) > 1) issues.push("Duplicate workflow line in builder.");
+      }
+      byRowId[row.id] = {
+        ok: issues.length === 0,
+        issues,
+        fromStatus,
+        action,
+        toStatus,
+      };
+    });
+    return byRowId;
+  }, [resolvedRows, selectedCategory?.id]);
+
+  const hasUnsavedRows = rows.some((row) => !["Saved", "Already exists"].includes(rowSaveStates[row.id]));
+  const saveDisabled = isLoading || isSaving || rows.length === 0 || !hasUnsavedRows || rows.some((row) => !rowValidation[row.id]?.ok);
+
   const validationLabel = useMemo(() => {
+    if (validationStale) return "Validation Stale";
+    if (validationResult) return validationResult.readyToActivate || validationResult.valid ? "Ready" : "Not Ready";
     const completeRows = rows.filter((row) => row.fromStatus.trim() && row.action.trim() && row.toStatus.trim());
     if (completeRows.length === 0) return "Preview";
     return completeRows.length === rows.length ? "Ready to Test" : "Incomplete Rows";
-  }, [rows]);
+  }, [rows, validationResult, validationStale]);
 
   const terminalNames = useMemo(() => (
     statusOptions
@@ -171,6 +266,23 @@ export default function WorkflowBuilder() {
     });
     return list.length > 0 ? list : [startStatus || "New"];
   }, [rows, startStatus]);
+
+  const loadTransitionRules = useCallback(async (nextTransitions) => {
+    const entries = await Promise.all(
+      nextTransitions.map(async (transition) => {
+        try {
+          const response = await fetch(`/volt/workflow/transitions/${transition.id}/category-rules`, { headers: authHeaders() });
+          if (!response.ok) throw new Error("Category rules request failed");
+          return [transition.id, normalizeArray(await response.json(), "rules")];
+        } catch {
+          return [transition.id, []];
+        }
+      })
+    );
+    const nextRules = Object.fromEntries(entries);
+    setCategoryRulesByTransitionId(nextRules);
+    return nextRules;
+  }, []);
 
   const loadBuilderData = useCallback(async () => {
     setIsLoading(true);
@@ -199,7 +311,9 @@ export default function WorkflowBuilder() {
       setCategories(nextCategories);
       setStatuses(nextStatuses);
       setActions(normalizeArray(actionData, "actions"));
-      setTransitions(normalizeArray(transitionData, "transitions"));
+      const nextTransitions = normalizeArray(transitionData, "transitions");
+      setTransitions(nextTransitions);
+      await loadTransitionRules(nextTransitions);
 
       const defaultStart = nextStatuses.find((status) => status.statusKey === "NEW") || nextStatuses[0];
       if (defaultStart) setStartStatus(defaultStart.displayName || formatLabel(defaultStart.statusKey));
@@ -208,7 +322,7 @@ export default function WorkflowBuilder() {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [loadTransitionRules]);
 
   useEffect(() => {
     loadBuilderData();
@@ -237,17 +351,225 @@ export default function WorkflowBuilder() {
 
   const updateRow = (rowId, field, value) => {
     setTestResult(null);
+    setValidationResult(null);
+    setValidationStale(false);
+    setStatusMessage("");
+    setRowErrors((current) => ({ ...current, [rowId]: "" }));
+    setRowSaveStates((current) => ({ ...current, [rowId]: "Unsaved" }));
     setRows((current) => current.map((row) => row.id === rowId ? { ...row, [field]: value } : row));
   };
 
   const addRow = () => {
     const previous = rows[rows.length - 1];
+    setStatusMessage("");
+    setValidationResult(null);
+    setValidationStale(false);
     setRows((current) => [...current, createRow({ fromStatus: previous?.toStatus || "" })]);
   };
 
   const deleteRow = (rowId) => {
     setTestResult(null);
+    setRowSaveStates((current) => {
+      const next = { ...current };
+      delete next[rowId];
+      return next;
+    });
+    setRowErrors((current) => {
+      const next = { ...current };
+      delete next[rowId];
+      return next;
+    });
     setRows((current) => current.length === 1 ? current : current.filter((row) => row.id !== rowId));
+  };
+
+  const findExistingTransition = (fromStatus, action, toStatus, transitionList = transitions) => transitionList.find((transition) => (
+    String(transition.fromStatusId) === String(fromStatus.id)
+      && transition.actionKey === action.actionKey
+      && String(transition.toStatusId) === String(toStatus.id)
+  ));
+
+  const findSelectedCategoryRule = (transitionId, rulesByTransitionId = categoryRulesByTransitionId) => (
+    rulesByTransitionId[transitionId] || []
+  ).find((rule) => String(rule.categoryId) === String(selectedCategory?.id));
+
+  const activateTransition = async (transitionId) => {
+    const response = await fetch(`/volt/workflow/transitions/${transitionId}`, {
+      method: "PATCH",
+      headers: authHeaders(true),
+      body: JSON.stringify({ active: true }),
+    });
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Category rule was saved, but transition could not be activated."));
+    }
+    return response.json();
+  };
+
+  const createCategoryRule = async (transitionId) => {
+    const response = await fetch(`/volt/workflow/transitions/${transitionId}/category-rules`, {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify({ categoryId: Number(selectedCategory.id), active: true }),
+    });
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Unable to attach workflow line to selected category."));
+    }
+    return response.json();
+  };
+
+  const enableCategoryRule = async (transitionId, ruleId) => {
+    const response = await fetch(`/volt/workflow/transitions/${transitionId}/category-rules/${ruleId}`, {
+      method: "PATCH",
+      headers: authHeaders(true),
+      body: JSON.stringify({ active: true }),
+    });
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Unable to enable selected-category workflow rule."));
+    }
+    return response.json();
+  };
+
+  const saveExistingTransitionRow = async ({ fromStatus, action, toStatus }, rowIndex) => {
+    let transition = findExistingTransition(fromStatus, action, toStatus);
+    let createdTransition = false;
+
+    if (!transition) {
+      const response = await fetch("/volt/workflow/transitions", {
+        method: "POST",
+        headers: authHeaders(true),
+        body: JSON.stringify({
+          fromStatusId: Number(fromStatus.id),
+          actionKey: action.actionKey,
+          toStatusId: Number(toStatus.id),
+          displayName: action.displayName || formatLabel(action.actionKey),
+          active: false,
+          sortOrder: (rowIndex + 1) * 10,
+        }),
+      });
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Unable to create workflow transition."));
+      }
+      transition = await response.json();
+      createdTransition = true;
+      setTransitions((current) => [...current, transition]);
+    }
+
+    let rule = findSelectedCategoryRule(transition.id);
+    if (rule?.active && transition.active) {
+      return "Already exists";
+    }
+
+    if (rule && !rule.active) {
+      rule = await enableCategoryRule(transition.id, rule.id);
+    } else if (!rule) {
+      rule = await createCategoryRule(transition.id);
+    }
+
+    setCategoryRulesByTransitionId((current) => ({
+      ...current,
+      [transition.id]: [
+        ...(current[transition.id] || []).filter((candidate) => candidate.id !== rule.id),
+        rule,
+      ],
+    }));
+
+    if (!transition.active) {
+      await activateTransition(transition.id);
+    }
+
+    return createdTransition ? "Saved" : "Saved";
+  };
+
+  const refreshValidationAfterSave = async () => {
+    const response = await fetch("/volt/workflow/validate-category-workflow", {
+      method: "POST",
+      headers: authHeaders(true),
+      body: JSON.stringify({ categoryId: Number(selectedCategory.id) }),
+    });
+    if (!response.ok) {
+      throw new Error(await readApiError(response, "Workflow saved, but validation could not be refreshed."));
+    }
+    const result = await response.json();
+    setValidationResult(result);
+    setValidationStale(false);
+  };
+
+  const refreshAfterSave = async () => {
+    const [transitionResponse, configResponse] = await Promise.all([
+      fetch("/volt/workflow/transitions", { headers: authHeaders() }),
+      selectedCategory?.id
+        ? fetch(`/volt/ticket-categories/${selectedCategory.id}/workflow-config`, { headers: authHeaders() })
+        : Promise.resolve(null),
+    ]);
+    if (transitionResponse.ok) {
+      const nextTransitions = normalizeArray(await transitionResponse.json(), "transitions");
+      setTransitions(nextTransitions);
+      await loadTransitionRules(nextTransitions);
+    }
+    if (configResponse?.ok) {
+      setCategoryConfig(await configResponse.json());
+    }
+    await refreshValidationAfterSave();
+  };
+
+  const saveWorkflow = async () => {
+    if (saveDisabled) return;
+
+    setIsSaving(true);
+    setError("");
+    setStatusMessage("");
+    setValidationStale(false);
+    const targetRows = rows.filter((row) => !["Saved", "Already exists"].includes(rowSaveStates[row.id]));
+    let savedCount = 0;
+    let alreadyCount = 0;
+    let failedCount = 0;
+
+    try {
+      for (const row of targetRows) {
+        const rowIndex = rows.findIndex((candidate) => candidate.id === row.id);
+        const validation = rowValidation[row.id];
+        if (!validation?.ok) {
+          failedCount += 1;
+          setRowSaveStates((current) => ({ ...current, [row.id]: "Failed" }));
+          setRowErrors((current) => ({ ...current, [row.id]: validation?.issues?.[0] || "Workflow line is not valid." }));
+          continue;
+        }
+
+        setRowSaveStates((current) => ({ ...current, [row.id]: "Saving" }));
+        setRowErrors((current) => ({ ...current, [row.id]: "" }));
+
+        try {
+          const result = await saveExistingTransitionRow(validation, rowIndex);
+          if (result === "Already exists") {
+            alreadyCount += 1;
+          } else {
+            savedCount += 1;
+          }
+          setRowSaveStates((current) => ({ ...current, [row.id]: result }));
+        } catch (saveError) {
+          failedCount += 1;
+          setRowSaveStates((current) => ({ ...current, [row.id]: "Failed" }));
+          setRowErrors((current) => ({ ...current, [row.id]: saveError.message || "Unable to save workflow line." }));
+        }
+      }
+
+      try {
+        await refreshAfterSave();
+      } catch (validationError) {
+        setValidationResult(null);
+        setValidationStale(true);
+        setError(validationError.message || "Workflow saved, but validation could not be refreshed.");
+      }
+
+      if (failedCount > 0) {
+        setStatusMessage("Some workflow lines were saved, but some failed. Review failed rows and retry.");
+      } else if (savedCount === 0 && alreadyCount > 0) {
+        setStatusMessage("No changes needed. All workflow lines already exist for this category.");
+      } else {
+        setStatusMessage("All workflow lines saved successfully.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const runClientTest = () => {
@@ -303,6 +625,7 @@ export default function WorkflowBuilder() {
         </header>
 
         {error && <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{error}</p>}
+        {statusMessage && <p className="mt-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">{statusMessage}</p>}
 
         <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-5" aria-label="Workflow builder summary">
           <SummaryTile icon={GitBranch} label="Selected Category" value={categoryName} tone="text-blue-600" />
@@ -360,52 +683,64 @@ export default function WorkflowBuilder() {
                 </button>
                 <button
                   type="button"
-                  disabled
-                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-slate-200 px-4 py-2 text-sm font-bold text-slate-500"
+                  onClick={saveWorkflow}
+                  disabled={saveDisabled}
+                  title={saveDisabled ? "Complete all rows with existing active statuses/actions before saving." : "Save selected-category workflow lines"}
+                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
                 >
-                  Save Workflow - Coming Soon
+                  {isSaving ? "Saving Workflow..." : "Save Workflow"}
                 </button>
               </div>
             </div>
 
             <div className="mt-4 space-y-3">
               {rows.map((row, index) => (
-                <div key={row.id} className="grid gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] lg:items-start">
-                  <SearchableInput
-                    label={`Line ${index + 1} From Status`}
-                    value={row.fromStatus}
-                    onChange={(value) => updateRow(row.id, "fromStatus", value)}
-                    options={statusOptions}
-                    listId={`from-status-${row.id}`}
-                    placeholder="New"
-                  />
-                  <RowArrow />
-                  <SearchableInput
-                    label="Action"
-                    value={row.action}
-                    onChange={(value) => updateRow(row.id, "action", value)}
-                    options={actionOptions}
-                    listId={`action-${row.id}`}
-                    placeholder="Start Repair Work"
-                  />
-                  <RowArrow />
-                  <SearchableInput
-                    label="To Status"
-                    value={row.toStatus}
-                    onChange={(value) => updateRow(row.id, "toStatus", value)}
-                    options={statusOptions}
-                    listId={`to-status-${row.id}`}
-                    placeholder="In Progress"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => deleteRow(row.id)}
-                    disabled={rows.length === 1}
-                    title={rows.length === 1 ? "At least one line is kept in the builder." : "Delete unsaved line"}
-                    className="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-200 bg-white px-3 text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <Trash2 size={17} aria-hidden="true" />
-                  </button>
+                <div key={row.id} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto] lg:items-start">
+                    <SearchableInput
+                      label={`Line ${index + 1} From Status`}
+                      value={row.fromStatus}
+                      onChange={(value) => updateRow(row.id, "fromStatus", value)}
+                      options={statusOptions}
+                      listId={`from-status-${row.id}`}
+                      placeholder="New"
+                    />
+                    <RowArrow />
+                    <SearchableInput
+                      label="Action"
+                      value={row.action}
+                      onChange={(value) => updateRow(row.id, "action", value)}
+                      options={actionOptions}
+                      listId={`action-${row.id}`}
+                      placeholder="Start Repair Work"
+                    />
+                    <RowArrow />
+                    <SearchableInput
+                      label="To Status"
+                      value={row.toStatus}
+                      onChange={(value) => updateRow(row.id, "toStatus", value)}
+                      options={statusOptions}
+                      listId={`to-status-${row.id}`}
+                      placeholder="In Progress"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => deleteRow(row.id)}
+                      disabled={rows.length === 1 || isSaving}
+                      title={rows.length === 1 ? "At least one line is kept in the builder." : "Delete unsaved line"}
+                      className="inline-flex min-h-11 items-center justify-center rounded-lg border border-red-200 bg-white px-3 text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      <Trash2 size={17} aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 text-xs font-semibold sm:flex-row sm:items-center sm:justify-between">
+                    <span className={`inline-flex min-h-7 w-fit items-center rounded-full border px-2.5 py-1 font-bold ${rowStateStyles[rowSaveStates[row.id] || "Unsaved"]}`}>
+                      {rowSaveStates[row.id] || "Unsaved"}
+                    </span>
+                    {(rowErrors[row.id] || rowValidation[row.id]?.issues?.[0]) && (
+                      <span className="text-red-700">{rowErrors[row.id] || rowValidation[row.id].issues[0]}</span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -472,14 +807,14 @@ export default function WorkflowBuilder() {
 
             {testResult && (
               <div className={`mt-3 rounded-lg border px-3 py-2 text-sm font-semibold ${testResult.ok ? "border-green-200 bg-green-50 text-green-700" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
-                {testResult.ok ? "Preview flow passes the Phase B client checks." : testResult.issues.map((issue) => <p key={issue}>{issue}</p>)}
+                {testResult.ok ? "Preview flow passes the client checks." : testResult.issues.map((issue) => <p key={issue}>{issue}</p>)}
               </div>
             )}
           </aside>
         </div>
 
         <p className="mt-4 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-900">
-          Save is disabled in this preview phase. This builder does not create statuses, actions, transitions, category rules, role rules, or category workflow mode changes.
+          Phase C saves existing statuses and actions only. This builder does not create statuses, create actions, create role rules, grant role access, or activate category workflow mode.
         </p>
       </div>
     </main>

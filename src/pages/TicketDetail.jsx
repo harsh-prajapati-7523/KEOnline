@@ -8,6 +8,7 @@ import {
   ChevronRight,
   ClipboardCheck,
   Clock3,
+  FileText,
   History,
   IndianRupee,
   ListChecks,
@@ -927,6 +928,7 @@ export default function TicketDetail() {
   const hasLoadedAvailableActions = Boolean(availableActions) && !availableActionsLoading && !availableActionsError;
   const ticketStatusLabel = ticket ? getTicketStatusLabel(ticket) : "Not available";
   const totalAmount = ticket?.totalCharge ?? chargeTotal;
+  const chargesTotalAmount = showCharges ? chargeTotal : totalAmount;
   const sanitizedMobileNumber = ticket?.mobileNumber ? String(ticket.mobileNumber).replace(/[^\d+]/g, "") : "";
   const problemSummary = ticket?.complaintDescription || formatEnumDisplay(ticket?.category);
   const historySummary = hasLoadedWorkflowHistory
@@ -936,10 +938,10 @@ export default function TicketDetail() {
     ? customerHistoryCount > 0 ? `${customerHistoryCount} ticket${customerHistoryCount === 1 ? "" : "s"}` : "No previous tickets"
     : "View";
 
-  const openWorkItemsView = async () => {
-    setActiveDetailView("workItems");
+  const openChargesView = async () => {
+    setActiveDetailView("charges");
     setShowCharges(true);
-    setShowAddChargeForm(false);
+    setShowAddChargeForm(true);
     if (canViewCharges) await loadCharges();
   };
 
@@ -1192,7 +1194,7 @@ export default function TicketDetail() {
     <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
       <h2 className="text-lg font-extrabold leading-tight text-blue-950">Work Items</h2>
       <div className="mt-3">
-        {canViewCharges && <DetailRow icon={IndianRupee} label="Charges" value={formatCompactCurrency(totalAmount)} actionLabel="View" onClick={openWorkItemsView} tone={Number(totalAmount) > 0 ? "green" : "slate"} />}
+        {canViewCharges && <DetailRow icon={IndianRupee} label="Charges" value={formatCompactCurrency(totalAmount)} actionLabel="View" onClick={openChargesView} tone={Number(totalAmount) > 0 ? "green" : "slate"} />}
         <DetailRow icon={Wrench} label="Missing Parts" value="Not added" />
         <DetailRow icon={ShieldCheck} label="Warranty" value="Not marked" />
       </div>
@@ -1226,80 +1228,88 @@ export default function TicketDetail() {
           )}
           {mainAction
             ? renderActionButton({ ...mainAction, tone: "yellow", full: true })
-            : canAddCharge && renderActionButton({ key: "sticky-add-charge", label: "Add Charge", icon: Plus, tone: "yellow", full: true, onClick: openWorkItemsView })}
+            : canAddCharge && renderActionButton({ key: "sticky-add-charge", label: "Add Charge", icon: Plus, tone: "yellow", full: true, onClick: openChargesView })}
         </div>
       </div>
     );
   };
 
-  const renderChargeControls = () => (
+  const renderChargeSummary = () => (
     <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-lg font-extrabold text-blue-950">Charges</h2>
-          <p className="mt-1 text-sm font-semibold text-slate-600">Total</p>
-          <p className="text-2xl font-extrabold text-green-700">{formatCompactCurrency(totalAmount)}</p>
+      <div className="grid grid-cols-[1fr_1fr_0.9fr] divide-x divide-blue-100">
+        <div className="flex min-w-0 items-center gap-1.5 pr-2">
+          <IconBubble icon={FileText} className="h-9 w-9" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-600">Ticket ID</p>
+            <p className="truncate text-base font-extrabold text-blue-950">{ticket.ticketNumber ?? "Not available"}</p>
+          </div>
         </div>
-        {canAddCharge && (
-          <button type="button" onClick={openAddCharge} className="ke-accent-action inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold">
-            <Plus size={19} aria-hidden="true" /> Add Charge
-          </button>
-        )}
+        <div className="flex min-w-0 items-center gap-1.5 px-2">
+          <IconBubble icon={User} className="h-9 w-9" />
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-slate-600">Customer</p>
+            <p className="truncate text-base font-extrabold text-blue-950">{ticket.customerName ?? "Not available"}</p>
+          </div>
+        </div>
+        <div className="min-w-0 pl-2 text-center">
+          <p className="text-xs font-semibold text-slate-600">Total</p>
+          <p className="mt-1 rounded-xl bg-green-100 px-2 py-1 text-base font-extrabold text-green-700">{formatCompactCurrency(chargesTotalAmount)}</p>
+        </div>
       </div>
+    </section>
+  );
 
-      <div className="mt-4 space-y-3">
-        {chargeLoading && <p className="text-sm font-semibold text-gray-600">Loading charges...</p>}
-        {chargeError && <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{chargeError}</p>}
-
-        {!chargeLoading && !chargeError && showAddChargeForm && (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <h3 className="text-sm font-bold text-slate-900">Add Charge</h3>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="block text-sm font-semibold text-slate-700">
-                Description
-                <Suspense fallback={<input name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" autoComplete="off" />}>
-                  <SuggestionInput endpoint="/volt/suggestions/charge-descriptions" name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
-                </Suspense>
-                {chargeFormErrors.description && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.description}</span>}
-              </label>
-              <label className="block text-sm font-semibold text-slate-700">
-                Amount
-                <input name="amount" type="number" min="0.01" max="999999.99" step="0.01" value={chargeForm.amount} onChange={handleChargeInput} className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 outline-none focus:border-blue-950" />
-                {chargeFormErrors.amount && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.amount}</span>}
-              </label>
-            </div>
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <button type="button" onClick={cancelAddCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="min-h-11 rounded-xl border border-blue-950 px-3 py-2 text-sm font-bold text-blue-950 disabled:opacity-60">
-                Cancel
-              </button>
-              <button type="button" onClick={addCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="ke-accent-action min-h-11 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-60">
-                {processingKeys[`add-charge-${ticketId}`] ? "Saving..." : "Save"}
-              </button>
-            </div>
-          </div>
-        )}
-
+  const renderChargeBreakdown = () => (
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
+      <h2 className="text-lg font-extrabold text-blue-950">Charge Breakdown</h2>
+      <div className="mt-3 overflow-hidden rounded-xl border border-blue-100">
+        <div className="grid grid-cols-[1fr_auto] bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
+          <span>Description</span>
+          <span>Amount (₹)</span>
+        </div>
+        {chargeLoading && <p className="px-3 py-3 text-sm font-semibold text-slate-600">Loading charges...</p>}
+        {chargeError && <p className="px-3 py-3 text-sm font-semibold text-red-700">{chargeError}</p>}
         {!chargeLoading && !chargeError && chargeItems.length === 0 && (
-          <p className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm font-semibold text-slate-600">No charge items found.</p>
+          <p className="px-3 py-3 text-sm font-semibold text-slate-600">No charge items found.</p>
         )}
-
-        {!chargeLoading && !chargeError && chargeItems.length > 0 && (
-          <div className="overflow-hidden rounded-xl border border-blue-100">
-            {chargeItems.map((item) => (
-              <div key={item.id} className="flex min-h-14 items-center gap-3 border-t border-blue-100 px-3 py-2 first:border-t-0">
-                <IconBubble icon={ClipboardCheck} />
-                <p className="min-w-0 flex-1 break-words text-sm font-bold text-blue-950">{item.description}</p>
-                <span className="shrink-0 text-sm font-extrabold text-slate-900">{formatCompactCurrency(item.amount)}</span>
-                {canDeleteCharge && ticket.status !== "CANCELLED" && (
-                  <button type="button" onClick={() => setPendingDeleteChargeId(item.id)} disabled={processingKeys[`delete-charge-${item.id}`]} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-red-700 hover:bg-red-50 disabled:opacity-60" aria-label={`Delete ${item.description}`}>
-                    <Trash2 size={18} aria-hidden="true" />
-                  </button>
-                )}
-              </div>
-            ))}
+        {!chargeLoading && !chargeError && chargeItems.map((item) => (
+          <div key={item.id} className="grid min-h-11 grid-cols-[1fr_auto] items-center border-t border-blue-100 px-3 py-2 text-sm">
+            <span className="min-w-0 break-words text-slate-900">{item.description}</span>
+            <span className="font-semibold text-slate-900">{formatCompactCurrency(item.amount)}</span>
           </div>
-        )}
+        ))}
+        <div className="grid min-h-11 grid-cols-[1fr_auto] items-center border-t border-blue-100 bg-slate-50 px-3 py-2 text-base font-extrabold text-blue-950">
+          <span>Total</span>
+          <span>{formatCompactCurrency(chargesTotalAmount)}</span>
+        </div>
+      </div>
+    </section>
+  );
 
+  const renderAddChargeForm = () => (
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
+      <h2 className="text-lg font-extrabold text-blue-950">Add Charge</h2>
+      <div className="mt-3 space-y-3">
+        <label className="block text-sm font-semibold text-slate-600">
+          Charge Name
+          <Suspense fallback={<input name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} placeholder="Example: Service charge" className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-300 px-3 py-2 text-base outline-none focus:border-blue-950" autoComplete="off" />}>
+            <SuggestionInput endpoint="/volt/suggestions/charge-descriptions" name="description" value={chargeForm.description} onChange={handleChargeInput} maxLength={120} placeholder="Example: Service charge" className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-300 px-3 py-2 text-base outline-none focus:border-blue-950" />
+          </Suspense>
+          {chargeFormErrors.description && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.description}</span>}
+        </label>
+        <label className="block text-sm font-semibold text-slate-600">
+          Amount (₹)
+          <input name="amount" type="number" min="0.01" max="999999.99" step="0.01" value={chargeForm.amount} onChange={handleChargeInput} placeholder="Enter amount" className="mt-1.5 min-h-12 w-full rounded-xl border border-slate-300 px-3 py-2 text-base outline-none focus:border-blue-950" />
+          {chargeFormErrors.amount && <span className="mt-1 block text-xs text-red-600">{chargeFormErrors.amount}</span>}
+        </label>
+        <div className="grid grid-cols-2 gap-3 pt-1">
+          <button type="button" onClick={cancelAddCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="min-h-12 rounded-xl border border-blue-950 px-3 py-2 text-sm font-bold text-blue-950 disabled:opacity-60">
+            Cancel
+          </button>
+          <button type="button" onClick={addCharge} disabled={processingKeys[`add-charge-${ticketId}`]} className="ke-accent-action min-h-12 rounded-xl px-3 py-2 text-sm font-bold disabled:opacity-60">
+            {processingKeys[`add-charge-${ticketId}`] ? "Saving..." : "Save Charge"}
+          </button>
+        </div>
         {chargeActionMessage && chargeActionMessage.startsWith("Unable") && (
           <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{chargeActionMessage}</p>
         )}
@@ -1315,6 +1325,18 @@ export default function TicketDetail() {
       <div className="mt-5">
         <h1 className="break-words text-3xl font-extrabold leading-tight text-blue-950 sm:text-4xl">{title}</h1>
         {subtitle && <p className="mt-1.5 break-words text-base font-semibold text-slate-600">{subtitle}</p>}
+      </div>
+    </>
+  );
+
+  const renderChargesHeader = () => (
+    <>
+      <button type="button" onClick={() => setActiveDetailView("ticket")} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 text-base font-semibold text-blue-950">
+        <ArrowLeft size={18} aria-hidden="true" /> Back to Work Items
+      </button>
+      <div className="mt-5">
+        <h1 className="break-words text-3xl font-extrabold leading-tight text-blue-950 sm:text-4xl">Charges</h1>
+        <p className="mt-1.5 break-words text-base font-semibold text-slate-600">Add and review ticket charges.</p>
       </div>
     </>
   );
@@ -1432,35 +1454,18 @@ export default function TicketDetail() {
     </div>
   );
 
-  const renderWorkItemsView = () => (
-    <div className="min-w-0 space-y-5">
-      {renderDetailHeader("Work Items", "Overview of charges, missing parts and warranty details.")}
-      <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-sm">
-        <DetailRow icon={IndianRupee} label="Charges" value={formatCompactCurrency(totalAmount)} tone={Number(totalAmount) > 0 ? "green" : "slate"} />
-        <DetailRow icon={Wrench} label="Missing Parts" value="Not added" />
-        <DetailRow icon={ShieldCheck} label="Warranty" value="Not marked" />
-      </section>
-      {canViewCharges && renderChargeControls()}
-      <section className="rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <IconBubble icon={Wrench} />
-            <h2 className="text-lg font-extrabold text-blue-950">Missing Parts</h2>
-          </div>
-          <span className="text-sm font-bold text-slate-500">Future</span>
-        </div>
-        <p className="mt-3 text-sm font-semibold text-slate-600">Missing parts tracking is not added yet.</p>
-      </section>
-      <section className="rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <IconBubble icon={ShieldCheck} />
-            <h2 className="text-lg font-extrabold text-blue-950">Warranty</h2>
-          </div>
-          <span className="text-sm font-bold text-slate-500">Future</span>
-        </div>
-        <p className="mt-3 text-sm font-semibold text-slate-600">Warranty details are not marked yet.</p>
-      </section>
+  const renderChargesView = () => (
+    <div className="min-w-0 space-y-4 pb-4">
+      {renderChargesHeader()}
+      {renderChargeSummary()}
+      {renderChargeBreakdown()}
+      {canAddCharge && renderAddChargeForm()}
+      {!chargeLoading && !chargeError && chargeItems.length === 0 && (
+        <p className="flex items-center gap-2 px-2 text-sm font-semibold text-slate-600">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full border border-blue-200 text-blue-500" aria-hidden="true">i</span>
+          No charges added yet.
+        </p>
+      )}
     </div>
   );
 
@@ -1498,7 +1503,7 @@ export default function TicketDetail() {
             {activeDetailView === "customerHistory" && renderCustomerHistoryView()}
             {activeDetailView === "timeline" && renderTimelineView()}
             {activeDetailView === "status" && renderStatusView()}
-            {activeDetailView === "workItems" && renderWorkItemsView()}
+            {activeDetailView === "charges" && renderChargesView()}
 
             {chargeActionMessage && !chargeActionMessage.startsWith("Unable") && (
               <div className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white shadow-2xl sm:bottom-4" role="status">

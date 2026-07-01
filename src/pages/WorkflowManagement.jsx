@@ -804,69 +804,52 @@ function getGenericWorkflowStory(statuses, transitions, actionByKey = {}) {
     if (status?.id != null) statusMap.set(String(status.id), status);
   });
 
-  transitions.forEach((transition) => {
-    if (!statusMap.has(String(transition.fromStatusId))) {
-      statusMap.set(String(transition.fromStatusId), {
-        id: transition.fromStatusId,
-        statusKey: transition.fromStatusKey || transition.fromStatus,
-        displayName: transition.fromStatusDisplayName || formatLabel(transition.fromStatusKey || transition.fromStatus),
-        terminal: false,
-      });
-    }
-    if (!statusMap.has(String(transition.toStatusId))) {
-      statusMap.set(String(transition.toStatusId), {
-        id: transition.toStatusId,
-        statusKey: transition.toStatusKey || transition.toStatus,
-        displayName: transition.toStatusDisplayName || formatLabel(transition.toStatusKey || transition.toStatus),
-        terminal: Boolean(transition.toStatusTerminal),
-      });
-    }
-  });
+  const statusFromTransition = (transition, direction) => {
+    const id = direction === "from" ? transition.fromStatusId : transition.toStatusId;
+    const existing = statusMap.get(String(id));
+    if (existing) return existing;
+    return {
+      id,
+      statusKey: direction === "from" ? transition.fromStatusKey || transition.fromStatus : transition.toStatusKey || transition.toStatus,
+      displayName: direction === "from"
+        ? transition.fromStatusDisplayName || formatLabel(transition.fromStatusKey || transition.fromStatus)
+        : transition.toStatusDisplayName || formatLabel(transition.toStatusKey || transition.toStatus),
+      terminal: direction === "to" ? Boolean(transition.toStatusTerminal) : Boolean(transition.fromStatusTerminal),
+    };
+  };
 
-  const incomingIds = new Set(transitions.map((transition) => String(transition.toStatusId)));
-  const outgoingIds = new Set(transitions.map((transition) => String(transition.fromStatusId)));
-  const statusOrder = [...statusMap.values()].sort((first, second) => {
-    const firstIsStart = outgoingIds.has(String(first.id)) && !incomingIds.has(String(first.id));
-    const secondIsStart = outgoingIds.has(String(second.id)) && !incomingIds.has(String(second.id));
-    if (firstIsStart !== secondIsStart) return firstIsStart ? -1 : 1;
-    return (first.sortOrder ?? 999) - (second.sortOrder ?? 999) || String(first.statusKey || first.id).localeCompare(String(second.statusKey || second.id));
-  });
-
-  const nodes = statusOrder.map((status, index) => ({
-    id: `generic-${status.id ?? status.statusKey ?? index}`,
+  const nodeFromStatus = (status, suffix) => ({
+    id: `generic-${status.id ?? status.statusKey}-${suffix}`,
     label: status.displayName || formatLabel(status.statusKey),
     status,
-    tone: status.terminal ? "purple" : index === statusOrder.length - 1 ? "green" : "blue",
+    tone: status.terminal ? "purple" : String(status.statusKey || "").toUpperCase().includes("CANCEL") ? "orange" : "blue",
     terminal: Boolean(status.terminal),
-  }));
-
-  const edgesByFromId = new Map();
-  transitions.forEach((transition) => {
-    const edge = {
-      id: `generic-edge-${transition.id ?? `${transition.fromStatusId}-${transition.actionKey}-${transition.toStatusId}`}`,
-      from: String(transition.fromStatusId),
-      to: String(transition.toStatusId),
-      label: transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey),
-      transition,
-    };
-    const current = edgesByFromId.get(edge.from) || [];
-    current.push(edge);
-    edgesByFromId.set(edge.from, current);
-  });
-
-  const orderedEdges = nodes.slice(0, -1).map((node, index) => {
-    const nextNode = nodes[index + 1];
-    const edges = edgesByFromId.get(String(node.status?.id)) || [];
-    return edges.find((edge) => edge.to === String(nextNode?.status?.id)) || edges[0] || null;
   });
 
   return {
-    groups: [{
-      id: "configured",
-      label: "Configured Workflow",
-      nodes,
-      edges: orderedEdges,
-    }],
+    groups: [...transitions]
+      .sort((first, second) => (first.sortOrder ?? 999) - (second.sortOrder ?? 999) || (first.id ?? 0) - (second.id ?? 0))
+      .map((transition) => {
+        const fromStatus = statusFromTransition(transition, "from");
+        const toStatus = statusFromTransition(transition, "to");
+        const edge = {
+          id: `generic-edge-${transition.id ?? `${transition.fromStatusId}-${transition.actionKey}-${transition.toStatusId}`}`,
+          from: String(transition.fromStatusId),
+          to: String(transition.toStatusId),
+          label: transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey),
+          transition,
+        };
+        return {
+          id: `configured-transition-${transition.id}`,
+          label: `Path ${transition.sortOrder ?? transition.id ?? ""}`.trim(),
+          nodes: [
+            nodeFromStatus(fromStatus, `from-${transition.id}`),
+            nodeFromStatus(toStatus, `to-${transition.id}`),
+          ],
+          edges: [edge],
+          tone: String(toStatus.statusKey || "").toUpperCase().includes("CANCEL") ? "orange" : toStatus.terminal ? "green" : "blue",
+        };
+      }),
   };
 }
 
@@ -933,26 +916,9 @@ function WorkflowMapView({
   isLegacyWorkflowMode,
   isLoadingCategoryWorkflow,
 }) {
-  const [activeFilter, setActiveFilter] = useState("all");
-  const story = useMemo(() => getWorkflowStory(statuses, transitions), [statuses, transitions]);
   const genericStory = useMemo(() => getGenericWorkflowStory(statuses, transitions, actionByKey), [actionByKey, statuses, transitions]);
-  useEffect(() => {
-    setActiveFilter("all");
-  }, [selectedCategory?.id]);
-  const filterChips = [
-    { id: "all", label: "All" },
-    { id: "main", label: "Main Path" },
-    { id: "missing", label: "Missing Part" },
-    { id: "approval", label: "Customer Approval" },
-    { id: "warranty", label: "Warranty" },
-    { id: "declined", label: "Declined" },
-  ];
-  const configuredGroups = story.groups.filter((group) => group.edges.some((edge) => edge.transition));
-  const mapGroups = configuredGroups.length > 0 ? configuredGroups : genericStory.groups.filter((group) => group.nodes.length > 0);
-  const isGenericMap = configuredGroups.length === 0 && mapGroups.length > 0;
-  const visibleGroups = activeFilter === "all"
-    ? mapGroups.filter((group) => group.id !== "declined")
-    : mapGroups.filter((group) => group.id === activeFilter);
+  const mapGroups = genericStory.groups.filter((group) => group.nodes.length > 0);
+  const visibleGroups = mapGroups;
   const isNodeSelected = (node) => selectedItem?.type === "story-status" && selectedItem.data.id === node.id;
   const isEdgeSelected = (edge) => selectedItem?.type === "transition" && edge.transition && String(selectedItem.data.id) === String(edge.transition.id);
   const sectionTone = {
@@ -979,27 +945,9 @@ function WorkflowMapView({
             No workflow transitions are configured for this category yet. Create transitions and enable category rules to build this category workflow.
           </div>
         )}
-        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && mapGroups.length > 0 && !isGenericMap && (
-          <div className="flex flex-wrap gap-3">
-            {filterChips.map((chip) => (
-              <button
-                key={chip.id}
-                type="button"
-                onClick={() => setActiveFilter(chip.id)}
-                className={`min-h-10 rounded-lg border px-4 py-2 text-sm font-bold transition ${
-                  activeFilter === chip.id
-                    ? "border-blue-600 bg-blue-600 text-white shadow-sm"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:text-blue-700"
-                }`}
-              >
-                {chip.label}
-              </button>
-            ))}
-          </div>
-        )}
-        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && mapGroups.length > 0 && isGenericMap && (
+        {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && mapGroups.length > 0 && (
           <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-950">
-            Showing configured category workflow path from active selected-category transitions.
+            Showing active selected-category transitions from the transition table.
           </div>
         )}
         {!isLoadingCategoryWorkflow && !isLegacyWorkflowMode && mapGroups.length > 0 && visibleGroups.length === 0 && (
@@ -1620,9 +1568,8 @@ export default function WorkflowManagement() {
   const readyToActivate = Boolean(validationForSelectedCategory && validationResult.readyToActivate && blockingIssueCount === 0);
   const activationTargetConfig = { workflowMode: "DB_CONFIGURED", dbWorkflowEnabled: true, fixedActionsEnabled: false };
   const rollbackTargetConfig = { workflowMode: "LEGACY_FIXED", dbWorkflowEnabled: false, fixedActionsEnabled: true };
-  const workflowStory = useMemo(() => getWorkflowStory(categoryWorkflowStatuses, categoryWorkflowTransitions), [categoryWorkflowStatuses, categoryWorkflowTransitions]);
   const configuredTerminalStatus = selectedCategoryConfiguredStatuses.find((status) => status.terminal);
-  const terminalStatusLabel = configuredTerminalStatus?.displayName || (categoryWorkflowTransitions.length > 0 ? workflowStory.nodes.delivered.label : "Not configured");
+  const terminalStatusLabel = configuredTerminalStatus?.displayName || "Not configured";
   const workflowModeLabel = categoryWorkflowConfig?.workflowMode === "DB_CONFIGURED" || categoryWorkflowConfig?.dbWorkflowEnabled ? "DB Configured" : categoryWorkflowConfig?.workflowMode ? formatLabel(categoryWorkflowConfig.workflowMode) : "Not loaded";
   const workflowStatusLabel = isLegacyWorkflowMode
     ? "Legacy Fixed"

@@ -11,6 +11,7 @@ const EmployeeManagement = lazy(() => import("./pages/EmployeeManagement"));
 const RoleManagement = lazy(() => import("./pages/RoleManagement"));
 const RoleAccessManagement = lazy(() => import("./pages/RoleAccessManagement"));
 const WorkflowManagement = lazy(() => import("./pages/WorkflowManagement"));
+const WorkflowBuilder = lazy(() => import("./pages/WorkflowBuilder"));
 const TicketCategoryManagement = lazy(() => import("./pages/TicketCategoryManagement"));
 const TicketCategoryFieldManagement = lazy(() => import("./pages/TicketCategoryFieldManagement"));
 const TicketFieldManagement = lazy(() => import("./pages/TicketFieldManagement"));
@@ -324,6 +325,11 @@ function AppRoutes() {
           <Route path="/admin/workflow" element={
             <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
               <WorkflowManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/workflow/builder" element={
+            <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+              <WorkflowBuilder />
             </ProtectedRoute>
           }/>
           <Route path="/admin/ticket-categories" element={

@@ -431,9 +431,11 @@ function TransitionFormModal({ formState, statuses, actions, selectedCategory, o
             </div>
           )}
 
-          <FormField label="Display Name">
-            <input className={textInputClass()} value={values.displayName} onChange={(event) => onChange("displayName", event.target.value)} maxLength={80} required />
-          </FormField>
+          {!isCreate && (
+            <FormField label="Display Name">
+              <input className={textInputClass()} value={values.displayName} onChange={(event) => onChange("displayName", event.target.value)} maxLength={80} required />
+            </FormField>
+          )}
           <FormField label="Sort Order">
             <input className={textInputClass()} type="number" value={values.sortOrder} onChange={(event) => onChange("sortOrder", event.target.value)} />
           </FormField>
@@ -1520,6 +1522,7 @@ export default function WorkflowManagement() {
     [isLegacyWorkflowMode, selectedCategoryActiveTransitions]
   );
   const selectedCategoryConfiguredTransitions = selectedCategoryActiveTransitions;
+  const workflowBuilderLabel = selectedCategoryConfiguredTransitions.length > 0 ? "Edit Workflow Path" : "Build Workflow";
 
   const selectedCategoryConfiguredActionKeys = useMemo(
     () => new Set(selectedCategoryConfiguredTransitions.map((transition) => transition.actionKey)),
@@ -1886,6 +1889,11 @@ export default function WorkflowManagement() {
     setSelectedCategoryId(categoryId);
   };
 
+  const openWorkflowBuilder = () => {
+    const categoryQuery = selectedCategoryId ? `?categoryId=${encodeURIComponent(selectedCategoryId)}` : "";
+    navigate(`/admin/workflow/builder${categoryQuery}`);
+  };
+
   useEffect(() => {
     if (validationResult && String(validationResult.categoryId) !== String(selectedCategoryId)) {
       setValidationResult(null);
@@ -2068,16 +2076,23 @@ export default function WorkflowManagement() {
     return true;
   };
 
-  const buildTransitionPayload = (values, includeCreateOnly) => ({
-    ...(includeCreateOnly ? {
+  const buildTransitionPayload = (values, includeCreateOnly) => {
+    const selectedAction = actions.find((action) => action.actionKey === values.actionKey);
+    const displayName = includeCreateOnly
+      ? (selectedAction?.displayName ?? "").trim()
+      : values.displayName.trim();
+
+    return {
+      ...(includeCreateOnly ? {
       fromStatusId: Number(values.fromStatusId),
       actionKey: values.actionKey,
       toStatusId: Number(values.toStatusId),
       active: Boolean(values.active),
-    } : {}),
-    displayName: values.displayName.trim(),
-    sortOrder: values.sortOrder === "" ? null : Number(values.sortOrder),
-  });
+      } : {}),
+      displayName,
+      sortOrder: values.sortOrder === "" ? null : Number(values.sortOrder),
+    };
+  };
 
   const saveTransitionForm = async (change = transitionForm) => {
     if (!change) return;
@@ -2758,52 +2773,65 @@ export default function WorkflowManagement() {
           )}
 
           {activeTab === "overview" && (
-            <TableShell minWidth="min-w-[760px]">
-              <thead>
-                <tr>
-                  <HeaderCell>Area</HeaderCell>
-                  <HeaderCell>Value</HeaderCell>
-                  <HeaderCell>Status</HeaderCell>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <BodyCell><span className="font-bold text-blue-950">Selected category</span></BodyCell>
-                  <BodyCell><BusinessKeyLabel label={selectedCategory?.displayName} technicalKey={selectedCategory?.categoryKey} subtle /></BodyCell>
-                  <BodyCell><StateBadge enabled={Boolean(selectedCategory?.active)} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
-                </tr>
-                <tr>
-                  <BodyCell><span className="font-bold text-blue-950">Workflow config</span></BodyCell>
-                  <BodyCell>{categoryWorkflowConfig?.workflowMode || "Not available"}</BodyCell>
-                  <BodyCell>
-                    <div className="flex flex-wrap gap-2">
-                      <StateBadge enabled={Boolean(categoryWorkflowConfig?.dbWorkflowEnabled)} trueLabel="DB workflow enabled" falseLabel="DB workflow disabled" />
-                      <StateBadge enabled={Boolean(categoryWorkflowConfig?.fixedActionsEnabled)} trueLabel="Fixed enabled" falseLabel="Fixed disabled" />
-                    </div>
-                  </BodyCell>
-                </tr>
-                <tr>
-                  <BodyCell><span className="font-bold text-blue-950">Transitions</span></BodyCell>
-                  <BodyCell>{selectedCategoryConfiguredTransitions.length} configured for selected category</BodyCell>
-                  <BodyCell><Badge tone={selectedCategoryConfiguredTransitions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
-                </tr>
-                <tr>
-                  <BodyCell><span className="font-bold text-blue-950">Statuses</span></BodyCell>
-                  <BodyCell>{selectedCategoryConfiguredStatuses.length} configured for selected category</BodyCell>
-                  <BodyCell><Badge tone={selectedCategoryConfiguredStatuses.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
-                </tr>
-                <tr>
-                  <BodyCell><span className="font-bold text-blue-950">Actions</span></BodyCell>
-                  <BodyCell>{selectedCategoryConfiguredActions.length} configured for selected category</BodyCell>
-                  <BodyCell><Badge tone={selectedCategoryConfiguredActions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
-                </tr>
-                <tr>
-                  <BodyCell><span className="font-bold text-blue-950">Validation</span></BodyCell>
-                  <BodyCell>{validationStatus}</BodyCell>
-                  <BodyCell><Badge tone={validationStatus === "Ready" ? "green" : validationStatus === "Not Ready" ? "red" : "yellow"}>{validationStatus}</Badge></BodyCell>
-                </tr>
-              </tbody>
-            </TableShell>
+            <div className="space-y-3">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={openWorkflowBuilder}
+                  disabled={!selectedCategoryId}
+                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
+                >
+                  <Workflow size={16} aria-hidden="true" />
+                  {workflowBuilderLabel}
+                </button>
+              </div>
+              <TableShell minWidth="min-w-[760px]">
+                <thead>
+                  <tr>
+                    <HeaderCell>Area</HeaderCell>
+                    <HeaderCell>Value</HeaderCell>
+                    <HeaderCell>Status</HeaderCell>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <BodyCell><span className="font-bold text-blue-950">Selected category</span></BodyCell>
+                    <BodyCell><BusinessKeyLabel label={selectedCategory?.displayName} technicalKey={selectedCategory?.categoryKey} subtle /></BodyCell>
+                    <BodyCell><StateBadge enabled={Boolean(selectedCategory?.active)} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                  </tr>
+                  <tr>
+                    <BodyCell><span className="font-bold text-blue-950">Workflow config</span></BodyCell>
+                    <BodyCell>{categoryWorkflowConfig?.workflowMode || "Not available"}</BodyCell>
+                    <BodyCell>
+                      <div className="flex flex-wrap gap-2">
+                        <StateBadge enabled={Boolean(categoryWorkflowConfig?.dbWorkflowEnabled)} trueLabel="DB workflow enabled" falseLabel="DB workflow disabled" />
+                        <StateBadge enabled={Boolean(categoryWorkflowConfig?.fixedActionsEnabled)} trueLabel="Fixed enabled" falseLabel="Fixed disabled" />
+                      </div>
+                    </BodyCell>
+                  </tr>
+                  <tr>
+                    <BodyCell><span className="font-bold text-blue-950">Transitions</span></BodyCell>
+                    <BodyCell>{selectedCategoryConfiguredTransitions.length} configured for selected category</BodyCell>
+                    <BodyCell><Badge tone={selectedCategoryConfiguredTransitions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
+                  </tr>
+                  <tr>
+                    <BodyCell><span className="font-bold text-blue-950">Statuses</span></BodyCell>
+                    <BodyCell>{selectedCategoryConfiguredStatuses.length} configured for selected category</BodyCell>
+                    <BodyCell><Badge tone={selectedCategoryConfiguredStatuses.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
+                  </tr>
+                  <tr>
+                    <BodyCell><span className="font-bold text-blue-950">Actions</span></BodyCell>
+                    <BodyCell>{selectedCategoryConfiguredActions.length} configured for selected category</BodyCell>
+                    <BodyCell><Badge tone={selectedCategoryConfiguredActions.length > 0 ? "blue" : "slate"}>Category scoped</Badge></BodyCell>
+                  </tr>
+                  <tr>
+                    <BodyCell><span className="font-bold text-blue-950">Validation</span></BodyCell>
+                    <BodyCell>{validationStatus}</BodyCell>
+                    <BodyCell><Badge tone={validationStatus === "Ready" ? "green" : validationStatus === "Not Ready" ? "red" : "yellow"}>{validationStatus}</Badge></BodyCell>
+                  </tr>
+                </tbody>
+              </TableShell>
+            </div>
           )}
 
           {activeTab === "transitions" && (
@@ -2814,13 +2842,24 @@ export default function WorkflowManagement() {
 	                  <Badge tone="slate">Available global: {availableGlobalTransitions.length}</Badge>
 	                  <Badge tone="slate">Safe options: {transitionOptions.length}</Badge>
 	                </div>
-                <button
-                  type="button"
-                  onClick={() => openTransitionForm()}
-                  className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900"
-                >
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={openWorkflowBuilder}
+                    disabled={!selectedCategoryId}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
+                  >
+                    <Workflow size={16} aria-hidden="true" />
+                    {workflowBuilderLabel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => openTransitionForm()}
+                    className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50"
+                  >
 	                  Create Transition
 	                </button>
+                </div>
 	              </div>
 	              <div>
 	                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">Selected Category Transitions</h2>
@@ -2840,7 +2879,22 @@ export default function WorkflowManagement() {
                 </thead>
                 <tbody>
                   {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={9}>Loading workflow transitions for selected category...</EmptyRows>}
-                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredTransitions.length === 0 && <EmptyRows colSpan={9}>No workflow transitions are configured for this category yet. Create transitions and enable category rules to build this category workflow.</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredTransitions.length === 0 && (
+                    <EmptyRows colSpan={9}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <span>No workflow transitions are configured for this category yet.</span>
+                        <button
+                          type="button"
+                          onClick={openWorkflowBuilder}
+                          disabled={!selectedCategoryId}
+                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
+                        >
+                          <Workflow size={16} aria-hidden="true" />
+                          Build Workflow
+                        </button>
+                      </div>
+                    </EmptyRows>
+                  )}
                   {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredTransitions.map((transition) => {
                     const from = getStatusLabel(transition, "from");
                     const to = getStatusLabel(transition, "to");

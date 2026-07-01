@@ -1473,7 +1473,6 @@ export default function WorkflowManagement() {
   const [selectedCategoryId, setSelectedCategoryId] = useState("");
   const [categoryWorkflowConfig, setCategoryWorkflowConfig] = useState(null);
   const [transitions, setTransitions] = useState([]);
-  const [transitionOptions, setTransitionOptions] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [actions, setActions] = useState([]);
   const [accessKeys, setAccessKeys] = useState([]);
@@ -1693,10 +1692,7 @@ export default function WorkflowManagement() {
   }, []);
 
   const loadTransitionsAndRules = useCallback(async () => {
-    const [transitionResponse, optionResponse] = await Promise.all([
-      fetch("/volt/workflow/transitions", { headers: authHeaders() }),
-      fetch("/volt/workflow/transition-options", { headers: authHeaders() }),
-    ]);
+    const transitionResponse = await fetch("/volt/workflow/transitions", { headers: authHeaders() });
 
     if (!transitionResponse.ok) {
       throw new Error("Unable to refresh workflow transitions.");
@@ -1705,10 +1701,6 @@ export default function WorkflowManagement() {
     const transitionData = await transitionResponse.json();
     const nextTransitions = normalizeArray(transitionData, "transitions");
     setTransitions(nextTransitions);
-    if (optionResponse.ok) {
-      const optionData = await optionResponse.json();
-      setTransitionOptions(normalizeArray(optionData, "options"));
-    }
     await loadTransitionRules(nextTransitions);
   }, [loadTransitionRules]);
 
@@ -1767,10 +1759,9 @@ export default function WorkflowManagement() {
     setIsLoading(true);
     setError("");
     try {
-      const [categoryResponse, transitionResponse, transitionOptionResponse, statusResponse, actionResponse, roleResponse, accessKeyResponse] = await Promise.all([
+      const [categoryResponse, transitionResponse, statusResponse, actionResponse, roleResponse, accessKeyResponse] = await Promise.all([
         fetch("/volt/ticket-categories", { headers: authHeaders() }),
         fetch("/volt/workflow/transitions", { headers: authHeaders() }),
-        fetch("/volt/workflow/transition-options", { headers: authHeaders() }),
         fetch("/volt/workflow/statuses", { headers: authHeaders() }),
         fetch("/volt/workflow/actions", { headers: authHeaders() }),
         fetch("/volt/roles", { headers: authHeaders() }),
@@ -1791,10 +1782,6 @@ export default function WorkflowManagement() {
 
       setCategories(nextCategories);
       setTransitions(nextTransitions);
-      if (transitionOptionResponse.ok) {
-        const optionData = await transitionOptionResponse.json();
-        setTransitionOptions(normalizeArray(optionData, "options"));
-      }
       setStatuses(nextStatuses);
       setActions(nextActions);
       if (accessKeyResponse.ok) {
@@ -2840,7 +2827,6 @@ export default function WorkflowManagement() {
 	                <div className="flex flex-wrap gap-2">
 	                  <Badge tone="blue">Configured editable: {editableConfiguredTransitions.length}</Badge>
 	                  <Badge tone="slate">Available global: {availableGlobalTransitions.length}</Badge>
-	                  <Badge tone="slate">Safe options: {transitionOptions.length}</Badge>
 	                </div>
                 <div className="flex flex-wrap gap-2">
                   <button

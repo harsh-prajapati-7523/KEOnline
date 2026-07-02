@@ -1455,14 +1455,20 @@ textarea {
   }
 }
 
-.dashboard-premium-bg {
-  min-height: 100svh;
+.dashboard-premium-header {
+  border-radius: 1rem;
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.18);
+  min-height: 0;
 }
 
 .dashboard-page {
-  background: transparent;
+  background: var(--ke-bg);
   min-height: 100svh;
   padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 24px);
+}
+
+.dashboard-premium-header .ke-wave-bg__content {
+  min-height: 0;
 }
 
 .dashboard-hero-card {

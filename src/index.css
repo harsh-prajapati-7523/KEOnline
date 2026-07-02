@@ -344,6 +344,7 @@ textarea {
   flex: 1 1 auto;
   min-width: 0;
   position: relative;
+  transform: translate(5px, 5px);
   z-index: 1;
 }
 
@@ -359,11 +360,11 @@ textarea {
   border-radius: 12px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   display: flex;
-  height: 44px;
+  height: 54px;
   justify-content: center;
   padding: 0.28rem;
   position: relative;
-  width: 44px;
+  width: 54px;
   z-index: 1;
 }
 
@@ -378,7 +379,7 @@ textarea {
 
 .ke-brand-title {
   color: #ffffff;
-  font-size: 20px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: 0.1px;
   line-height: 1.08;
@@ -389,7 +390,7 @@ textarea {
 
 .ke-brand-subtitle {
   color: rgba(255, 255, 255, 0.86);
-  font-size: 13px;
+  font-size: 15.2px;
   font-weight: 600;
   line-height: 1.15;
   margin-top: 3px;
@@ -902,9 +903,9 @@ textarea {
 
   .ke-brand-logo-badge {
     border-radius: 12px;
-    height: 48px;
+    height: 59px;
     padding: 0.3rem;
-    width: 48px;
+    width: 59px;
   }
 
   .ke-brand-logo {
@@ -913,11 +914,11 @@ textarea {
   }
 
   .ke-brand-title {
-    font-size: 21px;
+    font-size: 25.2px;
   }
 
   .ke-brand-subtitle {
-    font-size: 14px;
+    font-size: 16.4px;
   }
 
   .ticket-detail-page {
@@ -1022,18 +1023,18 @@ textarea {
 
 .ke-app-header.ke-app-header-compact .ke-brand-logo-badge {
   border-radius: 12px;
-  height: 44px;
+  height: 54px;
   padding: 0.28rem;
-  width: 44px;
+  width: 54px;
 }
 
 .ke-app-header.ke-app-header-compact .ke-brand-title {
-  font-size: 20px;
+  font-size: 24px;
   line-height: 1.08;
 }
 
 .ke-app-header.ke-app-header-compact .ke-brand-subtitle {
-  font-size: 13px;
+  font-size: 15.2px;
   line-height: 1.15;
   margin-top: 3px;
 }
@@ -1240,18 +1241,18 @@ textarea {
 
   .ke-app-header .ke-brand-logo-badge {
     border-radius: 12px;
-    height: 44px;
+    height: 54px;
     padding: 0.28rem;
-    width: 44px;
+    width: 54px;
   }
 
   .ke-app-header .ke-brand-title {
-    font-size: 12px;
+    font-size: 14.4px;
     line-height: 1.08;
   }
 
   .ke-app-header .ke-brand-subtitle {
-    font-size: 8px;
+    font-size: 9.4px;
     line-height: 1.15;
     margin-top: 3px;
   }
@@ -1449,18 +1450,18 @@ textarea {
 
   .ke-app-header .ke-brand-logo-badge,
   .ke-app-header.ke-app-header-compact .ke-brand-logo-badge {
-    height: 40px;
-    width: 40px;
+    height: 49px;
+    width: 49px;
   }
 
   .ke-app-header .ke-brand-title,
   .ke-app-header.ke-app-header-compact .ke-brand-title {
-    font-size: 11px;
+    font-size: 13.2px;
   }
 
   .ke-app-header .ke-brand-subtitle,
   .ke-app-header.ke-app-header-compact .ke-brand-subtitle {
-    font-size: 7px;
+    font-size: 8.2px;
   }
 }
 

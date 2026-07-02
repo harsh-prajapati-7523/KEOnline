@@ -1477,6 +1477,18 @@ textarea {
     padding: 6px 8px !important;
   }
 
+  .ticket-detail-page .ticket-summary-mobile-row {
+    min-height: auto;
+  }
+
+  .ticket-detail-page .ticket-summary-call-button {
+    border-radius: 8px !important;
+    height: 27px !important;
+    min-height: 27px !important;
+    padding: 0 !important;
+    width: 27px !important;
+  }
+
   .ticket-detail-page :where(.h-9, .h-11, .h-12) {
     height: 1.8rem !important;
   }

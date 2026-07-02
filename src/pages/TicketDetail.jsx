@@ -1132,13 +1132,13 @@ export default function TicketDetail() {
           <dt className="inline text-blue-100">Total Charge: </dt>
           <dd className="inline font-extrabold text-white">{formatCurrency(totalAmount)}</dd>
         </div>
-        <div className="flex min-w-0 items-center justify-between gap-2">
+        <div className="ticket-summary-mobile-row flex min-w-0 items-center justify-between gap-2">
           <div className="min-w-0 break-words">
             <dt className="inline text-blue-100">Mobile: </dt>
             <dd className="inline font-extrabold text-white">{mobileSummaryLabel}</dd>
           </div>
           {sanitizedMobileNumber && (
-            <a href={`tel:${sanitizedMobileNumber}`} aria-label="Call customer from ticket summary" title="Call Customer" className="ke-primary-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg p-0">
+            <a href={`tel:${sanitizedMobileNumber}`} aria-label="Call customer from ticket summary" title="Call Customer" className="ticket-summary-call-button ke-primary-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg p-0">
               <PhoneCall size={15} aria-hidden="true" />
             </a>
           )}

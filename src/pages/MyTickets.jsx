@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Phone, RefreshCw } from "lucide-react";
+import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const TICKET_PAGE_SIZE = 30;
@@ -28,29 +28,6 @@ function formatOptionalLabel(value) {
   return /_/.test(value) ? formatLabel(value) : value;
 }
 
-function formatTicketDate(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const today = new Date();
-  const time = new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-
-  if (date.toDateString() === today.toDateString()) return `Today ${time}`;
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-}
-
 function TicketCardSkeleton() {
   return (
     <article className="ke-ticket-card min-w-0 overflow-hidden p-3.5 sm:p-4" aria-hidden="true">
@@ -67,8 +44,8 @@ function TicketCardSkeleton() {
 }
 
 function MyTicketCard({ ticket, onOpen }) {
-  const updatedLabel = formatTicketDate(ticket.updatedAt);
   const customerName = ticket.customerName?.trim() || "Not available";
+  const mobileNumber = ticket.mobileNumber?.trim() || "Not available";
   const productType = formatOptionalLabel(ticket.productType) || "Not available";
   const villageOrArea = ticket.villageOrArea?.trim() || "Not available";
   const categoryLabel = getTicketCategoryLabel(ticket);
@@ -81,33 +58,26 @@ function MyTicketCard({ ticket, onOpen }) {
     >
       <span className="flex min-w-0 items-start justify-between gap-3">
         <span className="min-w-0 overflow-wrap-anywhere text-[1.05rem] font-extrabold leading-tight text-blue-950 sm:text-lg">
-          {ticket.ticketNumber ?? "Not available"}
+          {ticket.ticketNumber ?? "Not available"} <span className="font-bold text-gray-400">|</span> <span className="text-sm font-bold text-blue-800 sm:text-base">{categoryLabel}</span>
         </span>
         <span className="ke-status-pill max-w-[45%] shrink-0 overflow-wrap-anywhere rounded-full px-2.5 py-1 text-xs font-bold leading-tight">
           {getTicketStatusLabel(ticket)}
         </span>
       </span>
 
-      <span className="mt-2.5 block space-y-1 text-sm leading-snug">
-        <span className="block min-w-0 overflow-wrap-anywhere text-gray-600">
+      <span className="mt-2.5 block space-y-1.5 text-sm leading-snug">
+        <span className="block min-w-0 overflow-wrap-anywhere text-gray-700">
           <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Customer: </span>
-          <span className="font-semibold text-gray-900">{customerName}</span>
+          <span className="font-semibold text-gray-900">{customerName} ({mobileNumber})</span>
         </span>
-        <span className="block min-w-0 overflow-wrap-anywhere text-gray-600">
-          <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Product: </span>
-          <span className="font-bold text-blue-950">{productType}</span>
+        <span className="block min-w-0 overflow-wrap-anywhere text-gray-700">
+          <span className="inline-block min-w-[4.7rem] text-xs font-bold uppercase tracking-wide text-gray-400">Area</span>
+          <span className="font-semibold text-gray-900">: {villageOrArea}</span>
         </span>
-      </span>
-
-      <span className="mt-2.5 grid min-w-0 grid-cols-1 gap-1.5 text-xs font-semibold text-gray-500 min-[380px]:grid-cols-2">
-        <span className="flex min-w-0 items-center gap-1.5 overflow-wrap-anywhere">
-          <Phone className="shrink-0" size={13} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
+        <span className="block min-w-0 overflow-wrap-anywhere text-gray-700">
+          <span className="inline-block min-w-[4.7rem] text-xs font-bold uppercase tracking-wide text-gray-400">Product</span>
+          <span className="font-bold text-blue-950">: {productType}</span>
         </span>
-        <span className="min-w-0 overflow-wrap-anywhere min-[380px]:text-right">Area: {villageOrArea}</span>
-        <span className="min-w-0 overflow-wrap-anywhere min-[380px]:col-span-2">Category: {categoryLabel}</span>
-      </span>
-      <span className="mt-2.5 block border-t border-blue-50 pt-2.5 text-xs font-semibold text-gray-500">
-        {updatedLabel ? `Updated: ${updatedLabel}` : "Updated time not available"}
       </span>
     </button>
   );

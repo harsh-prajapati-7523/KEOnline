@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Download, Home, LayoutDashboard, ListChecks, LogIn, LogOut, PlusCircle, X } from "lucide-react";
 import EmployeeLogin from "./pages/EmployeeLogin";
+import KEWaveBackground from "./components/KEWaveBackground";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { clearAccess, hasAnyAccess } from "./utils/access";
 
@@ -176,55 +177,57 @@ function Navbar() {
 
   return (
     <nav className={`ke-app-header ${isCreateTicket ? "ke-app-header-compact" : ""} w-full overflow-hidden text-white`}>
-      <div className="ke-app-header-inner mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
-        <div className="ke-app-header-brand flex min-w-0 items-center gap-2.5 text-center sm:gap-3 lg:text-left">
-          <span className="ke-brand-logo-badge shrink-0" aria-hidden="true">
-            <img
-              src="/ke-icon-64.png"
-              alt=""
-              aria-hidden="true"
-              width="34"
-              height="34"
-              className="ke-brand-logo"
-            />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="ke-brand-title break-words font-extrabold leading-tight">
-              <span>Kumar Electronics and Electricals</span>
-            </p>
-            <p className="ke-brand-subtitle text-xs font-semibold">
-              <span>Service Ticket Management</span>
-            </p>
+      <KEWaveBackground className="app-header-wave">
+        <div className="ke-app-header-inner mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
+          <div className="ke-app-header-brand flex min-w-0 items-center gap-2.5 text-center sm:gap-3 lg:text-left">
+            <span className="ke-brand-logo-badge shrink-0" aria-hidden="true">
+              <img
+                src="/ke-icon-64.png"
+                alt=""
+                aria-hidden="true"
+                width="34"
+                height="34"
+                className="ke-brand-logo"
+              />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="ke-brand-title break-words font-extrabold leading-tight">
+                <span>Kumar Electronics and Electricals</span>
+              </p>
+              <p className="ke-brand-subtitle text-xs font-semibold">
+                <span>Service Ticket Management</span>
+              </p>
+            </div>
+          </div>
+          <div className={`${isAuthenticated ? "hidden sm:flex" : "flex"} ml-auto min-w-0 flex-wrap justify-end gap-2 sm:gap-3`}>
+            {isAuthenticated ? (
+              <>
+                <span className="flex min-h-11 min-w-0 max-w-full items-center overflow-hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-blue-100">
+                  {employeeName || "Employee"}
+                </span>
+                <button type="button" onClick={() => navigate("/employee-dashboard")} className={buttonClassName(active === "/employee-dashboard")} aria-label="Dashboard">
+                  <LayoutDashboard size={18} aria-hidden="true" /> Dashboard
+                </button>
+                <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets/find")} className={buttonClassName(active.startsWith("/tickets"))} aria-label="Find Tickets">
+                  <ListChecks size={18} aria-hidden="true" /> Find Tickets
+                </button>
+                <button type="button" onClick={logout} className="flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold transition hover:bg-white/20 sm:px-4 sm:text-base" aria-label="Logout">
+                  Logout
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" onClick={() => navigate("/")} className={buttonClassName(active === "/")}>
+                  <Home size={18} aria-hidden="true" /> Home
+                </button>
+                <button type="button" onClick={() => navigate("/employee-login")} className={buttonClassName(active === "/employee-login")}>
+                  <LogIn size={18} aria-hidden="true" /> Employee Login
+                </button>
+              </>
+            )}
           </div>
         </div>
-        <div className={`${isAuthenticated ? "hidden sm:flex" : "flex"} ml-auto min-w-0 flex-wrap justify-end gap-2 sm:gap-3`}>
-          {isAuthenticated ? (
-            <>
-              <span className="flex min-h-11 min-w-0 max-w-full items-center overflow-hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold text-blue-100">
-                {employeeName || "Employee"}
-              </span>
-              <button type="button" onClick={() => navigate("/employee-dashboard")} className={buttonClassName(active === "/employee-dashboard")} aria-label="Dashboard">
-                <LayoutDashboard size={18} aria-hidden="true" /> Dashboard
-              </button>
-              <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets/find")} className={buttonClassName(active.startsWith("/tickets"))} aria-label="Find Tickets">
-                <ListChecks size={18} aria-hidden="true" /> Find Tickets
-              </button>
-              <button type="button" onClick={logout} className="flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold transition hover:bg-white/20 sm:px-4 sm:text-base" aria-label="Logout">
-                Logout
-              </button>
-            </>
-          ) : (
-            <>
-              <button type="button" onClick={() => navigate("/")} className={buttonClassName(active === "/")}>
-                <Home size={18} aria-hidden="true" /> Home
-              </button>
-              <button type="button" onClick={() => navigate("/employee-login")} className={buttonClassName(active === "/employee-login")}>
-                <LogIn size={18} aria-hidden="true" /> Employee Login
-              </button>
-            </>
-          )}
-        </div>
-      </div>
+      </KEWaveBackground>
     </nav>
   );
 }

@@ -1762,12 +1762,12 @@ textarea {
   }
 
   .ke-premium-card-bg.dashboard-welcome-premium-bg {
-    min-height: 87px;
+    min-height: 78px;
     border-radius: 16px;
   }
 
   .dashboard-welcome-premium-bg .ke-premium-card-bg__content {
-    min-height: 87px;
+    min-height: 78px;
   }
 
   .dashboard-welcome-premium-bg .ke-premium-card-bg__svg {

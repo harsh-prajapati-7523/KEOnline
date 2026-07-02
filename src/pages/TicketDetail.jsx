@@ -1119,7 +1119,7 @@ export default function TicketDetail() {
         <h1 className="min-w-0 break-words text-3xl font-extrabold leading-none">{ticket.ticketNumber ?? "Not available"}</h1>
         <StatusPill status={ticket.status} label={ticketStatusLabel} />
       </div>
-      <dl className="mt-3 space-y-1.5 text-sm font-semibold leading-snug">
+      <dl className="ticket-summary-fields mt-3 text-sm font-semibold leading-snug">
         <div className="min-w-0 break-words">
           <dt className="inline text-blue-100">Customer: </dt>
           <dd className="inline font-extrabold text-white">{customerSummaryLabel}</dd>
@@ -1138,7 +1138,7 @@ export default function TicketDetail() {
             <dd className="inline font-extrabold text-white">{mobileSummaryLabel}</dd>
           </div>
           {sanitizedMobileNumber && (
-            <a href={`tel:${sanitizedMobileNumber}`} aria-label="Call customer from ticket summary" title="Call Customer" className="ticket-summary-call-button ke-primary-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg p-0">
+            <a href={`tel:${sanitizedMobileNumber}`} aria-label="Call customer from ticket summary" title="Call Customer" className="ticket-summary-call-button ke-primary-action inline-flex shrink-0 items-center justify-center rounded-lg">
               <PhoneCall size={15} aria-hidden="true" />
             </a>
           )}

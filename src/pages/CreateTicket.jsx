@@ -286,7 +286,7 @@ export default function CreateTicket() {
             </button>
             <h1 id="create-ticket-title" className="page-title">Create Ticket</h1>
           </div>
-          <p className="page-helper">Fill the customer and product details.</p>
+          <p className="page-helper">Fill customer and product details.</p>
         </section>
 
         <form id="create-ticket-form" onSubmit={handleSubmit} className="create-ticket-form">

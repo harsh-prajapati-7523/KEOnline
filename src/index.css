@@ -1471,49 +1471,34 @@ textarea {
 }
 
 .dashboard-welcome-card {
-  position: relative;
-  overflow: hidden;
-  padding: 22px 20px;
+  display: block;
+}
+
+.ke-premium-card-bg.dashboard-welcome-premium-bg {
+  min-height: 180px;
   border-radius: 18px;
-  background:
-    radial-gradient(circle at 80% 20%, rgba(255, 204, 0, 0.08), transparent 28%),
-    linear-gradient(135deg, #071a3d 0%, #0f1e46 55%, #101b4d 100%);
-  color: #ffffff;
   box-shadow: 0 10px 24px rgba(16, 27, 77, 0.18);
 }
 
-.dashboard-welcome-card::before,
-.dashboard-welcome-card::after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
+.dashboard-welcome-premium-bg .ke-premium-card-bg__content {
+  min-height: 180px;
 }
 
-.dashboard-welcome-card::before {
-  right: 20px;
-  bottom: -58px;
-  width: 280px;
-  height: 140px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.06), transparent 65%);
-}
-
-.dashboard-welcome-card::after {
-  right: -36px;
-  bottom: -40px;
-  width: 220px;
-  height: 100px;
-  border-top: 2px solid rgba(255, 204, 0, 0.75);
-  border-radius: 50%;
-  transform: rotate(-10deg);
+.dashboard-welcome-premium-bg .ke-premium-card-bg__svg {
+  height: 142%;
+  left: -8%;
+  top: -20%;
+  width: 125%;
 }
 
 .dashboard-welcome-content {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 18px;
+  padding: 22px 20px;
+  color: #ffffff;
 }
 
 .dashboard-user-avatar {
@@ -1782,12 +1767,28 @@ textarea {
 
 @media (max-width: 390px) {
   .dashboard-welcome-card {
-    padding: 18px 16px;
+    display: block;
+  }
+
+  .ke-premium-card-bg.dashboard-welcome-premium-bg {
+    min-height: 134px;
     border-radius: 16px;
+  }
+
+  .dashboard-welcome-premium-bg .ke-premium-card-bg__content {
+    min-height: 134px;
+  }
+
+  .dashboard-welcome-premium-bg .ke-premium-card-bg__svg {
+    height: 162%;
+    left: -30%;
+    top: -26%;
+    width: 160%;
   }
 
   .dashboard-welcome-content {
     gap: 14px;
+    padding: 18px 16px;
   }
 
   .dashboard-user-avatar {

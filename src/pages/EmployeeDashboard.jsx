@@ -15,6 +15,7 @@ import {
   Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import KEPremiumCardBackground from "../components/KEPremiumCardBackground";
 import { clearAccess, fetchCurrentAccess, hasAnyAccess } from "../utils/access";
 
 const ROLE_LABELS = {
@@ -128,23 +129,25 @@ export default function EmployeeDashboard() {
     <main id="main-content" className="ke-page-main dashboard-page lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
         <header className="dashboard-welcome-card">
-          <div className="dashboard-welcome-content">
-            <div className="dashboard-user-avatar" aria-hidden="true">
-              <User />
+          <KEPremiumCardBackground className="dashboard-welcome-premium-bg">
+            <div className="dashboard-welcome-content">
+              <div className="dashboard-user-avatar" aria-hidden="true">
+                <User />
+              </div>
+              <div className="dashboard-user-info">
+                <h1 className="dashboard-welcome-title">
+                  Welcome{displayEmployeeName ? `, ${displayEmployeeName}` : ""}
+                </h1>
+                <span className="dashboard-role-pill">
+                  <Crown aria-hidden="true" />
+                  {roleLabel}
+                </span>
+                <p className="dashboard-welcome-helper">
+                  Choose a work area to continue.
+                </p>
+              </div>
             </div>
-            <div className="dashboard-user-info">
-              <h1 className="dashboard-welcome-title">
-                Welcome{displayEmployeeName ? `, ${displayEmployeeName}` : ""}
-              </h1>
-              <span className="dashboard-role-pill">
-                <Crown aria-hidden="true" />
-                {roleLabel}
-              </span>
-              <p className="dashboard-welcome-helper">
-                Choose a work area to continue.
-              </p>
-            </div>
-          </div>
+          </KEPremiumCardBackground>
         </header>
 
         <section className="mt-4 sm:mt-6" aria-labelledby="ticket-actions">

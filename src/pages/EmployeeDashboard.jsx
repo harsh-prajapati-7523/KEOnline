@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ClipboardList,
+  Crown,
   KeyRound,
   GitBranch,
   ListPlus,
@@ -10,11 +11,18 @@ import {
   Settings2,
   ShieldCheck,
   Tags,
+  User,
   Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import KEPremiumCardBackground from "../components/KEPremiumCardBackground";
 import { clearAccess, fetchCurrentAccess, hasAnyAccess } from "../utils/access";
+
+const ROLE_LABELS = {
+  SUPER_ADMIN: "Super Admin",
+  ADMIN: "Admin",
+  TECHNICIAN: "Technician",
+  EMPLOYEE: "Employee",
+};
 
 function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
   const [isOpening, setIsOpening] = useState(false);
@@ -41,12 +49,43 @@ function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
   );
 }
 
+function formatRoleLabel(roleValue) {
+  const normalizedRole = String(roleValue || "").trim().toUpperCase();
+  if (!normalizedRole) return "Employee";
+  if (ROLE_LABELS[normalizedRole]) return ROLE_LABELS[normalizedRole];
+
+  return normalizedRole
+    .toLowerCase()
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatEmployeeName(nameValue, roleValue, roleLabel) {
+  let displayName = String(nameValue || "").trim();
+  const normalizedRole = String(roleValue || "").trim();
+  const suffixes = [normalizedRole, normalizedRole.toUpperCase(), roleLabel].filter(Boolean);
+
+  suffixes.forEach((suffix) => {
+    const nameLower = displayName.toLowerCase();
+    const suffixLower = ` ${suffix.toLowerCase()}`;
+    if (nameLower.endsWith(suffixLower)) {
+      displayName = displayName.slice(0, -suffixLower.length).trim();
+    }
+  });
+
+  return displayName;
+}
+
 export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const [, setAccessRefreshKey] = useState(0);
   const [accessMessage, setAccessMessage] = useState("");
   const employeeName = localStorage.getItem("employeeName") ?? "";
   const role = localStorage.getItem("role") ?? "";
+  const roleLabel = formatRoleLabel(role);
+  const displayEmployeeName = formatEmployeeName(employeeName, role, roleLabel);
   const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
   const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
   const canManageEmployees = hasAnyAccess(["VIEW_EMPLOYEE_MANAGEMENT", "MANAGE_EMPLOYEES"]);
@@ -89,19 +128,23 @@ export default function EmployeeDashboard() {
     <main id="main-content" className="ke-page-main dashboard-page lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
         <header className="dashboard-welcome-card">
-          <KEPremiumCardBackground className="dashboard-welcome-premium-bg">
-            <div className="dashboard-welcome-content">
-              <p className="break-words text-xs font-semibold uppercase text-yellow-400 sm:text-sm">
-                Technician Dashboard
-              </p>
-              <h1 className="ke-page-title mt-1 break-words font-extrabold sm:mt-2">
-                Welcome{employeeName ? `, ${employeeName}` : ""}
+          <div className="dashboard-welcome-content">
+            <div className="dashboard-user-avatar" aria-hidden="true">
+              <User />
+            </div>
+            <div className="dashboard-user-info">
+              <h1 className="dashboard-welcome-title">
+                Welcome{displayEmployeeName ? `, ${displayEmployeeName}` : ""}
               </h1>
-              <p className="mt-1 break-words text-xs font-semibold text-blue-100 sm:mt-2 sm:text-sm">
-                Role: {role}
+              <span className="dashboard-role-pill">
+                <Crown aria-hidden="true" />
+                {roleLabel}
+              </span>
+              <p className="dashboard-welcome-helper">
+                Choose a work area to continue.
               </p>
             </div>
-          </KEPremiumCardBackground>
+          </div>
         </header>
 
         <section className="mt-4 sm:mt-6" aria-labelledby="ticket-actions">

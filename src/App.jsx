@@ -157,6 +157,7 @@ function Navbar() {
   const active = location.pathname;
   const isEmployeeLogin = active === "/employee-login";
   const isCreateTicket = active === "/tickets/new";
+  const isDashboard = active === "/employee-dashboard";
   const isAuthenticated = Boolean(localStorage.getItem("token"));
   const employeeName = localStorage.getItem("employeeName") ?? "";
 
@@ -176,10 +177,10 @@ function Navbar() {
   if (isEmployeeLogin) return null;
 
   return (
-    <nav className={`ke-app-header ${isCreateTicket ? "ke-app-header-compact" : ""} w-full overflow-hidden text-white`}>
+    <nav className={`ke-app-header ${isCreateTicket ? "ke-app-header-compact" : ""} ${isDashboard ? "ke-app-header-dashboard" : ""} w-full overflow-hidden text-white`}>
       <KEWaveBackground className="app-header-wave">
         <div className="ke-app-header-inner mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
-          <div className="ke-app-header-brand flex min-w-0 items-center gap-2.5 text-center sm:gap-3 lg:text-left">
+          <div className="ke-app-header-brand flex min-w-0 items-center gap-2.5 text-left sm:gap-3">
             <span className="ke-brand-logo-badge shrink-0" aria-hidden="true">
               <img
                 src="/ke-icon-64.png"
@@ -192,7 +193,7 @@ function Navbar() {
             </span>
             <div className="min-w-0 flex-1">
               <p className="ke-brand-title break-words font-extrabold leading-tight">
-                <span>Kumar Electronics and Electricals</span>
+                <span>Kumar Electronics &amp; Electricals</span>
               </p>
               <p className="ke-brand-subtitle text-xs font-semibold">
                 <span>Service Ticket Management</span>

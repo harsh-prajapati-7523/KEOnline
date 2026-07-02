@@ -333,6 +333,13 @@ textarea {
   top: -58%;
 }
 
+.ke-app-header.ke-app-header-dashboard,
+.ke-app-header.ke-app-header-dashboard .app-header-wave,
+.ke-app-header.ke-app-header-dashboard .app-header-wave .ke-wave-bg__content,
+.ke-app-header.ke-app-header-dashboard .ke-app-header-inner {
+  min-height: calc(126px + env(safe-area-inset-top));
+}
+
 .ke-app-header-brand {
   flex: 1 1 auto;
   min-width: 0;
@@ -1239,12 +1246,12 @@ textarea {
   }
 
   .ke-app-header .ke-brand-title {
-    font-size: 20px;
+    font-size: 12px;
     line-height: 1.08;
   }
 
   .ke-app-header .ke-brand-subtitle {
-    font-size: 13px;
+    font-size: 8px;
     line-height: 1.15;
     margin-top: 3px;
   }
@@ -1433,6 +1440,13 @@ textarea {
     padding: calc(7px + env(safe-area-inset-top)) 14px 7px;
   }
 
+  .ke-app-header.ke-app-header-dashboard,
+  .ke-app-header.ke-app-header-dashboard .app-header-wave,
+  .ke-app-header.ke-app-header-dashboard .app-header-wave .ke-wave-bg__content,
+  .ke-app-header.ke-app-header-dashboard .ke-app-header-inner {
+    min-height: calc(119px + env(safe-area-inset-top));
+  }
+
   .ke-app-header .ke-brand-logo-badge,
   .ke-app-header.ke-app-header-compact .ke-brand-logo-badge {
     height: 40px;
@@ -1441,12 +1455,12 @@ textarea {
 
   .ke-app-header .ke-brand-title,
   .ke-app-header.ke-app-header-compact .ke-brand-title {
-    font-size: 18px;
+    font-size: 11px;
   }
 
   .ke-app-header .ke-brand-subtitle,
   .ke-app-header.ke-app-header-compact .ke-brand-subtitle {
-    font-size: 12px;
+    font-size: 7px;
   }
 }
 

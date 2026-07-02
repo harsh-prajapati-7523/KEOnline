@@ -75,7 +75,7 @@ function formatEmployeeName(nameValue, roleValue, roleLabel) {
     }
   });
 
-  return displayName;
+  return displayName.split(/\s+/)[0] || "";
 }
 
 export default function EmployeeDashboard() {

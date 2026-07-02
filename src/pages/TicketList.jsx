@@ -171,12 +171,11 @@ function getMonthStartDate() {
 }
 
 const TicketCard = memo(function TicketCard({ ticket, onPreloadDetails, onViewDetails }) {
-  const productType = formatOptionalLabel(ticket.productType);
-  const complaintPreview = ticket.complaintDescription?.trim() ?? "";
-  const villageOrArea = ticket.villageOrArea?.trim() ?? "";
+  const productType = formatOptionalLabel(ticket.productType) || "Not available";
+  const customerName = ticket.customerName?.trim() || "Not available";
+  const villageOrArea = ticket.villageOrArea?.trim() || "Not available";
   const createdLabel = formatTicketDate(ticket.createdAt ?? ticket.createdDate);
-  const ownerLabel = getTicketOwner(ticket);
-  const hasIssueLine = productType || complaintPreview;
+  const ownerLabel = getTicketOwner(ticket) || "Not available";
 
   return (
     <article className="ke-ticket-card min-w-0 overflow-hidden p-3.5 sm:p-4">
@@ -187,20 +186,23 @@ const TicketCard = memo(function TicketCard({ ticket, onPreloadDetails, onViewDe
         </span>
       </div>
 
-      <p className="mt-2.5 overflow-wrap-anywhere text-sm font-semibold leading-snug text-gray-800">{ticket.customerName ?? "Not available"}</p>
-      {hasIssueLine && (
-        <p className="mt-1.5 line-clamp-2 min-w-0 overflow-hidden text-sm leading-snug text-gray-700">
-          {productType && <span className="font-bold text-blue-950">{productType}</span>}
-          {productType && complaintPreview && <span className="text-gray-400"> - </span>}
-          {complaintPreview && <span>{complaintPreview}</span>}
+      <div className="mt-2.5 space-y-1 text-sm leading-snug">
+        <p className="min-w-0 overflow-wrap-anywhere text-gray-600">
+          <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Customer: </span>
+          <span className="font-semibold text-gray-900">{customerName}</span>
         </p>
-      )}
+        <p className="min-w-0 overflow-wrap-anywhere text-gray-600">
+          <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Product: </span>
+          <span className="font-bold text-blue-950">{productType}</span>
+        </p>
+      </div>
+
       <div className="mt-2.5 grid min-w-0 grid-cols-1 gap-1.5 text-xs font-semibold text-gray-500 min-[380px]:grid-cols-2">
         <span className="flex min-w-0 items-center gap-1.5 overflow-wrap-anywhere">
           <Phone className="shrink-0" size={13} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
         </span>
-        {villageOrArea && <span className="min-w-0 overflow-wrap-anywhere min-[380px]:text-right">Area: {villageOrArea}</span>}
-        {ownerLabel && <span className="min-w-0 overflow-wrap-anywhere min-[380px]:col-span-2">Owner: {ownerLabel}</span>}
+        <span className="min-w-0 overflow-wrap-anywhere min-[380px]:text-right">Area: {villageOrArea}</span>
+        <span className="min-w-0 overflow-wrap-anywhere min-[380px]:col-span-2">Owner: {ownerLabel}</span>
       </div>
       <div className="mt-2.5 flex min-w-0 items-center justify-between gap-3 border-t border-blue-50 pt-2.5">
         <span className="min-w-0 overflow-wrap-anywhere text-xs font-semibold text-gray-500">

@@ -16,6 +16,7 @@
 html,
 body,
 #root {
+  min-height: 100dvh;
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
@@ -96,7 +97,7 @@ textarea {
   background: var(--ke-bg);
   display: flex;
   justify-content: center;
-  min-height: 100svh;
+  min-height: 100dvh;
   overflow-x: hidden;
   padding: calc(env(safe-area-inset-top) + clamp(0.875rem, 4vw, 1.25rem)) 0.75rem
     calc(env(safe-area-inset-bottom) + clamp(0.875rem, 4vw, 1.25rem));
@@ -212,7 +213,7 @@ textarea {
 
 .ke-page-main {
   background: var(--ke-bg);
-  min-height: 100svh;
+  min-height: 100dvh;
   overflow-x: hidden;
   padding: clamp(0.625rem, 2.5vw, 1rem);
   padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 24px);
@@ -531,7 +532,7 @@ textarea {
 
 .create-ticket-page {
   background: #f6f8fc;
-  min-height: 100svh;
+  min-height: 100dvh;
   overflow-x: hidden;
   padding: 0 20px calc(170px + env(safe-area-inset-bottom));
   width: 100%;
@@ -1544,8 +1545,14 @@ textarea {
 
 .dashboard-page {
   background: var(--ke-bg);
-  min-height: 100svh;
+  min-height: 100dvh;
   padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 24px);
+}
+
+.dashboard-mobile-container {
+  margin-left: auto;
+  margin-right: auto;
+  width: min(100%, 430px);
 }
 
 .dashboard-welcome-card {
@@ -1645,7 +1652,7 @@ textarea {
 .ke-login-shell {
   margin: 0 auto;
   max-width: 390px;
-  min-height: 100svh;
+  min-height: 100dvh;
   width: 100%;
 }
 

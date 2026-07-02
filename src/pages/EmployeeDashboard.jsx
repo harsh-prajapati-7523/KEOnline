@@ -139,7 +139,7 @@ export default function EmployeeDashboard() {
 
   return (
     <main id="main-content" className="ke-page-main dashboard-page lg:px-8">
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="dashboard-mobile-container max-w-5xl">
         <header className="dashboard-welcome-card">
           <KEPremiumCardBackground className="dashboard-welcome-premium-bg">
             <div className="dashboard-welcome-content">

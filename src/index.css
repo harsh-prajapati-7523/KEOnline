@@ -1470,11 +1470,25 @@ textarea {
   padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 24px);
 }
 
-.dashboard-hero-card {
-  background: linear-gradient(135deg, rgba(6, 21, 58, 0.86), rgba(14, 38, 91, 0.7));
-  border: 1px solid rgba(255, 204, 0, 0.28);
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
-  backdrop-filter: blur(10px);
+.dashboard-welcome-card {
+  display: block;
+}
+
+.ke-premium-card-bg.dashboard-welcome-premium-bg {
+  min-height: 180px;
+  border-radius: 24px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
+}
+
+.dashboard-welcome-premium-bg .ke-premium-card-bg__content {
+  min-height: 180px;
+}
+
+.dashboard-welcome-content {
+  position: relative;
+  z-index: 2;
+  padding: 20px;
+  color: #ffffff;
 }
 
 .dashboard-admin-panel {
@@ -1644,6 +1658,19 @@ textarea {
 
   .dashboard-page :where(.text-xs, .text-sm, .text-base, .text-lg, .text-xl) {
     line-height: 1.25 !important;
+  }
+
+  .ke-premium-card-bg.dashboard-welcome-premium-bg {
+    min-height: 170px;
+    border-radius: 20px;
+  }
+
+  .dashboard-welcome-premium-bg .ke-premium-card-bg__content {
+    min-height: 170px;
+  }
+
+  .dashboard-welcome-content {
+    padding: 18px;
   }
 
   .login-header-content {

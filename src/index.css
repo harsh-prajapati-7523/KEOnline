@@ -1013,46 +1013,46 @@ textarea {
 }
 
 .create-ticket-compact-page .create-ticket-title-area {
-  margin-top: 16px;
+  margin-top: 13px;
 }
 
 .create-ticket-compact-page .create-ticket-title-row {
-  gap: 10px;
+  gap: 8px;
 }
 
 .create-ticket-compact-page .create-ticket-back-button {
-  height: 24px;
-  width: 24px;
-}
-
-.create-ticket-compact-page .create-ticket-back-button svg {
   height: 20px;
   width: 20px;
 }
 
+.create-ticket-compact-page .create-ticket-back-button svg {
+  height: 16px;
+  width: 16px;
+}
+
 .create-ticket-compact-page .page-title {
-  font-size: 19.2px;
+  font-size: 15.4px;
   line-height: 1.08;
 }
 
 .create-ticket-compact-page .page-helper {
-  font-size: 12.5px;
+  font-size: 10px;
   line-height: 1.22;
-  margin-left: 34px;
-  margin-top: 4px;
+  margin-left: 28px;
+  margin-top: 3px;
   white-space: nowrap;
 }
 
 .create-ticket-compact-page .create-ticket-form {
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
 .create-ticket-compact-page .form-section {
   border-bottom: 1px solid #dde4ee;
-  column-gap: 8px;
+  column-gap: 6px;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr);
-  padding: 14px 0;
+  grid-template-columns: 20px minmax(0, 1fr);
+  padding: 11px 0;
 }
 
 .create-ticket-compact-page .section-icon {
@@ -1061,37 +1061,37 @@ textarea {
   border-radius: 999px;
   color: #101b4d;
   display: flex;
-  height: 24px;
+  height: 20px;
   justify-content: center;
   margin-top: 1px;
-  width: 24px;
+  width: 20px;
 }
 
 .create-ticket-compact-page .section-icon svg {
-  height: 14px;
-  width: 14px;
+  height: 11px;
+  width: 11px;
 }
 
 .create-ticket-compact-page .section-content h2 {
-  font-size: 18px;
+  font-size: 14.5px;
   line-height: 1.15;
-  margin: 0 0 4px;
+  margin: 0 0 3px;
 }
 
 .create-ticket-compact-page .section-content > p {
-  font-size: 12px;
+  font-size: 10px;
   line-height: 1.25;
-  margin: 0 0 10px;
+  margin: 0 0 8px;
 }
 
 .create-ticket-compact-page .field-stack {
-  gap: 10px;
+  gap: 8px;
 }
 
 .create-ticket-compact-page .form-label {
-  font-size: 13px;
+  font-size: 10.5px;
   line-height: 1.2;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
 }
 
 .create-ticket-compact-page input,
@@ -1101,7 +1101,7 @@ textarea {
 .create-ticket-compact-page .form-select,
 .create-ticket-compact-page .form-textarea {
   border-radius: 10px;
-  font-size: 13px;
+  font-size: 10.5px;
   line-height: 1.2;
 }
 
@@ -1109,20 +1109,20 @@ textarea {
 .create-ticket-compact-page select,
 .create-ticket-compact-page .form-input,
 .create-ticket-compact-page .form-select {
-  height: 40px;
-  min-height: 40px;
-  padding: 0 12px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 10px;
 }
 
 .create-ticket-compact-page textarea,
 .create-ticket-compact-page .form-textarea {
-  min-height: 68px;
-  padding: 12px;
+  min-height: 56px;
+  padding: 10px;
 }
 
 .create-ticket-compact-page .form-input::placeholder,
 .create-ticket-compact-page .form-textarea::placeholder {
-  font-size: 13px;
+  font-size: 10.5px;
 }
 
 .create-ticket-compact-page .input-with-icon > svg {
@@ -1131,24 +1131,24 @@ textarea {
 
 .create-ticket-compact-page .input-with-icon input,
 .create-ticket-compact-page .input-with-icon textarea {
-  padding-left: 12px;
+  padding-left: 10px;
 }
 
 .create-ticket-compact-page .select-with-icon > svg {
-  height: 18px;
-  right: 12px;
-  width: 18px;
+  height: 14px;
+  right: 10px;
+  width: 14px;
 }
 
 .create-ticket-compact-page .select-with-icon select {
-  padding-right: 38px;
+  padding-right: 30px;
 }
 
 .create-ticket-compact-page .quick-chip-row {
   display: flex;
   flex-wrap: nowrap;
-  gap: 8px;
-  margin-top: 8px;
+  gap: 6px;
+  margin-top: 6px;
   overflow-x: auto;
   padding-bottom: 2px;
   scrollbar-width: none;
@@ -1162,38 +1162,38 @@ textarea {
 .create-ticket-compact-page .quick-chip {
   border-radius: 8px;
   flex: 0 0 auto;
-  font-size: 12px;
-  height: 28px;
-  padding: 0 11px;
+  font-size: 10px;
+  height: 24px;
+  padding: 0 9px;
   white-space: nowrap;
 }
 
 .create-ticket-compact-page .optional-badge {
-  font-size: 11px;
-  height: 20px;
-  padding: 0 8px;
+  font-size: 9px;
+  height: 16px;
+  padding: 0 6px;
 }
 
 .create-ticket-compact-page .dynamic-field,
 .create-ticket-compact-page .dynamic-field-status {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .create-ticket-compact-page .create-ticket-action-bar {
   bottom: calc(74px + env(safe-area-inset-bottom));
-  padding: 10px 16px;
+  padding: 8px 16px;
 }
 
 .create-ticket-compact-page .create-ticket-submit {
-  border-radius: 12px;
-  font-size: 14px;
-  gap: 8px;
-  height: 44px;
+  border-radius: 10px;
+  font-size: 11.2px;
+  gap: 6px;
+  height: 38px;
 }
 
 .create-ticket-compact-page .create-ticket-submit svg {
-  height: 18px;
-  width: 18px;
+  height: 14px;
+  width: 14px;
 }
 
 a:focus-visible,

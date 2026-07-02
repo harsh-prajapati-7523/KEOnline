@@ -1661,16 +1661,23 @@ textarea {
   }
 
   .ke-premium-card-bg.dashboard-welcome-premium-bg {
-    min-height: 170px;
+    min-height: 102px;
     border-radius: 20px;
   }
 
   .dashboard-welcome-premium-bg .ke-premium-card-bg__content {
-    min-height: 170px;
+    min-height: 102px;
+  }
+
+  .dashboard-welcome-premium-bg .ke-premium-card-bg__svg {
+    height: 150%;
+    left: -18%;
+    top: -18%;
+    width: 138%;
   }
 
   .dashboard-welcome-content {
-    padding: 18px;
+    padding: 16px 18px;
   }
 
   .login-header-content {

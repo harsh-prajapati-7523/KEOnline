@@ -277,7 +277,7 @@ export default function CreateTicket() {
   const problemChips = ["Not charging", "No backup", "Not working", "Noise issue"];
 
   return (
-    <main id="main-content" className="create-ticket-page">
+    <main id="main-content" className="create-ticket-compact-page create-ticket-page">
       <div className="create-ticket-shell">
         <section className="create-ticket-title-area" aria-labelledby="create-ticket-title">
           <div className="create-ticket-title-row">

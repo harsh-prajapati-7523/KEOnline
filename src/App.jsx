@@ -152,6 +152,7 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const active = location.pathname;
+  const isCreateTicket = active === "/tickets/new";
   const isAuthenticated = Boolean(localStorage.getItem("token"));
   const employeeName = localStorage.getItem("employeeName") ?? "";
 
@@ -169,7 +170,7 @@ function Navbar() {
   }`;
 
   return (
-    <nav className="ke-app-header w-full overflow-hidden text-white">
+    <nav className={`ke-app-header ${isCreateTicket ? "ke-app-header-compact" : ""} w-full overflow-hidden text-white`}>
       <div className="ke-app-header-inner mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
         <div className="flex min-w-0 items-center gap-2.5 text-center sm:gap-3 lg:text-left">
           <span className="ke-brand-logo-badge shrink-0" aria-hidden="true">

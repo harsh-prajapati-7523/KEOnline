@@ -1684,6 +1684,43 @@ textarea {
 }
 
 @media (min-width: 768px) {
+  .ke-premium-card-bg.dashboard-welcome-premium-bg {
+    min-height: 190px;
+  }
+
+  .dashboard-welcome-premium-bg .ke-premium-card-bg__content {
+    min-height: 190px;
+  }
+
+  .dashboard-welcome-content {
+    gap: 36px;
+    padding: 28px 36px;
+  }
+
+  .dashboard-user-avatar {
+    width: 129px;
+    height: 129px;
+  }
+
+  .dashboard-user-avatar svg {
+    width: 116px;
+    height: 116px;
+  }
+
+  .dashboard-welcome-title {
+    font-size: 21.4px;
+  }
+
+  .dashboard-role-pill {
+    font-size: 20.1px;
+    margin-top: 12px;
+  }
+
+  .dashboard-welcome-helper {
+    font-size: 17.9px;
+    margin-top: 24px;
+  }
+
   .ke-login-shell {
     max-width: 430px;
   }

@@ -1185,8 +1185,6 @@ export default function TicketDetail() {
       <div className="mt-3">
         {canViewCharges && <DetailRow icon={IndianRupee} label="Charges" value={formatCompactCurrency(totalAmount)} actionLabel="View" onClick={openChargesView} tone={Number(totalAmount) > 0 ? "green" : "slate"} />}
         {canAssignTicket && !["COMPLETED", "CANCELLED"].includes(ticket.status) && <DetailRow icon={Users} label="Assign Ticket" actionLabel="Assign" onClick={openAssignDialog} />}
-        <DetailRow icon={Wrench} label="Missing Parts" value="Not added" />
-        <DetailRow icon={ShieldCheck} label="Warranty" value="Not marked" />
       </div>
     </section>
   );

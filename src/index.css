@@ -311,41 +311,47 @@ textarea {
 }
 
 .ke-app-header-inner {
-  padding-top: calc(0.5rem + env(safe-area-inset-top));
+  gap: 18px;
+  min-height: calc(96px + env(safe-area-inset-top));
+  padding: calc(14px + env(safe-area-inset-top)) 24px 14px;
 }
 
 .ke-brand-logo-badge {
   align-items: center;
   background: #ffffff;
   border: 1px solid rgba(255, 204, 0, 0.45);
-  border-radius: 0.75rem;
+  border-radius: 14px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   display: flex;
-  height: clamp(2.25rem, 9.5vw, 2.5rem);
+  height: 72px;
   justify-content: center;
-  padding: 0.32rem;
-  width: clamp(2.25rem, 9.5vw, 2.5rem);
+  padding: 0.5rem;
+  width: 72px;
 }
 
 .ke-brand-logo {
   display: block;
   height: 100%;
-  max-height: clamp(1.65rem, 7vw, 1.86rem);
-  max-width: clamp(1.65rem, 7vw, 1.86rem);
+  max-height: 100%;
+  max-width: 100%;
   object-fit: contain;
   width: auto;
 }
 
 .ke-brand-title {
-  font-size: clamp(0.95rem, 3.6vw, 1.06rem);
-  letter-spacing: 0;
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  line-height: 1.1;
 }
 
 .ke-brand-subtitle {
-  color: rgba(255, 255, 255, 0.82);
-  font-size: clamp(0.72rem, 2.7vw, 0.8rem);
-  line-height: 1.15;
-  margin-top: 0.125rem;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin-top: 4px;
 }
 
 .ke-bottom-nav {
@@ -432,22 +438,6 @@ textarea {
   color: var(--ke-primary);
 }
 
-.ke-create-card {
-  background: var(--ke-card);
-  border: 1px solid var(--ke-border);
-  border-radius: 1rem;
-  box-shadow: 0 8px 20px rgba(16, 27, 77, 0.08);
-}
-
-.ke-create-title {
-  font-size: clamp(1.25rem, 5vw, 1.5rem);
-}
-
-.ke-create-form {
-  gap: clamp(0.625rem, 2.5vw, 0.875rem);
-  padding: clamp(0.75rem, 3vw, 1rem);
-}
-
 .ke-form-label {
   color: #344054;
   font-size: clamp(0.92rem, 3.4vw, 0.98rem);
@@ -486,6 +476,322 @@ textarea {
 
 .ke-form-control:disabled {
   opacity: 0.6;
+}
+
+.create-ticket-page {
+  background: #f6f8fc;
+  min-height: 100svh;
+  overflow-x: hidden;
+  padding: 0 20px calc(180px + env(safe-area-inset-bottom));
+  width: 100%;
+}
+
+.create-ticket-shell {
+  margin: 0 auto;
+  max-width: 760px;
+  width: 100%;
+}
+
+.create-ticket-title-area {
+  margin-top: 28px;
+}
+
+.create-ticket-title-row {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  min-width: 0;
+}
+
+.create-ticket-back-button {
+  align-items: center;
+  color: #101b4d;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 36px;
+  justify-content: center;
+  width: 40px;
+}
+
+.create-ticket-back-button svg {
+  height: 28px;
+  width: 28px;
+}
+
+.page-title {
+  color: #101b4d;
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: 0.2px;
+  line-height: 1.15;
+  margin: 0;
+  min-width: 0;
+}
+
+.page-helper {
+  color: #667085;
+  font-size: 19px;
+  font-weight: 500;
+  line-height: 1.35;
+  margin: 8px 0 0 56px;
+}
+
+.create-ticket-form {
+  margin-top: 10px;
+}
+
+.form-section {
+  border-bottom: 1px solid #dde4ee;
+  column-gap: 16px;
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  padding: 26px 0;
+}
+
+.form-section:last-of-type {
+  border-bottom: 0;
+}
+
+.section-icon {
+  align-items: center;
+  background: #eef3ff;
+  border-radius: 999px;
+  color: #101b4d;
+  display: flex;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+
+.section-content {
+  min-width: 0;
+}
+
+.section-content h2 {
+  color: #101b4d;
+  font-size: 25px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin: 0 0 4px;
+}
+
+.section-content > p {
+  color: #667085;
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.35;
+  margin: 0 0 12px;
+}
+
+.field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-label {
+  color: #101b4d;
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.25;
+  margin-bottom: 8px;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  background: #ffffff;
+  border: 1.5px solid #d1d8e4;
+  border-radius: 12px;
+  box-sizing: border-box;
+  color: #101b4d;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.3;
+  padding: 0 18px;
+  width: 100%;
+}
+
+.form-input,
+.form-select {
+  height: 56px;
+}
+
+.form-select {
+  appearance: none;
+  padding-right: 52px;
+}
+
+.form-textarea {
+  min-height: 104px;
+  padding-top: 18px;
+  resize: none;
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: #9aa4b2;
+  font-weight: 600;
+  opacity: 1;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: #101b4d;
+  box-shadow: 0 0 0 3px rgba(16, 27, 77, 0.1);
+}
+
+.form-input[aria-invalid="true"],
+.form-select[aria-invalid="true"],
+.form-textarea[aria-invalid="true"] {
+  background: #fff8f8;
+  border-color: #ef233c;
+}
+
+.input-with-icon,
+.select-with-icon {
+  position: relative;
+}
+
+.input-with-icon > svg,
+.select-with-icon > svg {
+  color: #667085;
+  height: 22px;
+  left: 18px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  z-index: 1;
+}
+
+.select-with-icon > svg {
+  color: #101b4d;
+  left: auto;
+  pointer-events: none;
+  right: 18px;
+}
+
+.input-with-icon input,
+.input-with-icon textarea {
+  padding-left: 56px;
+}
+
+.input-with-icon.textarea > svg {
+  top: 24px;
+  transform: none;
+}
+
+.quick-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.quick-chip {
+  align-items: center;
+  background: #ffffff;
+  border: 1.5px solid #d1d8e4;
+  border-radius: 9px;
+  color: #101b4d;
+  display: inline-flex;
+  font-size: 16px;
+  font-weight: 600;
+  height: 36px;
+  justify-content: center;
+  padding: 0 18px;
+}
+
+.optional-badge {
+  align-items: center;
+  background: #eef0f3;
+  border-radius: 8px;
+  color: #667085;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  height: 26px;
+  margin-left: 8px;
+  padding: 0 10px;
+  vertical-align: 2px;
+}
+
+.field-error {
+  color: #b42318;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 6px;
+}
+
+.dynamic-field {
+  margin-top: 16px;
+}
+
+.dynamic-field-status {
+  margin-top: 16px;
+}
+
+.create-ticket-message {
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin: 8px 0 18px;
+  padding: 12px 14px;
+}
+
+.create-ticket-message-error {
+  background: #fff1f0;
+  color: #b42318;
+}
+
+.create-ticket-message-success {
+  background: #ecfdf3;
+  color: #027a48;
+}
+
+.create-ticket-action-bar {
+  backdrop-filter: blur(8px);
+  background: rgba(246, 248, 252, 0.96);
+  border-top: 1px solid #e1e7f0;
+  bottom: calc(82px + env(safe-area-inset-bottom));
+  left: 0;
+  padding: 14px 20px;
+  position: fixed;
+  right: 0;
+  z-index: 30;
+}
+
+.create-ticket-submit {
+  align-items: center;
+  background: #ffcc00;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(255, 204, 0, 0.22);
+  color: #101b4d;
+  display: flex;
+  font-size: 24px;
+  font-weight: 800;
+  gap: 16px;
+  height: 76px;
+  justify-content: center;
+  margin: 0 auto;
+  max-width: 760px;
+  width: 100%;
+}
+
+.create-ticket-submit svg {
+  height: 30px;
+  width: 30px;
+}
+
+.create-ticket-submit:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .ke-secondary-link-button {
@@ -535,23 +841,23 @@ textarea {
   }
 
   .ke-brand-logo-badge {
-    border-radius: 0.875rem;
-    height: 2.875rem;
-    padding: 0.38rem;
-    width: 2.875rem;
+    border-radius: 14px;
+    height: 72px;
+    padding: 0.5rem;
+    width: 72px;
   }
 
   .ke-brand-logo {
-    max-height: 2.1rem;
-    max-width: 2.1rem;
+    max-height: 100%;
+    max-width: 100%;
   }
 
   .ke-brand-title {
-    font-size: 1.125rem;
+    font-size: 26px;
   }
 
   .ke-brand-subtitle {
-    font-size: 0.75rem;
+    font-size: 20px;
   }
 
   .ticket-detail-page {
@@ -586,6 +892,50 @@ textarea {
   .mobile-full-width-actions > a {
     width: 100%;
     justify-content: center;
+  }
+}
+
+@media (max-width: 380px) {
+  .ke-app-header-inner {
+    gap: 12px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .ke-brand-logo-badge {
+    height: 58px;
+    width: 58px;
+  }
+
+  .ke-brand-title {
+    font-size: 22px;
+  }
+
+  .ke-brand-subtitle {
+    font-size: 16px;
+  }
+
+  .create-ticket-page {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .page-title {
+    font-size: 30px;
+  }
+
+  .page-helper {
+    font-size: 17px;
+  }
+
+  .create-ticket-action-bar {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .create-ticket-submit {
+    font-size: 21px;
+    gap: 12px;
   }
 }
 

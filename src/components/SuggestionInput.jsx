@@ -1,16 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import { hasAccess } from "../utils/access";
 
 const DEBOUNCE_MS = 275;
 
-export default function SuggestionInput({
+const SuggestionInput = forwardRef(function SuggestionInput({
   endpoint,
   name,
   value,
   onChange,
   className = "",
   ...inputProps
-}) {
+}, ref) {
   const [suggestions, setSuggestions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const requestIdRef = useRef(0);
@@ -67,6 +67,7 @@ export default function SuggestionInput({
   return (
     <div className="relative min-w-0">
       <input
+        ref={ref}
         {...inputProps}
         name={name}
         value={value}
@@ -94,4 +95,6 @@ export default function SuggestionInput({
       )}
     </div>
   );
-}
+});
+
+export default SuggestionInput;

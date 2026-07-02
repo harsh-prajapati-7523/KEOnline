@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowLeft, ChevronDown, ClipboardList, MapPin, MessageCircle, Package, Phone, Send, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SuggestionInput from "../components/SuggestionInput";
 
@@ -15,15 +15,15 @@ const emptyForm = {
 function validate(formData) {
   const errors = {};
 
-  if (!formData.customerName.trim()) errors.customerName = "Customer name is required.";
+  if (!formData.categoryId) errors.categoryId = "Select ticket type.";
   if (!formData.mobileNumber.trim()) {
-    errors.mobileNumber = "Mobile number is required.";
+    errors.mobileNumber = "Enter a valid 10-digit mobile number.";
   } else if (!/^\d{10}$/.test(formData.mobileNumber)) {
-    errors.mobileNumber = "Please enter a valid 10-digit mobile number.";
+    errors.mobileNumber = "Enter a valid 10-digit mobile number.";
   }
+  if (!formData.customerName.trim()) errors.customerName = "Customer name is required.";
   if (!formData.villageOrArea.trim()) errors.villageOrArea = "Village / Area is required.";
   if (!formData.productType.trim()) errors.productType = "Product type is required.";
-  if (!formData.categoryId) errors.categoryId = "Ticket category is required.";
 
   return errors;
 }
@@ -75,7 +75,7 @@ function buildDynamicValuesPayload(dynamicFields, dynamicValues) {
 }
 
 function FieldError({ id, message }) {
-  return message ? <p id={id} className="mt-1 text-sm font-semibold text-red-600">{message}</p> : null;
+  return message ? <p id={id} className="field-error">{message}</p> : null;
 }
 
 function authHeaders() {
@@ -110,6 +110,7 @@ function formatCategoryLabel(category) {
 
 export default function CreateTicket() {
   const navigate = useNavigate();
+  const fieldRefs = useRef({});
   const [formData, setFormData] = useState(emptyForm);
   const [categories, setCategories] = useState([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
@@ -123,8 +124,12 @@ export default function CreateTicket() {
   const [isLoadingDynamicFields, setIsLoadingDynamicFields] = useState(false);
   const [dynamicConfigError, setDynamicConfigError] = useState("");
 
-  const getFieldClassName = (fieldName, extraClassName = "") => `ke-form-control mt-1 ${errors[fieldName] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
-  const getDynamicFieldClassName = (fieldId, extraClassName = "") => `ke-form-control mt-1 ${dynamicErrors[fieldId] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
+  const getFieldClassName = (fieldName, type = "input", extraClassName = "") => `form-${type} ${errors[fieldName] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
+  const getDynamicFieldClassName = (fieldId, type = "input", extraClassName = "") => `form-${type} ${dynamicErrors[fieldId] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
+
+  const setFieldRef = (fieldName) => (element) => {
+    if (element) fieldRefs.current[fieldName] = element;
+  };
 
   const loadCategories = useCallback(async () => {
     setIsLoadingCategories(true);
@@ -137,7 +142,7 @@ export default function CreateTicket() {
       setCategories(nextCategories.filter((category) => category.active));
     } catch {
       setCategories([]);
-      setCategoryError("Unable to load ticket categories. Please try again.");
+      setCategoryError("Unable to load ticket types. Please try again.");
     } finally {
       setIsLoadingCategories(false);
     }
@@ -200,6 +205,12 @@ export default function CreateTicket() {
     setMessage("");
   };
 
+  const applyQuickValue = (name, value) => {
+    setFormData((current) => ({ ...current, [name]: value }));
+    setErrors((current) => ({ ...current, [name]: "" }));
+    setMessage("");
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (isSubmitting) return;
@@ -211,6 +222,13 @@ export default function CreateTicket() {
       setErrors(validationErrors);
       setDynamicErrors(dynamicValidationErrors);
       setMessage("");
+      const firstErrorKey = ["categoryId", "mobileNumber", "customerName", "villageOrArea", "productType"].find((key) => validationErrors[key]);
+      const firstDynamicErrorKey = Object.keys(dynamicValidationErrors)[0];
+      window.requestAnimationFrame(() => {
+        const field = firstErrorKey ? fieldRefs.current[firstErrorKey] : document.getElementById(`dynamic-field-${firstDynamicErrorKey}`);
+        field?.focus({ preventScroll: true });
+        field?.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
       return;
     }
 
@@ -255,82 +273,145 @@ export default function CreateTicket() {
     }
   };
 
+  const productChips = ["Battery", "Inverter", "UPS", "Fan", "Stabilizer"];
+  const problemChips = ["Not charging", "No backup", "Not working", "Noise issue"];
+
   return (
-    <main id="main-content" className="ke-page-main lg:px-8">
-      <div className="mx-auto w-full max-w-3xl">
-        <div className="mb-2.5 flex min-w-0 items-center gap-2 sm:mb-4">
-          <button type="button" onClick={() => navigate("/employee-dashboard")} className="flex min-h-10 shrink-0 items-center gap-1.5 rounded-xl px-1 py-1.5 font-semibold text-blue-950 sm:min-h-11 sm:gap-2 sm:py-2">
-            <ArrowLeft size={18} aria-hidden="true" />
-            <span className="sr-only sm:not-sr-only">Dashboard</span>
-          </button>
-          <h1 className="ke-create-title min-w-0 flex-1 break-words text-xl font-extrabold leading-tight text-blue-950 sm:text-2xl">Create Ticket</h1>
-        </div>
+    <main id="main-content" className="create-ticket-page">
+      <div className="create-ticket-shell">
+        <section className="create-ticket-title-area" aria-labelledby="create-ticket-title">
+          <div className="create-ticket-title-row">
+            <button type="button" onClick={() => navigate("/employee-dashboard")} className="create-ticket-back-button" aria-label="Back to dashboard">
+              <ArrowLeft aria-hidden="true" />
+            </button>
+            <h1 id="create-ticket-title" className="page-title">Create Ticket</h1>
+          </div>
+          <p className="page-helper">Fill the customer and product details.</p>
+        </section>
 
-        <section className="ke-create-card min-w-0 overflow-hidden">
-          <form onSubmit={handleSubmit} className="ke-create-form grid min-w-0 grid-cols-1 gap-2.5 p-3 sm:grid-cols-2 sm:gap-4 sm:p-6">
-            <label htmlFor="ticket-category" className="ke-form-label sm:col-span-2">
-              Ticket Category
-              <select id="ticket-category" name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className={getFieldClassName("categoryId", "bg-white")} aria-invalid={Boolean(errors.categoryId)} aria-describedby={errors.categoryId ? "ticket-category-error" : undefined}>
-                <option value="">{isLoadingCategories ? "Loading ticket categories..." : "Select ticket category"}</option>
-                {categories.map((category) => <option key={category.id} value={category.id}>{formatCategoryLabel(category)}</option>)}
-              </select>
-              <FieldError id="ticket-category-error" message={errors.categoryId} />
-              {categoryError && <p className="mt-1 text-sm font-semibold text-red-600">{categoryError}</p>}
-              {!isLoadingCategories && !categoryError && categories.length === 0 && (
-                <p className="mt-1 text-sm font-semibold text-yellow-700">No active ticket categories are available.</p>
-              )}
-            </label>
-
-            <label htmlFor="mobile-number" className="ke-form-label">
-              Mobile Number
-              <input id="mobile-number" name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} placeholder="Enter 10-digit mobile number" className={getFieldClassName("mobileNumber")} aria-invalid={Boolean(errors.mobileNumber)} aria-describedby={errors.mobileNumber ? "mobile-number-error" : undefined} />
-              <FieldError id="mobile-number-error" message={errors.mobileNumber} />
-            </label>
-
-            <label htmlFor="customer-name" className="ke-form-label">
-              Customer Name
-              <input id="customer-name" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="Enter customer name" className={getFieldClassName("customerName")} aria-invalid={Boolean(errors.customerName)} aria-describedby={errors.customerName ? "customer-name-error" : undefined} />
-              <FieldError id="customer-name-error" message={errors.customerName} />
-            </label>
-
-            <label htmlFor="village-or-area" className="ke-form-label">
-              Village / Area
-              <SuggestionInput id="village-or-area" endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} placeholder="Enter village or area" className={getFieldClassName("villageOrArea")} aria-invalid={Boolean(errors.villageOrArea)} aria-describedby={errors.villageOrArea ? "village-or-area-error" : undefined} />
-              <FieldError id="village-or-area-error" message={errors.villageOrArea} />
-            </label>
-
-            <label htmlFor="product-type" className="ke-form-label">
-              Product Type
-              <SuggestionInput id="product-type" endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} placeholder="e.g., Battery, Inverter, UPS, Stabilizer" className={getFieldClassName("productType")} aria-invalid={Boolean(errors.productType)} aria-describedby={errors.productType ? "product-type-error" : undefined} />
-              <FieldError id="product-type-error" message={errors.productType} />
-            </label>
-
-            <label htmlFor="complaint-description" className="ke-form-label sm:col-span-2">
-              Complaint Description <span className="text-sm font-normal text-gray-500">(Optional)</span>
-              <textarea id="complaint-description" name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} placeholder="Describe the customer complaint" className={getFieldClassName("complaintDescription", "min-h-24 resize-y sm:min-h-28")} />
-            </label>
-
-            {formData.categoryId && (isLoadingDynamicFields || dynamicConfigError) && (
-              <div className="sm:col-span-2">
-                {isLoadingDynamicFields && (
-                  <p className="text-sm font-semibold text-gray-600">Loading category fields...</p>
-                )}
-                {dynamicConfigError && (
-                  <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{dynamicConfigError}</p>
-                )}
+        <form id="create-ticket-form" onSubmit={handleSubmit} className="create-ticket-form">
+          <section className="form-section ticket-type-section" aria-labelledby="ticket-type-heading">
+            <div className="section-icon" aria-hidden="true">
+              <ClipboardList size={28} />
+            </div>
+            <div className="section-content">
+              <h2 id="ticket-type-heading">Ticket Type</h2>
+              <p>What service is needed?</p>
+              <label htmlFor="ticket-category" className="sr-only">Ticket Type</label>
+              <div className="select-with-icon">
+                <select ref={setFieldRef("categoryId")} id="ticket-category" name="categoryId" value={formData.categoryId} onChange={handleChange} disabled={isLoadingCategories || categories.length === 0} className={getFieldClassName("categoryId", "select")} aria-invalid={Boolean(errors.categoryId)} aria-describedby={errors.categoryId ? "ticket-category-error" : undefined}>
+                  <option value="">{isLoadingCategories ? "Loading ticket types..." : "Select service type"}</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{formatCategoryLabel(category)}</option>)}
+                </select>
+                <ChevronDown aria-hidden="true" />
               </div>
-            )}
+              <FieldError id="ticket-category-error" message={errors.categoryId} />
+              {categoryError && <p className="field-error">{categoryError}</p>}
+              {!isLoadingCategories && !categoryError && categories.length === 0 && (
+                <p className="mt-1 text-sm font-semibold text-yellow-700">No active ticket types are available.</p>
+              )}
+            </div>
+          </section>
 
-            {!isLoadingDynamicFields && !dynamicConfigError && dynamicFields.map((field) => {
+          <section className="form-section customer-section" aria-labelledby="customer-heading">
+            <div className="section-icon" aria-hidden="true">
+              <User size={28} />
+            </div>
+            <div className="section-content">
+              <h2 id="customer-heading">Customer</h2>
+              <div className="field-stack">
+                <div>
+                  <label htmlFor="mobile-number" className="sr-only">Mobile Number</label>
+                  <div className="input-with-icon">
+                    <Phone aria-hidden="true" />
+                    <input ref={setFieldRef("mobileNumber")} id="mobile-number" name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} placeholder="Enter 10-digit mobile number" className={getFieldClassName("mobileNumber")} aria-invalid={Boolean(errors.mobileNumber)} aria-describedby={errors.mobileNumber ? "mobile-number-error" : undefined} />
+                  </div>
+                  <FieldError id="mobile-number-error" message={errors.mobileNumber} />
+                </div>
+
+                <div>
+                  <label htmlFor="customer-name" className="sr-only">Customer Name</label>
+                  <div className="input-with-icon">
+                    <User aria-hidden="true" />
+                    <input ref={setFieldRef("customerName")} id="customer-name" name="customerName" value={formData.customerName} onChange={handleChange} placeholder="Enter customer name" className={getFieldClassName("customerName")} aria-invalid={Boolean(errors.customerName)} aria-describedby={errors.customerName ? "customer-name-error" : undefined} />
+                  </div>
+                  <FieldError id="customer-name-error" message={errors.customerName} />
+                </div>
+
+                <div>
+                  <label htmlFor="village-or-area" className="sr-only">Village / Area</label>
+                  <div className="input-with-icon">
+                    <MapPin aria-hidden="true" />
+                    <SuggestionInput ref={setFieldRef("villageOrArea")} id="village-or-area" endpoint="/volt/suggestions/villages" name="villageOrArea" value={formData.villageOrArea} onChange={handleChange} placeholder="Enter village or area" className={getFieldClassName("villageOrArea")} aria-invalid={Boolean(errors.villageOrArea)} aria-describedby={errors.villageOrArea ? "village-or-area-error" : undefined} />
+                  </div>
+                  <FieldError id="village-or-area-error" message={errors.villageOrArea} />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="form-section product-problem-section" aria-labelledby="product-problem-heading">
+            <div className="section-icon" aria-hidden="true">
+              <Package size={28} />
+            </div>
+            <div className="section-content">
+              <h2 id="product-problem-heading">Product &amp; Problem</h2>
+              <div className="field-stack">
+                <div>
+                  <label htmlFor="product-type" className="form-label">Product Type</label>
+                  <div className="input-with-icon">
+                    <Package aria-hidden="true" />
+                    <SuggestionInput ref={setFieldRef("productType")} id="product-type" endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} placeholder="e.g., Inverter, Battery" className={getFieldClassName("productType")} aria-invalid={Boolean(errors.productType)} aria-describedby={errors.productType ? "product-type-error" : undefined} />
+                  </div>
+                  <FieldError id="product-type-error" message={errors.productType} />
+                  <div className="quick-chip-row" aria-label="Product type shortcuts">
+                    {productChips.map((chip) => (
+                      <button key={chip} type="button" className="quick-chip" onClick={() => applyQuickValue("productType", chip)}>
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="complaint-description" className="form-label">
+                    Problem Details <span className="optional-badge">Optional</span>
+                  </label>
+                  <div className="input-with-icon textarea">
+                    <MessageCircle aria-hidden="true" />
+                    <textarea id="complaint-description" name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} placeholder="Example: not charging" className={getFieldClassName("complaintDescription", "textarea")} />
+                  </div>
+                  <div className="quick-chip-row" aria-label="Problem detail shortcuts">
+                    {problemChips.map((chip) => (
+                      <button key={chip} type="button" className="quick-chip" onClick={() => applyQuickValue("complaintDescription", chip)}>
+                        {chip}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {formData.categoryId && (isLoadingDynamicFields || dynamicConfigError) && (
+                <div className="dynamic-field-status">
+                  {isLoadingDynamicFields && (
+                    <p className="text-sm font-semibold text-gray-600">Loading category fields...</p>
+                  )}
+                  {dynamicConfigError && (
+                    <p className="rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{dynamicConfigError}</p>
+                  )}
+                </div>
+              )}
+
+              {!isLoadingDynamicFields && !dynamicConfigError && dynamicFields.map((field) => {
               const fieldId = String(field.categoryFieldConfigId);
               const inputId = `dynamic-field-${fieldId}`;
               const errorId = `dynamic-field-${fieldId}-error`;
 
               if (field.fieldType === "TEXTAREA") {
                 return (
-                  <label key={fieldId} htmlFor={inputId} className="ke-form-label sm:col-span-2">
+                  <label key={fieldId} htmlFor={inputId} className="form-label dynamic-field">
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
-                    <textarea id={inputId} name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={getDynamicFieldClassName(fieldId, "min-h-24 resize-y")} aria-invalid={Boolean(dynamicErrors[fieldId])} aria-describedby={dynamicErrors[fieldId] ? errorId : undefined} />
+                    <textarea id={inputId} name={fieldId} rows="3" value={dynamicValues[fieldId] ?? ""} onChange={handleDynamicChange} maxLength={1000} className={getDynamicFieldClassName(fieldId, "textarea")} aria-invalid={Boolean(dynamicErrors[fieldId])} aria-describedby={dynamicErrors[fieldId] ? errorId : undefined} />
                     {field.helpText && <p className="mt-1 text-sm font-normal text-gray-500">{field.helpText}</p>}
                     <FieldError id={errorId} message={dynamicErrors[fieldId]} />
                   </label>
@@ -340,7 +421,7 @@ export default function CreateTicket() {
               if (field.fieldType === "DROPDOWN") {
                 const options = getDropdownOptions(field);
                 return (
-                  <label key={fieldId} htmlFor={inputId} className="ke-form-label">
+                  <label key={fieldId} htmlFor={inputId} className="form-label dynamic-field">
                     {field.displayName} {field.required && <span className="text-red-600">*</span>}
                     <select
                       id={inputId}
@@ -348,7 +429,7 @@ export default function CreateTicket() {
                       value={dynamicValues[fieldId] ?? ""}
                       onChange={handleDynamicChange}
                       disabled={options.length === 0}
-                      className={getDynamicFieldClassName(fieldId, "bg-white disabled:opacity-60")}
+                      className={getDynamicFieldClassName(fieldId, "select", "disabled:opacity-60")}
                       aria-invalid={Boolean(dynamicErrors[fieldId])}
                       aria-describedby={dynamicErrors[fieldId] ? errorId : undefined}
                     >
@@ -367,7 +448,7 @@ export default function CreateTicket() {
               }
 
               return (
-                <label key={fieldId} htmlFor={inputId} className="ke-form-label">
+                <label key={fieldId} htmlFor={inputId} className="form-label dynamic-field">
                   {field.displayName} {field.required && <span className="text-red-600">*</span>}
                   <input
                     id={inputId}
@@ -386,21 +467,24 @@ export default function CreateTicket() {
                 </label>
               );
             })}
-
-            <div aria-live="polite" className="sm:col-span-2">
-              {message && (
-                <p role="status" className={`rounded-xl px-4 py-3 text-sm font-semibold ${message.startsWith("Unable") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
-                  {message}
-                </p>
-              )}
             </div>
+          </section>
 
-            <button type="submit" disabled={isSubmitting || isLoadingCategories || isLoadingDynamicFields || categories.length === 0} aria-busy={isSubmitting} className="ke-accent-action mt-1 flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 font-bold transition disabled:cursor-not-allowed disabled:opacity-60 sm:col-span-2">
-              <Send size={18} aria-hidden="true" />
-              {isSubmitting ? "Creating Ticket..." : "Create Ticket"}
-            </button>
-          </form>
-        </section>
+          <div aria-live="polite">
+            {message && (
+              <p role="status" className={`create-ticket-message ${message.startsWith("Unable") ? "create-ticket-message-error" : "create-ticket-message-success"}`}>
+                {message}
+              </p>
+            )}
+          </div>
+        </form>
+      </div>
+
+      <div className="create-ticket-action-bar">
+        <button type="submit" form="create-ticket-form" disabled={isSubmitting || isLoadingCategories || isLoadingDynamicFields || categories.length === 0} aria-busy={isSubmitting} className="create-ticket-submit">
+          <Send aria-hidden="true" />
+          {isSubmitting ? "Creating Ticket..." : "Create Ticket"}
+        </button>
       </div>
     </main>
   );

@@ -1009,7 +1009,7 @@ textarea {
 }
 
 .create-ticket-compact-page {
-  padding: 0 16px calc(190px + env(safe-area-inset-bottom));
+  padding: 0 16px calc(260px + env(safe-area-inset-bottom));
 }
 
 .create-ticket-compact-page .create-ticket-title-area {
@@ -1045,6 +1045,7 @@ textarea {
 
 .create-ticket-compact-page .create-ticket-form {
   margin-top: 14px;
+  padding-bottom: 96px;
 }
 
 .create-ticket-compact-page .form-section {
@@ -1194,6 +1195,10 @@ textarea {
 .create-ticket-compact-page .create-ticket-submit svg {
   height: 14px;
   width: 14px;
+}
+
+.create-ticket-compact-page .product-problem-section {
+  margin-bottom: 88px;
 }
 
 a:focus-visible,

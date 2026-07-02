@@ -273,18 +273,6 @@ textarea {
   gap: 0.375rem;
 }
 
-.ticket-summary-mobile-row {
-  align-items: center;
-  line-height: inherit;
-}
-
-.ticket-summary-call-button {
-  height: 1.5rem;
-  min-height: 1.5rem;
-  padding: 0;
-  width: 1.5rem;
-}
-
 @media (max-width: 639px) {
   .ticket-detail-page {
     padding-left: 0.875rem;
@@ -1493,19 +1481,6 @@ textarea {
     font-size: 8.4px !important;
     min-height: 27px !important;
     padding: 6px 8px !important;
-  }
-
-  .ticket-detail-page .ticket-summary-mobile-row {
-    align-items: center;
-    min-height: auto;
-  }
-
-  .ticket-detail-page .ticket-summary-call-button {
-    border-radius: 8px !important;
-    height: 20px !important;
-    min-height: 20px !important;
-    padding: 0 !important;
-    width: 20px !important;
   }
 
   .ticket-detail-page :where(.h-9, .h-11, .h-12) {

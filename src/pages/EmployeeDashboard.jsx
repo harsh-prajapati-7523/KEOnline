@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ClipboardList,
-  Crown,
   KeyRound,
   GitBranch,
   ListPlus,
@@ -139,7 +138,6 @@ export default function EmployeeDashboard() {
                   Welcome{displayEmployeeName ? `, ${displayEmployeeName}` : ""}
                 </h1>
                 <span className="dashboard-role-pill">
-                  <Crown aria-hidden="true" />
                   {roleLabel}
                 </span>
                 <p className="dashboard-welcome-helper">

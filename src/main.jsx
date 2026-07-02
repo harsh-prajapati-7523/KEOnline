@@ -9,7 +9,13 @@ function scheduleServiceWorkerRegistration() {
   const register = async () => {
     try {
       const { registerSW } = await import('virtual:pwa-register')
-      registerSW({ immediate: true })
+      let updateSW = () => {}
+      updateSW = registerSW({
+        immediate: true,
+        onNeedRefresh() {
+          updateSW(true)
+        },
+      })
     } catch {
       // Service worker registration is non-critical and should never block app startup.
     }

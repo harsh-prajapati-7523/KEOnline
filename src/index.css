@@ -1498,6 +1498,8 @@ textarea {
   display: flex;
   align-items: center;
   gap: 21px;
+  box-sizing: border-box;
+  min-height: inherit;
   padding: 20px 21px;
   color: #ffffff;
 }
@@ -1779,8 +1781,16 @@ textarea {
   }
 
   .dashboard-welcome-content {
+    align-items: center;
     gap: 13px;
+    min-height: 78px;
     padding: 10px 16px;
+  }
+
+  .dashboard-user-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
   }
 
   .dashboard-user-avatar {
@@ -1799,12 +1809,12 @@ textarea {
 
   .dashboard-role-pill {
     font-size: 9.2px;
-    margin-top: 5px;
+    margin-top: 3px;
   }
 
   .dashboard-welcome-helper {
     font-size: 8.5px;
-    margin-top: 7px;
+    margin-top: 4px;
   }
 }
 

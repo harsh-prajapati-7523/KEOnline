@@ -62,7 +62,7 @@ export default function OpenTicket() {
           return;
         }
 
-        navigate(`/tickets/${ticket.id}`);
+        navigate(`/tickets/${ticket.id}`, { state: { from: "openTicket" } });
         return;
       }
 

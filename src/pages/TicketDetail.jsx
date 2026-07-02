@@ -304,8 +304,16 @@ export default function TicketDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { ticketId } = useParams();
-  const backTarget = location.state?.from === "myTickets" ? "/tickets/my" : `/tickets/find${location.search}`;
-  const backLabel = location.state?.from === "myTickets" ? "Back to My Tickets" : "Back to Find Tickets";
+  const backTarget = location.state?.from === "myTickets"
+    ? "/tickets/my"
+    : location.state?.from === "openTicket"
+      ? "/tickets/open"
+      : `/tickets/find${location.search}`;
+  const backLabel = location.state?.from === "myTickets"
+    ? "Back to My Tickets"
+    : location.state?.from === "openTicket"
+      ? "Back to Open Ticket"
+      : "Back to Find Tickets";
   const [ticket, setTicket] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");

@@ -930,6 +930,8 @@ export default function TicketDetail() {
   const totalAmount = ticket?.totalCharge ?? chargeTotal;
   const chargesTotalAmount = showCharges ? chargeTotal : totalAmount;
   const sanitizedMobileNumber = ticket?.mobileNumber ? String(ticket.mobileNumber).replace(/[^\d+]/g, "") : "";
+  const customerSummaryLabel = `${ticket?.customerName || "Not available"}${ticket?.villageOrArea ? ` (${ticket.villageOrArea})` : ""}`;
+  const mobileSummaryLabel = ticket?.mobileNumber || "Not available";
   const problemSummary = ticket?.complaintDescription || formatEnumDisplay(ticket?.category);
   const historySummary = hasLoadedWorkflowHistory
     ? `${workflowHistory.length} event${workflowHistory.length === 1 ? "" : "s"}`
@@ -1120,7 +1122,7 @@ export default function TicketDetail() {
       <dl className="mt-3 space-y-1.5 text-sm font-semibold leading-snug">
         <div className="min-w-0 break-words">
           <dt className="inline text-blue-100">Customer: </dt>
-          <dd className="inline font-extrabold text-white">{ticket.customerName ?? "Not available"}</dd>
+          <dd className="inline font-extrabold text-white">{customerSummaryLabel}</dd>
         </div>
         <div className="min-w-0 break-words">
           <dt className="inline text-blue-100">Product: </dt>
@@ -1129,6 +1131,17 @@ export default function TicketDetail() {
         <div className="min-w-0 break-words">
           <dt className="inline text-blue-100">Total Charge: </dt>
           <dd className="inline font-extrabold text-white">{formatCurrency(totalAmount)}</dd>
+        </div>
+        <div className="flex min-w-0 items-center justify-between gap-2">
+          <div className="min-w-0 break-words">
+            <dt className="inline text-blue-100">Mobile: </dt>
+            <dd className="inline font-extrabold text-white">{mobileSummaryLabel}</dd>
+          </div>
+          {sanitizedMobileNumber && (
+            <a href={`tel:${sanitizedMobileNumber}`} aria-label="Call customer from ticket summary" title="Call Customer" className="ke-primary-action inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg p-0">
+              <PhoneCall size={15} aria-hidden="true" />
+            </a>
+          )}
         </div>
       </dl>
     </header>
@@ -1474,7 +1487,6 @@ export default function TicketDetail() {
         </p>
       )}
       {renderWorkflowActions()}
-      {renderCustomerSection()}
       {renderWorkItemsSection()}
       {renderMoreDetailsSection()}
       {renderStickyActions()}

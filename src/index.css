@@ -1760,43 +1760,6 @@ textarea {
     line-height: 1.25 !important;
   }
 
-  .dashboard-page .dashboard-welcome-title {
-    font-size: 10.4px !important;
-    line-height: 1.15 !important;
-  }
-
-  .login-header-content {
-    min-height: 242px;
-    padding-bottom: 48px;
-  }
-
-  .login-header-content .ke-login-logo {
-    height: 70px;
-    max-width: 70px;
-    width: 70px;
-  }
-
-  .login-header-content .ke-login-brand {
-    font-size: 18px;
-    line-height: 1.12;
-  }
-
-  .login-header-content .ke-login-title {
-    font-size: 20px;
-    line-height: 1.12;
-  }
-
-  .login-header-content .ke-login-subtitle {
-    font-size: 13px;
-  }
-
-  .ke-login-form-area {
-    margin-top: -30px;
-    width: calc(100% - 38px);
-  }
-}
-
-@media (max-width: 390px) {
   .dashboard-welcome-card {
     display: block;
   }
@@ -1843,6 +1806,7 @@ textarea {
 
   .dashboard-page .dashboard-welcome-title {
     font-size: 11.7px !important;
+    line-height: 1.15 !important;
   }
 
   .dashboard-role-pill {
@@ -1853,6 +1817,36 @@ textarea {
   .dashboard-welcome-helper {
     font-size: 8.5px;
     margin-top: 4px;
+  }
+
+  .login-header-content {
+    min-height: 242px;
+    padding-bottom: 48px;
+  }
+
+  .login-header-content .ke-login-logo {
+    height: 70px;
+    max-width: 70px;
+    width: 70px;
+  }
+
+  .login-header-content .ke-login-brand {
+    font-size: 18px;
+    line-height: 1.12;
+  }
+
+  .login-header-content .ke-login-title {
+    font-size: 20px;
+    line-height: 1.12;
+  }
+
+  .login-header-content .ke-login-subtitle {
+    font-size: 13px;
+  }
+
+  .ke-login-form-area {
+    margin-top: -30px;
+    width: calc(100% - 38px);
   }
 }
 

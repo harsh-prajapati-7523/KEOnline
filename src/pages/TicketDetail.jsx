@@ -304,6 +304,8 @@ export default function TicketDetail() {
   const navigate = useNavigate();
   const location = useLocation();
   const { ticketId } = useParams();
+  const backTarget = location.state?.from === "myTickets" ? "/tickets/my" : `/tickets/find${location.search}`;
+  const backLabel = location.state?.from === "myTickets" ? "Back to My Tickets" : "Back to Find Tickets";
   const [ticket, setTicket] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -1490,8 +1492,8 @@ export default function TicketDetail() {
     <main className="ke-page-main ticket-detail-page bg-gray-50 lg:px-8">
       <div className="mx-auto w-full max-w-4xl">
         {activeDetailView === "ticket" && (
-          <button type="button" onClick={() => navigate(`/tickets/find${location.search}`)} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 text-base font-semibold text-blue-950">
-            <ArrowLeft size={18} aria-hidden="true" /> Back to Find Tickets
+          <button type="button" onClick={() => navigate(backTarget)} className="flex min-h-10 items-center gap-2 rounded-xl px-1 py-1.5 text-base font-semibold text-blue-950">
+            <ArrowLeft size={18} aria-hidden="true" /> {backLabel}
           </button>
         )}
 

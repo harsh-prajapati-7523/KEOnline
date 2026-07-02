@@ -145,7 +145,7 @@ export default function MyTickets() {
   }, [hasMoreTickets, isLoading, isLoadingMore]);
 
   const openTicket = useCallback((ticketId) => {
-    navigate(`/tickets/${ticketId}`);
+    navigate(`/tickets/${ticketId}`, { state: { from: "myTickets" } });
   }, [navigate]);
 
   const summary = useMemo(() => {

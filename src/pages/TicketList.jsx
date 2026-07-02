@@ -463,7 +463,7 @@ export default function TicketList() {
   }, []);
 
   const handleViewDetails = useCallback((ticketId) => {
-    navigate(`/tickets/${ticketId}${locationSearchRef.current}`);
+    navigate(`/tickets/${ticketId}${locationSearchRef.current}`, { state: { from: "findTickets" } });
   }, [navigate]);
 
   const handlePreloadTicketDetail = useCallback(() => {

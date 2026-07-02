@@ -1117,20 +1117,20 @@ export default function TicketDetail() {
         <h1 className="min-w-0 break-words text-3xl font-extrabold leading-none">{ticket.ticketNumber ?? "Not available"}</h1>
         <StatusPill status={ticket.status} label={ticketStatusLabel} />
       </div>
-      <div className="mt-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_auto] min-[420px]:divide-x min-[420px]:divide-white/25">
-        <div className="min-w-0 px-2 first:pl-0">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><User size={15} aria-hidden="true" /> Customer</p>
-          <p className="mt-1 line-clamp-2 break-words text-sm font-extrabold leading-tight">{ticket.customerName ?? "Not available"}</p>
+      <dl className="mt-3 space-y-1.5 text-sm font-semibold leading-snug">
+        <div className="min-w-0 break-words">
+          <dt className="inline text-blue-100">Customer: </dt>
+          <dd className="inline font-extrabold text-white">{ticket.customerName ?? "Not available"}</dd>
         </div>
-        <div className="min-w-0 px-2">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><Box size={15} aria-hidden="true" /> Product</p>
-          <p className="mt-1 line-clamp-2 break-words text-sm font-extrabold leading-tight">{ticket.productType ?? "Not available"}</p>
+        <div className="min-w-0 break-words">
+          <dt className="inline text-blue-100">Product: </dt>
+          <dd className="inline font-extrabold text-white">{ticket.productType ?? "Not available"}</dd>
         </div>
-        <div className="min-w-0 px-2 pr-0">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><IndianRupee size={15} aria-hidden="true" /> Total</p>
-          <p className="mt-1 truncate text-sm font-extrabold">{formatCompactCurrency(totalAmount)}</p>
+        <div className="min-w-0 break-words">
+          <dt className="inline text-blue-100">Total Charge: </dt>
+          <dd className="inline font-extrabold text-white">{formatCurrency(totalAmount)}</dd>
         </div>
-      </div>
+      </dl>
     </header>
   );
 

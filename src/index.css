@@ -1416,11 +1416,82 @@ textarea {
   }
 
   .ticket-detail-page {
-    padding-bottom: calc(118px + env(safe-area-inset-bottom));
+    padding: 10px 13px calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .ticket-detail-page .mt-3,
+  .ticket-detail-page .mt-3\.5,
+  .ticket-detail-page .mt-4 {
+    margin-top: 0.7rem !important;
+  }
+
+  .ticket-detail-page .space-y-3\.5 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.7rem !important;
+  }
+
+  .ticket-detail-page .gap-3,
+  .ticket-detail-page .gap-2 {
+    gap: 0.4rem !important;
+  }
+
+  .ticket-detail-page :where(header.rounded-2xl, section.rounded-2xl, details.rounded-2xl, div.rounded-2xl) {
+    border-radius: 8px !important;
+    padding: 8px !important;
+  }
+
+  .ticket-detail-page .text-xs {
+    font-size: 8px !important;
+    line-height: 1.15 !important;
+  }
+
+  .ticket-detail-page .text-sm {
+    font-size: 8px !important;
+    line-height: 1.18 !important;
+  }
+
+  .ticket-detail-page .text-base,
+  .ticket-detail-page .text-lg {
+    font-size: 8.4px !important;
+    line-height: 1.18 !important;
+  }
+
+  .ticket-detail-page .text-xl {
+    font-size: 12.3px !important;
+    line-height: 1.15 !important;
+  }
+
+  .ticket-detail-page .text-2xl {
+    font-size: 16.4px !important;
+    line-height: 1.12 !important;
+  }
+
+  .ticket-detail-page .text-3xl {
+    font-size: 19.8px !important;
+    line-height: 1.08 !important;
+  }
+
+  .ticket-detail-page :where(button, a.ke-primary-action, a.ke-accent-action, .ke-primary-action, .ke-accent-action) {
+    border-radius: 8px !important;
+    font-size: 8.4px !important;
+    min-height: 27px !important;
+    padding: 6px 8px !important;
+  }
+
+  .ticket-detail-page :where(.h-9, .h-11, .h-12) {
+    height: 1.8rem !important;
+  }
+
+  .ticket-detail-page :where(.w-9, .w-11, .w-12) {
+    width: 1.8rem !important;
+  }
+
+  .ticket-detail-page :where(svg) {
+    max-height: 13px;
+    max-width: 13px;
   }
 
   .ticket-detail-page :where(.fixed.inset-x-0) {
-    padding: 8px 16px !important;
+    padding: 6px 13px !important;
   }
 }
 

@@ -13,7 +13,6 @@ import {
   Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess, hasAnyAccess } from "../utils/access";
 
 function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
@@ -88,19 +87,17 @@ export default function EmployeeDashboard() {
   return (
     <main id="main-content" className="ke-page-main dashboard-page lg:px-8">
       <div className="mx-auto w-full max-w-5xl">
-        <KEWaveBackground className="dashboard-premium-header">
-          <header className="ke-page-header dashboard-hero-card text-white shadow-lg">
-            <p className="break-words text-xs font-semibold uppercase text-yellow-400 sm:text-sm">
-              Technician Dashboard
-            </p>
-            <h1 className="ke-page-title mt-1 break-words font-extrabold sm:mt-2">
-              Welcome{employeeName ? `, ${employeeName}` : ""}
-            </h1>
-            <p className="mt-1 break-words text-xs font-semibold text-blue-100 sm:mt-2 sm:text-sm">
-              Role: {role}
-            </p>
-          </header>
-        </KEWaveBackground>
+        <header className="ke-page-header dashboard-hero-card text-white shadow-lg">
+          <p className="break-words text-xs font-semibold uppercase text-yellow-400 sm:text-sm">
+            Technician Dashboard
+          </p>
+          <h1 className="ke-page-title mt-1 break-words font-extrabold sm:mt-2">
+            Welcome{employeeName ? `, ${employeeName}` : ""}
+          </h1>
+          <p className="mt-1 break-words text-xs font-semibold text-blue-100 sm:mt-2 sm:text-sm">
+            Role: {role}
+          </p>
+        </header>
 
         <section className="mt-4 sm:mt-6" aria-labelledby="ticket-actions">
           <h2 id="ticket-actions" className="text-lg font-extrabold text-blue-950 sm:text-xl">

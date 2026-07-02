@@ -1,5 +1,5 @@
 import { lazy, memo, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Eye, Filter, Phone, X } from "lucide-react";
+import { ArrowLeft, Eye, Filter, X } from "lucide-react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { hasAccess } from "../utils/access";
 
@@ -60,23 +60,6 @@ function appendPagingParams(params, page) {
   return nextParams;
 }
 
-function formatCurrency(value) {
-  const normalizedValue = typeof value === "string"
-    ? (value.replace(/[₹,\s]/g, "").match(/^-?\d+(?:\.\d+)?/)?.[0] ?? "")
-    : value;
-  const amount = Number(normalizedValue);
-  if (!Number.isFinite(amount)) {
-    return "₹0.00";
-  }
-
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(amount);
-}
-
 function formatLabel(value) {
   return value ? value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Not available";
 }
@@ -90,38 +73,8 @@ function getTicketStatusLabel(ticket) {
   return ticket?.statusDisplayName || formatLabel(ticket?.status);
 }
 
-function formatTicketDate(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-
-  const today = new Date();
-  const isToday = date.toDateString() === today.toDateString();
-  const time = new Intl.DateTimeFormat("en-IN", {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-
-  if (isToday) return `Today ${time}`;
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-}
-
-function getTicketOwner(ticket) {
-  return ticket?.pickedByEmployeeName
-    || ticket?.pickedByEmployeeNameSnapshot
-    || ticket?.assignedEmployeeName
-    || ticket?.ownerEmployeeName
-    || ticket?.technicianName
-    || ticket?.pickedByEmployeeId
-    || "";
+function getTicketCategoryLabel(ticket) {
+  return ticket?.categoryDisplayName || ticket?.categoryKey || ticket?.category || "Not available";
 }
 
 function normalizeStatusFilterOptions(data) {
@@ -173,42 +126,34 @@ function getMonthStartDate() {
 const TicketCard = memo(function TicketCard({ ticket, onPreloadDetails, onViewDetails }) {
   const productType = formatOptionalLabel(ticket.productType) || "Not available";
   const customerName = ticket.customerName?.trim() || "Not available";
+  const mobileNumber = ticket.mobileNumber?.trim() || "Not available";
   const villageOrArea = ticket.villageOrArea?.trim() || "Not available";
-  const createdLabel = formatTicketDate(ticket.createdAt ?? ticket.createdDate);
-  const ownerLabel = getTicketOwner(ticket) || "Not available";
+  const categoryLabel = getTicketCategoryLabel(ticket);
 
   return (
     <article className="ke-ticket-card min-w-0 overflow-hidden p-3.5 sm:p-4">
       <div className="flex min-w-0 items-start justify-between gap-3">
-        <h2 className="min-w-0 overflow-wrap-anywhere text-[1.05rem] font-extrabold leading-tight text-blue-950 sm:text-lg">{ticket.ticketNumber ?? "Not available"}</h2>
+        <h2 className="min-w-0 overflow-wrap-anywhere text-[1.05rem] font-extrabold leading-tight text-blue-950 sm:text-lg">
+          {ticket.ticketNumber ?? "Not available"} <span className="font-bold text-gray-400">|</span> <span className="text-[0.7rem] font-semibold text-gray-700 sm:text-[0.85rem]">{categoryLabel}</span>
+        </h2>
         <span className="ke-status-pill max-w-[45%] shrink-0 overflow-wrap-anywhere rounded-full px-2.5 py-1 text-xs font-bold leading-tight">
           {getTicketStatusLabel(ticket)}
         </span>
       </div>
 
-      <div className="mt-2.5 space-y-1 text-sm leading-snug">
+      <div className="mt-2.5 space-y-1.5 text-sm leading-snug">
         <p className="min-w-0 overflow-wrap-anywhere text-gray-600">
           <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Customer: </span>
-          <span className="font-semibold text-gray-900">{customerName}</span>
+          <span className="font-semibold text-gray-900">{customerName} ({mobileNumber})</span>
         </p>
-        <p className="min-w-0 overflow-wrap-anywhere text-gray-600">
-          <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Product: </span>
-          <span className="font-bold text-blue-950">{productType}</span>
+        <p className="min-w-0 overflow-wrap-anywhere text-gray-700">
+          <span className="inline-block min-w-[4.7rem] text-xs font-bold uppercase tracking-wide text-gray-400">Area</span>
+          <span className="font-semibold text-gray-900">: {villageOrArea}</span>
         </p>
-      </div>
-
-      <div className="mt-2.5 grid min-w-0 grid-cols-1 gap-1.5 text-xs font-semibold text-gray-500 min-[380px]:grid-cols-2">
-        <span className="flex min-w-0 items-center gap-1.5 overflow-wrap-anywhere">
-          <Phone className="shrink-0" size={13} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
-        </span>
-        <span className="min-w-0 overflow-wrap-anywhere min-[380px]:text-right">Area: {villageOrArea}</span>
-        <span className="min-w-0 overflow-wrap-anywhere min-[380px]:col-span-2">Owner: {ownerLabel}</span>
-      </div>
-      <div className="mt-2.5 flex min-w-0 items-center justify-between gap-3 border-t border-blue-50 pt-2.5">
-        <span className="min-w-0 overflow-wrap-anywhere text-xs font-semibold text-gray-500">
-          {createdLabel ? `Created: ${createdLabel}` : "Newest first"}
-        </span>
-        <span className="shrink-0 text-base font-extrabold text-blue-950">{formatCurrency(ticket.totalCharge)}</span>
+        <p className="min-w-0 overflow-wrap-anywhere text-gray-700">
+          <span className="inline-block min-w-[4.7rem] text-xs font-bold uppercase tracking-wide text-gray-400">Product</span>
+          <span className="font-bold text-blue-950">: {productType}</span>
+        </p>
       </div>
 
       <button

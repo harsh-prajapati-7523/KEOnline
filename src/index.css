@@ -1455,6 +1455,147 @@ textarea {
   }
 }
 
+.dashboard-premium-bg {
+  min-height: 100svh;
+}
+
+.dashboard-page {
+  background: transparent;
+  min-height: 100svh;
+  padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 24px);
+}
+
+.dashboard-hero-card {
+  background: linear-gradient(135deg, rgba(6, 21, 58, 0.86), rgba(14, 38, 91, 0.7));
+  border: 1px solid rgba(255, 204, 0, 0.28);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.26);
+  backdrop-filter: blur(10px);
+}
+
+.dashboard-admin-panel {
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18);
+}
+
+.ke-login-page--premium {
+  align-items: flex-start;
+  background: var(--ke-bg);
+  display: block;
+  padding: 0 0 calc(env(safe-area-inset-bottom) + 1.25rem);
+}
+
+.ke-login-shell {
+  margin: 0 auto;
+  max-width: 32rem;
+  width: 100%;
+}
+
+.login-header-content {
+  justify-content: center;
+  min-height: 240px;
+  padding: calc(env(safe-area-inset-top) + 1.25rem) 1.25rem 1.5rem;
+  text-align: center;
+}
+
+.login-header-content .ke-login-logo {
+  background: #ffffff;
+  border: 1px solid rgba(255, 204, 0, 0.75);
+  border-radius: 18px;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.24);
+  height: 76px;
+  padding: 0.45rem;
+  width: 76px;
+}
+
+.login-header-content .ke-login-brand,
+.login-header-content .ke-login-title {
+  color: #ffffff;
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.28);
+}
+
+.login-header-content .ke-login-subtitle {
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.ke-login-form-area {
+  margin-top: -2.25rem;
+  position: relative;
+  z-index: 3;
+}
+
+.ke-login-form-area .ke-login-form {
+  margin-top: 0;
+}
+
+@media (min-width: 768px) {
+  .ke-login-shell {
+    max-width: 34rem;
+  }
+
+  .login-header-content {
+    min-height: 320px;
+    padding-bottom: 3.25rem;
+  }
+
+  .login-header-content .ke-login-logo {
+    height: 88px;
+    width: 88px;
+  }
+
+  .ke-login-form-area {
+    margin-top: -3rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .dashboard-page {
+    padding-bottom: calc(var(--ke-bottom-nav-height) + env(safe-area-inset-bottom) + 18px);
+  }
+
+  .dashboard-page :where(h1, .ke-page-title) {
+    font-size: 18px !important;
+    line-height: 1.12 !important;
+  }
+
+  .dashboard-page :where(h2) {
+    font-size: 16px !important;
+    line-height: 1.2 !important;
+  }
+
+  .dashboard-page :where(.text-xs, .text-sm, .text-base, .text-lg, .text-xl) {
+    line-height: 1.25 !important;
+  }
+
+  .login-header-content {
+    min-height: 230px;
+    padding-bottom: 2.5rem;
+  }
+
+  .login-header-content .ke-login-logo {
+    height: 70px;
+    max-width: 70px;
+    width: 70px;
+  }
+
+  .login-header-content .ke-login-brand {
+    font-size: 18px;
+    line-height: 1.12;
+  }
+
+  .login-header-content .ke-login-title {
+    font-size: 20px;
+    line-height: 1.12;
+  }
+
+  .login-header-content .ke-login-subtitle {
+    font-size: 13px;
+  }
+
+  .ke-login-form-area {
+    margin-top: -2rem;
+    width: calc(100% - 2rem);
+  }
+}
+
 a:focus-visible,
 button:focus-visible,
 input:focus-visible,

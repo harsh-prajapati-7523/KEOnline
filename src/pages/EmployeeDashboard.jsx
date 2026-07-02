@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess, hasAnyAccess } from "../utils/access";
 
 function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
@@ -85,114 +86,116 @@ export default function EmployeeDashboard() {
   }, []);
 
   return (
-    <main id="main-content" className="ke-page-main bg-gray-50 lg:px-8">
-      <div className="mx-auto w-full max-w-5xl">
-        <header className="ke-page-header bg-blue-950 text-white shadow-lg">
-          <p className="break-words text-xs font-semibold uppercase text-yellow-400 sm:text-sm">
-            Technician Dashboard
-          </p>
-          <h1 className="ke-page-title mt-1 break-words font-extrabold sm:mt-2">
-            Welcome{employeeName ? `, ${employeeName}` : ""}
-          </h1>
-          <p className="mt-1 break-words text-xs font-semibold text-blue-100 sm:mt-2 sm:text-sm">
-            Role: {role}
-          </p>
-        </header>
+    <KEWaveBackground className="dashboard-premium-bg">
+      <main id="main-content" className="ke-page-main dashboard-page lg:px-8">
+        <div className="mx-auto w-full max-w-5xl">
+          <header className="ke-page-header dashboard-hero-card text-white shadow-lg">
+            <p className="break-words text-xs font-semibold uppercase text-yellow-400 sm:text-sm">
+              Technician Dashboard
+            </p>
+            <h1 className="ke-page-title mt-1 break-words font-extrabold sm:mt-2">
+              Welcome{employeeName ? `, ${employeeName}` : ""}
+            </h1>
+            <p className="mt-1 break-words text-xs font-semibold text-blue-100 sm:mt-2 sm:text-sm">
+              Role: {role}
+            </p>
+          </header>
 
-        <section className="mt-4 sm:mt-6" aria-labelledby="ticket-actions">
-          <h2 id="ticket-actions" className="text-lg font-extrabold text-blue-950 sm:text-xl">
-            Available Work Areas
-          </h2>
+          <section className="mt-4 sm:mt-6" aria-labelledby="ticket-actions">
+            <h2 id="ticket-actions" className="text-lg font-extrabold text-white sm:text-xl">
+              Available Work Areas
+            </h2>
 
-          {hasPrimaryActions && (
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {canCreateTicket && (
-                <DashboardAction icon={PlusCircle} tone="yellow" onClick={() => navigate("/tickets/new")}>
-                  Create Ticket
-                </DashboardAction>
-              )}
-              {canViewTickets && (
-                <DashboardAction icon={ListChecks} onClick={() => navigate("/tickets/my")}>
-                  My Tickets
-                </DashboardAction>
-              )}
-              {canViewTickets && (
-                <DashboardAction icon={Search} onClick={() => navigate("/tickets/open")}>
-                  Open Ticket
-                </DashboardAction>
-              )}
-              {canViewTickets && (
-                <DashboardAction icon={ClipboardList} onClick={() => navigate("/tickets/find")}>
-                  Find Tickets
-                </DashboardAction>
-              )}
-            </div>
-          )}
-
-          {hasAdminActions && (
-            <details className="mt-4 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
-              <summary className="cursor-pointer text-sm font-extrabold text-blue-950">
-                Administration Tools
-              </summary>
+            {hasPrimaryActions && (
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {canManageEmployees && (
-                  <DashboardAction icon={Users} onClick={() => navigate("/admin/employees")}>
-                    Employee Management
+                {canCreateTicket && (
+                  <DashboardAction icon={PlusCircle} tone="yellow" onClick={() => navigate("/tickets/new")}>
+                    Create Ticket
                   </DashboardAction>
                 )}
-                {canManageRoles && (
-                  <DashboardAction icon={ShieldCheck} onClick={() => navigate("/admin/roles")}>
-                    Role Management
+                {canViewTickets && (
+                  <DashboardAction icon={ListChecks} onClick={() => navigate("/tickets/my")}>
+                    My Tickets
                   </DashboardAction>
                 )}
-                {canManageRoleAccess && (
-                  <DashboardAction icon={KeyRound} onClick={() => navigate("/admin/role-access")}>
-                    Role Access &amp; Keys
+                {canViewTickets && (
+                  <DashboardAction icon={Search} onClick={() => navigate("/tickets/open")}>
+                    Open Ticket
                   </DashboardAction>
                 )}
-                {canManageWorkflow && (
-                  <DashboardAction icon={GitBranch} onClick={() => navigate("/admin/workflow")}>
-                    Workflow Management
-                  </DashboardAction>
-                )}
-                {canManageTicketCategories && (
-                  <DashboardAction icon={Tags} onClick={() => navigate("/admin/ticket-categories")}>
-                    Ticket Categories
-                  </DashboardAction>
-                )}
-                {canManageTicketFields && (
-                  <DashboardAction icon={ClipboardList} onClick={() => navigate("/admin/ticket-fields")}>
-                    Ticket Fields
-                  </DashboardAction>
-                )}
-                {canManageCategoryFieldConfiguration && (
-                  <DashboardAction icon={Settings2} onClick={() => navigate("/admin/ticket-category-fields")}>
-                    Category Field Configuration
-                  </DashboardAction>
-                )}
-                {canManageDropdownSources && (
-                  <DashboardAction icon={ListPlus} onClick={() => navigate("/admin/dropdown-sources")}>
-                    Dropdown Sources
+                {canViewTickets && (
+                  <DashboardAction icon={ClipboardList} onClick={() => navigate("/tickets/find")}>
+                    Find Tickets
                   </DashboardAction>
                 )}
               </div>
-            </details>
-          )}
+            )}
 
-          <div className={!hasPrimaryActions && !hasAdminActions ? "mt-4" : ""}>
-            {!hasDashboardActions && (
-              <p className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600">
-                No actions available for your role.
+            {hasAdminActions && (
+              <details className="dashboard-admin-panel mt-4 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
+                <summary className="cursor-pointer text-sm font-extrabold text-blue-950">
+                  Administration Tools
+                </summary>
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {canManageEmployees && (
+                    <DashboardAction icon={Users} onClick={() => navigate("/admin/employees")}>
+                      Employee Management
+                    </DashboardAction>
+                  )}
+                  {canManageRoles && (
+                    <DashboardAction icon={ShieldCheck} onClick={() => navigate("/admin/roles")}>
+                      Role Management
+                    </DashboardAction>
+                  )}
+                  {canManageRoleAccess && (
+                    <DashboardAction icon={KeyRound} onClick={() => navigate("/admin/role-access")}>
+                      Role Access &amp; Keys
+                    </DashboardAction>
+                  )}
+                  {canManageWorkflow && (
+                    <DashboardAction icon={GitBranch} onClick={() => navigate("/admin/workflow")}>
+                      Workflow Management
+                    </DashboardAction>
+                  )}
+                  {canManageTicketCategories && (
+                    <DashboardAction icon={Tags} onClick={() => navigate("/admin/ticket-categories")}>
+                      Ticket Categories
+                    </DashboardAction>
+                  )}
+                  {canManageTicketFields && (
+                    <DashboardAction icon={ClipboardList} onClick={() => navigate("/admin/ticket-fields")}>
+                      Ticket Fields
+                    </DashboardAction>
+                  )}
+                  {canManageCategoryFieldConfiguration && (
+                    <DashboardAction icon={Settings2} onClick={() => navigate("/admin/ticket-category-fields")}>
+                      Category Field Configuration
+                    </DashboardAction>
+                  )}
+                  {canManageDropdownSources && (
+                    <DashboardAction icon={ListPlus} onClick={() => navigate("/admin/dropdown-sources")}>
+                      Dropdown Sources
+                    </DashboardAction>
+                  )}
+                </div>
+              </details>
+            )}
+
+            <div className={!hasPrimaryActions && !hasAdminActions ? "mt-4" : ""}>
+              {!hasDashboardActions && (
+                <p className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600">
+                  No actions available for your role.
+                </p>
+              )}
+            </div>
+            {accessMessage && (
+              <p className="mt-3 rounded-xl bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
+                {accessMessage}
               </p>
             )}
-          </div>
-          {accessMessage && (
-            <p className="mt-3 rounded-xl bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
-              {accessMessage}
-            </p>
-          )}
-        </section>
-      </div>
-    </main>
+          </section>
+        </div>
+      </main>
+    </KEWaveBackground>
   );
 }

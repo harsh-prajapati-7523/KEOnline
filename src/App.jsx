@@ -185,8 +185,7 @@ function Navbar() {
           </span>
           <div className="min-w-0">
             <p className="ke-brand-title break-words font-extrabold leading-tight">
-              <span className="sm:hidden">Kumar Electronics</span>
-              <span className="hidden sm:inline">Kumar Electronics &amp; Electricals</span>
+              <span>Kumar Electronics and Electricals</span>
             </p>
             <p className="ke-brand-subtitle text-xs font-semibold">
               <span>Service Ticket Management</span>

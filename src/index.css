@@ -342,8 +342,11 @@ textarea {
   color: #ffffff;
   font-size: 21px;
   font-weight: 800;
-  letter-spacing: 0.2px;
-  line-height: 1.1;
+  letter-spacing: 0.1px;
+  line-height: 1.08;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ke-brand-subtitle {
@@ -919,16 +922,16 @@ textarea {
   }
 
   .ke-brand-logo-badge {
-    height: 46px;
-    width: 46px;
+    height: 42px;
+    width: 42px;
   }
 
   .ke-brand-title {
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .ke-brand-subtitle {
-    font-size: 14px;
+    font-size: 12.5px;
   }
 
   .create-ticket-page {
@@ -985,27 +988,27 @@ textarea {
 }
 
 .ke-app-header.ke-app-header-compact .ke-app-header-inner {
-  gap: 10px;
-  min-height: calc(64px + env(safe-area-inset-top));
+  gap: 12px;
+  min-height: calc(74px + env(safe-area-inset-top));
   padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
 }
 
 .ke-app-header.ke-app-header-compact .ke-brand-logo-badge {
-  border-radius: 10px;
-  height: 42px;
+  border-radius: 12px;
+  height: 44px;
   padding: 0.28rem;
-  width: 42px;
+  width: 44px;
 }
 
 .ke-app-header.ke-app-header-compact .ke-brand-title {
-  font-size: 19px;
-  line-height: 1.05;
+  font-size: 21px;
+  line-height: 1.08;
 }
 
 .ke-app-header.ke-app-header-compact .ke-brand-subtitle {
-  font-size: 13px;
-  line-height: 1.1;
-  margin-top: 2px;
+  font-size: 14px;
+  line-height: 1.15;
+  margin-top: 3px;
 }
 
 .create-ticket-compact-page {
@@ -1203,27 +1206,27 @@ textarea {
 
 @media (max-width: 639px) {
   .ke-app-header .ke-app-header-inner {
-    gap: 10px;
-    min-height: calc(64px + env(safe-area-inset-top));
+    gap: 12px;
+    min-height: calc(74px + env(safe-area-inset-top));
     padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
   }
 
   .ke-app-header .ke-brand-logo-badge {
-    border-radius: 10px;
-    height: 42px;
+    border-radius: 12px;
+    height: 44px;
     padding: 0.28rem;
-    width: 42px;
+    width: 44px;
   }
 
   .ke-app-header .ke-brand-title {
-    font-size: 19px;
-    line-height: 1.05;
+    font-size: 21px;
+    line-height: 1.08;
   }
 
   .ke-app-header .ke-brand-subtitle {
-    font-size: 13px;
-    line-height: 1.1;
-    margin-top: 2px;
+    font-size: 14px;
+    line-height: 1.15;
+    margin-top: 3px;
   }
 
   .ke-page-main {

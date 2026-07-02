@@ -67,7 +67,7 @@ export default function EmployeeLogin() {
           <img src="/ke-logo-256w.png" alt="" aria-hidden="true" className="ke-login-logo" />
 
           <p className="ke-login-brand">
-            Kumar Electronics
+            Kumar Electronics and Electricals
           </p>
 
           <h1 className="ke-login-title">

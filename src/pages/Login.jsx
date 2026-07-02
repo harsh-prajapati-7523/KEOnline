@@ -34,7 +34,7 @@ export default function Login() {
           </div>
 
           <h1 className="text-3xl font-extrabold text-blue-950 mt-4 text-center">
-            Kumar Electronics
+            Kumar Electronics and Electricals
           </h1>
 
           <p className="text-gray-500 text-sm mt-2 text-center">

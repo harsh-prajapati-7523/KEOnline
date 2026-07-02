@@ -59,7 +59,7 @@ export default function EmployeeLogin() {
   };
 
   return (
-    <main id="main-content" className="ke-login-page ke-login-page--premium">
+    <main id="main-content" className="app-screen ke-login-page ke-login-page--premium">
       <div className="ke-login-shell">
         <KEWaveBackground className="login-premium-header">
           <header className="login-header-content flex flex-col items-center">

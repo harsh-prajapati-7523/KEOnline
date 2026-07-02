@@ -23,6 +23,11 @@ function getTicketCategoryLabel(ticket) {
   return ticket?.categoryDisplayName || ticket?.categoryKey || ticket?.category || "Not available";
 }
 
+function formatOptionalLabel(value) {
+  if (!value) return "";
+  return /_/.test(value) ? formatLabel(value) : value;
+}
+
 function formatTicketDate(value) {
   if (!value) return "";
   const date = new Date(value);
@@ -63,7 +68,10 @@ function TicketCardSkeleton() {
 
 function MyTicketCard({ ticket, onOpen }) {
   const updatedLabel = formatTicketDate(ticket.updatedAt);
-  const villageOrArea = ticket.villageOrArea?.trim() ?? "";
+  const customerName = ticket.customerName?.trim() || "Not available";
+  const productType = formatOptionalLabel(ticket.productType) || "Not available";
+  const villageOrArea = ticket.villageOrArea?.trim() || "Not available";
+  const categoryLabel = getTicketCategoryLabel(ticket);
 
   return (
     <button
@@ -80,16 +88,23 @@ function MyTicketCard({ ticket, onOpen }) {
         </span>
       </span>
 
-      <span className="mt-2.5 block overflow-wrap-anywhere text-sm font-semibold leading-snug text-gray-800">
-        {ticket.customerName ?? "Not available"}
+      <span className="mt-2.5 block space-y-1 text-sm leading-snug">
+        <span className="block min-w-0 overflow-wrap-anywhere text-gray-600">
+          <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Customer: </span>
+          <span className="font-semibold text-gray-900">{customerName}</span>
+        </span>
+        <span className="block min-w-0 overflow-wrap-anywhere text-gray-600">
+          <span className="text-xs font-bold uppercase tracking-wide text-gray-400">Product: </span>
+          <span className="font-bold text-blue-950">{productType}</span>
+        </span>
       </span>
+
       <span className="mt-2.5 grid min-w-0 grid-cols-1 gap-1.5 text-xs font-semibold text-gray-500 min-[380px]:grid-cols-2">
         <span className="flex min-w-0 items-center gap-1.5 overflow-wrap-anywhere">
           <Phone className="shrink-0" size={13} aria-hidden="true" /> {ticket.mobileNumber ?? "Not available"}
         </span>
-        {villageOrArea && <span className="min-w-0 overflow-wrap-anywhere min-[380px]:text-right">Area: {villageOrArea}</span>}
-        <span className="min-w-0 overflow-wrap-anywhere">Category: {getTicketCategoryLabel(ticket)}</span>
-        <span className="min-w-0 overflow-wrap-anywhere min-[380px]:text-right">Status: {getTicketStatusLabel(ticket)}</span>
+        <span className="min-w-0 overflow-wrap-anywhere min-[380px]:text-right">Area: {villageOrArea}</span>
+        <span className="min-w-0 overflow-wrap-anywhere min-[380px]:col-span-2">Category: {categoryLabel}</span>
       </span>
       <span className="mt-2.5 block border-t border-blue-50 pt-2.5 text-xs font-semibold text-gray-500">
         {updatedLabel ? `Updated: ${updatedLabel}` : "Updated time not available"}

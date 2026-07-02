@@ -1040,7 +1040,7 @@ textarea {
 }
 
 .create-ticket-compact-page {
-  padding: 0 16px calc(128px + env(safe-area-inset-bottom));
+  padding: 0 16px calc(108px + env(safe-area-inset-bottom));
 }
 
 .create-ticket-compact-page .create-ticket-title-area {
@@ -1212,7 +1212,7 @@ textarea {
 }
 
 .create-ticket-compact-page .create-ticket-action-bar {
-  bottom: calc(74px + env(safe-area-inset-bottom));
+  bottom: calc(54px + env(safe-area-inset-bottom));
   padding: 8px 16px;
 }
 

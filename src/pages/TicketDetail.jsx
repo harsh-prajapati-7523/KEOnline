@@ -1207,7 +1207,7 @@ export default function TicketDetail() {
     if (!sanitizedMobileNumber && !mainAction && !canAddCharge) return null;
 
     return (
-      <div className="fixed inset-x-0 bottom-[calc(var(--ke-bottom-nav-height)+env(safe-area-inset-bottom))] z-30 border-t border-blue-100 bg-white/95 px-3 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden">
+      <div className="fixed inset-x-0 bottom-[calc(54px+env(safe-area-inset-bottom))] z-30 border-t border-blue-100 bg-white/95 px-3 py-2.5 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur sm:hidden">
         <div className="mx-auto grid max-w-md grid-cols-2 gap-2">
           {sanitizedMobileNumber && (
             <a href={`tel:${sanitizedMobileNumber}`} className="ke-primary-action inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold">

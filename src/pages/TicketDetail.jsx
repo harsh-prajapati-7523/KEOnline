@@ -1117,18 +1117,14 @@ export default function TicketDetail() {
         <h1 className="min-w-0 break-words text-3xl font-extrabold leading-none">{ticket.ticketNumber ?? "Not available"}</h1>
         <StatusPill status={ticket.status} label={ticketStatusLabel} />
       </div>
-      <div className="mt-4 grid grid-cols-4 gap-0 divide-x divide-white/25">
+      <div className="mt-4 grid grid-cols-1 gap-3 min-[420px]:grid-cols-[minmax(0,1.25fr)_minmax(0,1.25fr)_auto] min-[420px]:divide-x min-[420px]:divide-white/25">
         <div className="min-w-0 px-2 first:pl-0">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><User size={15} aria-hidden="true" /> Customer</p>
-          <p className="mt-1 truncate text-sm font-extrabold">{ticket.customerName ?? "Not available"}</p>
+          <p className="mt-1 line-clamp-2 break-words text-sm font-extrabold leading-tight">{ticket.customerName ?? "Not available"}</p>
         </div>
         <div className="min-w-0 px-2">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><Box size={15} aria-hidden="true" /> Product</p>
-          <p className="mt-1 truncate text-sm font-extrabold">{ticket.productType ?? "Not available"}</p>
-        </div>
-        <div className="min-w-0 px-2">
-          <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><MessageCircle size={15} aria-hidden="true" /> Problem</p>
-          <p className="mt-1 line-clamp-2 text-sm font-extrabold leading-tight">{problemSummary}</p>
+          <p className="mt-1 line-clamp-2 break-words text-sm font-extrabold leading-tight">{ticket.productType ?? "Not available"}</p>
         </div>
         <div className="min-w-0 px-2 pr-0">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-blue-100"><IndianRupee size={15} aria-hidden="true" /> Total</p>
@@ -1136,6 +1132,17 @@ export default function TicketDetail() {
         </div>
       </div>
     </header>
+  );
+
+  const renderProblemSection = () => (
+    <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
+      <h2 className="flex items-center gap-2 text-lg font-extrabold leading-tight text-blue-950">
+        <MessageCircle size={18} aria-hidden="true" /> Problem
+      </h2>
+      <p className="mt-2 line-clamp-4 break-words text-sm font-semibold leading-relaxed text-slate-700">
+        {problemSummary || "No problem details added."}
+      </p>
+    </section>
   );
 
   const renderCustomerSection = () => (
@@ -1460,6 +1467,7 @@ export default function TicketDetail() {
   const renderTicketHome = () => (
     <div className="mt-3.5 min-w-0 space-y-3.5 pb-24 sm:pb-0">
       {renderTicketSummary()}
+      {renderProblemSection()}
       {statusMessage && (
         <p className={`rounded-xl px-4 py-3 text-sm font-semibold ${statusMessage.startsWith("Unable") || statusMessage.startsWith("Please") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
           {statusMessage}

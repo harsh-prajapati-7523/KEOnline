@@ -148,13 +148,9 @@ export default function EmployeeDashboard() {
           </KEPremiumCardBackground>
         </header>
 
-        <section className="mt-4 sm:mt-6" aria-labelledby="ticket-actions">
-          <h2 id="ticket-actions" className="text-lg font-extrabold text-blue-950 sm:text-xl">
-            Available Work Areas
-          </h2>
-
+        <section className="mt-4 sm:mt-6" aria-label="Dashboard work areas">
           {hasPrimaryActions && (
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {canCreateTicket && (
                 <DashboardAction icon={PlusCircle} tone="yellow" onClick={() => navigate("/tickets/new")}>
                   Create Ticket

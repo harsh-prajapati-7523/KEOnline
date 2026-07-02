@@ -26,9 +26,22 @@ const ROLE_LABELS = {
 
 function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
   const [isOpening, setIsOpening] = useState(false);
-  const iconClassName = tone === "yellow"
-    ? "rounded-xl bg-yellow-100 p-2 text-yellow-800"
-    : "rounded-xl bg-blue-50 p-2 text-blue-950";
+  const iconToneClassNames = {
+    amber: "rounded-xl bg-amber-100 p-2 text-amber-800",
+    blue: "rounded-xl bg-blue-50 p-2 text-blue-950",
+    cyan: "rounded-xl bg-cyan-50 p-2 text-cyan-800",
+    emerald: "rounded-xl bg-emerald-50 p-2 text-emerald-800",
+    fuchsia: "rounded-xl bg-fuchsia-50 p-2 text-fuchsia-800",
+    indigo: "rounded-xl bg-indigo-50 p-2 text-indigo-800",
+    orange: "rounded-xl bg-orange-50 p-2 text-orange-800",
+    pink: "rounded-xl bg-pink-50 p-2 text-pink-800",
+    purple: "rounded-xl bg-purple-50 p-2 text-purple-800",
+    rose: "rounded-xl bg-rose-50 p-2 text-rose-800",
+    sky: "rounded-xl bg-sky-50 p-2 text-sky-800",
+    teal: "rounded-xl bg-teal-50 p-2 text-teal-800",
+    yellow: "rounded-xl bg-yellow-100 p-2 text-yellow-800",
+  };
+  const iconClassName = iconToneClassNames[tone] || iconToneClassNames.blue;
   const label = isOpening ? "Opening..." : children;
 
   return (
@@ -157,17 +170,17 @@ export default function EmployeeDashboard() {
                 </DashboardAction>
               )}
               {canViewTickets && (
-                <DashboardAction icon={ListChecks} onClick={() => navigate("/tickets/my")}>
+                <DashboardAction icon={ListChecks} tone="sky" onClick={() => navigate("/tickets/my")}>
                   My Tickets
                 </DashboardAction>
               )}
               {canViewTickets && (
-                <DashboardAction icon={Search} onClick={() => navigate("/tickets/open")}>
+                <DashboardAction icon={Search} tone="indigo" onClick={() => navigate("/tickets/open")}>
                   Open Ticket
                 </DashboardAction>
               )}
               {canViewTickets && (
-                <DashboardAction icon={ClipboardList} onClick={() => navigate("/tickets/find")}>
+                <DashboardAction icon={ClipboardList} tone="teal" onClick={() => navigate("/tickets/find")}>
                   Find Tickets
                 </DashboardAction>
               )}
@@ -181,42 +194,42 @@ export default function EmployeeDashboard() {
               </summary>
               <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {canManageEmployees && (
-                  <DashboardAction icon={Users} onClick={() => navigate("/admin/employees")}>
+                  <DashboardAction icon={Users} tone="emerald" onClick={() => navigate("/admin/employees")}>
                     Employee Management
                   </DashboardAction>
                 )}
                 {canManageRoles && (
-                  <DashboardAction icon={ShieldCheck} onClick={() => navigate("/admin/roles")}>
+                  <DashboardAction icon={ShieldCheck} tone="purple" onClick={() => navigate("/admin/roles")}>
                     Role Management
                   </DashboardAction>
                 )}
                 {canManageRoleAccess && (
-                  <DashboardAction icon={KeyRound} onClick={() => navigate("/admin/role-access")}>
+                  <DashboardAction icon={KeyRound} tone="amber" onClick={() => navigate("/admin/role-access")}>
                     Role Access &amp; Keys
                   </DashboardAction>
                 )}
                 {canManageWorkflow && (
-                  <DashboardAction icon={GitBranch} onClick={() => navigate("/admin/workflow")}>
+                  <DashboardAction icon={GitBranch} tone="cyan" onClick={() => navigate("/admin/workflow")}>
                     Workflow Management
                   </DashboardAction>
                 )}
                 {canManageTicketCategories && (
-                  <DashboardAction icon={Tags} onClick={() => navigate("/admin/ticket-categories")}>
+                  <DashboardAction icon={Tags} tone="orange" onClick={() => navigate("/admin/ticket-categories")}>
                     Ticket Categories
                   </DashboardAction>
                 )}
                 {canManageTicketFields && (
-                  <DashboardAction icon={ClipboardList} onClick={() => navigate("/admin/ticket-fields")}>
+                  <DashboardAction icon={ClipboardList} tone="rose" onClick={() => navigate("/admin/ticket-fields")}>
                     Ticket Fields
                   </DashboardAction>
                 )}
                 {canManageCategoryFieldConfiguration && (
-                  <DashboardAction icon={Settings2} onClick={() => navigate("/admin/ticket-category-fields")}>
+                  <DashboardAction icon={Settings2} tone="fuchsia" onClick={() => navigate("/admin/ticket-category-fields")}>
                     Category Field Configuration
                   </DashboardAction>
                 )}
                 {canManageDropdownSources && (
-                  <DashboardAction icon={ListPlus} onClick={() => navigate("/admin/dropdown-sources")}>
+                  <DashboardAction icon={ListPlus} tone="pink" onClick={() => navigate("/admin/dropdown-sources")}>
                     Dropdown Sources
                   </DashboardAction>
                 )}

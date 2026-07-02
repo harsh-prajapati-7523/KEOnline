@@ -112,25 +112,21 @@
 }
 
 .login-premium-header {
-  min-height: 240px;
-  border-radius: 0 0 28px 28px;
+  min-height: 242px;
+  border-radius: 0 0 30px 30px;
 }
 
 .login-premium-header .ke-wave-bg__content {
-  min-height: 240px;
-}
-
-.dashboard-premium-bg .ke-wave-bg__content {
-  min-height: 100svh;
+  min-height: 242px;
 }
 
 @media (min-width: 768px) {
   .login-premium-header {
-    min-height: 320px;
+    min-height: 300px;
   }
 
   .login-premium-header .ke-wave-bg__content {
-    min-height: 320px;
+    min-height: 300px;
   }
 }
 

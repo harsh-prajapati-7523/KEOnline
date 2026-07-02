@@ -82,10 +82,12 @@ function RouteLoadingFallback() {
 }
 
 function InstallAppPrompt() {
+  const location = useLocation();
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    if (location.pathname === "/employee-login") return undefined;
     if (isStandaloneDisplay()) return undefined;
 
     const handleBeforeInstallPrompt = (event) => {
@@ -106,7 +108,7 @@ function InstallAppPrompt() {
       window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
-  }, []);
+  }, [location.pathname]);
 
   const handleInstall = async () => {
     if (!installPromptEvent) return;
@@ -120,7 +122,7 @@ function InstallAppPrompt() {
     }
   };
 
-  if (!installPromptEvent || !isVisible) return null;
+  if (location.pathname === "/employee-login" || !installPromptEvent || !isVisible) return null;
 
   return (
     <aside className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-2xl border border-blue-100 bg-white p-3 text-blue-950 shadow-2xl sm:bottom-4 sm:right-4 sm:left-auto sm:mx-0 sm:w-full" aria-label="Install RiseTicket app">
@@ -152,6 +154,7 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const active = location.pathname;
+  const isEmployeeLogin = active === "/employee-login";
   const isCreateTicket = active === "/tickets/new";
   const isAuthenticated = Boolean(localStorage.getItem("token"));
   const employeeName = localStorage.getItem("employeeName") ?? "";
@@ -168,6 +171,8 @@ function Navbar() {
   const buttonClassName = (isActive) => `flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-xl px-2.5 py-1.5 text-sm font-semibold transition sm:min-h-11 sm:gap-2 sm:px-4 sm:py-2 sm:text-base ${
     isActive ? "ke-nav-active" : "bg-white/10 hover:bg-white/20"
   }`;
+
+  if (isEmployeeLogin) return null;
 
   return (
     <nav className={`ke-app-header ${isCreateTicket ? "ke-app-header-compact" : ""} w-full overflow-hidden text-white`}>
@@ -230,7 +235,7 @@ function AuthenticatedBottomNav() {
   const active = location.pathname;
   const isAuthenticated = Boolean(localStorage.getItem("token"));
 
-  if (!isAuthenticated) return null;
+  if (!isAuthenticated || active === "/employee-login") return null;
 
   const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
   const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);

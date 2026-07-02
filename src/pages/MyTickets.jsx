@@ -58,7 +58,7 @@ function MyTicketCard({ ticket, onOpen }) {
     >
       <span className="flex min-w-0 items-start justify-between gap-3">
         <span className="min-w-0 overflow-wrap-anywhere text-[1.05rem] font-extrabold leading-tight text-blue-950 sm:text-lg">
-          {ticket.ticketNumber ?? "Not available"} <span className="font-bold text-gray-400">|</span> <span className="text-sm font-bold text-blue-800 sm:text-base">{categoryLabel}</span>
+          {ticket.ticketNumber ?? "Not available"} <span className="font-bold text-gray-400">|</span> <span className="text-xs font-semibold text-gray-700 sm:text-sm">{categoryLabel}</span>
         </span>
         <span className="ke-status-pill max-w-[45%] shrink-0 overflow-wrap-anywhere rounded-full px-2.5 py-1 text-xs font-bold leading-tight">
           {getTicketStatusLabel(ticket)}

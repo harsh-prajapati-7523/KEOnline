@@ -1762,15 +1762,16 @@ textarea {
   }
 
   .ke-premium-card-bg.dashboard-welcome-premium-bg {
-    min-height: 121px;
+    min-height: 87px;
     border-radius: 16px;
   }
 
   .dashboard-welcome-premium-bg .ke-premium-card-bg__content {
-    min-height: 121px;
+    min-height: 87px;
   }
 
   .dashboard-welcome-premium-bg .ke-premium-card-bg__svg {
+    opacity: 0.88;
     height: 172%;
     left: -34%;
     top: -30%;
@@ -1778,31 +1779,32 @@ textarea {
   }
 
   .dashboard-welcome-content {
-    gap: 16px;
-    padding: 16px 17px;
+    gap: 13px;
+    padding: 10px 16px;
   }
 
   .dashboard-user-avatar {
-    width: 61px;
-    height: 61px;
+    width: 44px;
+    height: 44px;
   }
 
   .dashboard-user-avatar svg {
-    width: 55px;
-    height: 55px;
+    width: 26px;
+    height: 26px;
   }
 
   .dashboard-page .dashboard-welcome-title {
-    font-size: 16.5px !important;
+    font-size: 18.5px !important;
   }
 
   .dashboard-role-pill {
-    font-size: 6.5px;
+    font-size: 5.85px;
+    margin-top: 5px;
   }
 
   .dashboard-welcome-helper {
-    font-size: 9.25px;
-    margin-top: 10px;
+    font-size: 8.5px;
+    margin-top: 7px;
   }
 }
 

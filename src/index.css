@@ -305,28 +305,74 @@ textarea {
 }
 
 .ke-app-header {
-  background: var(--ke-primary);
+  background:
+    radial-gradient(circle at 75% 20%, rgba(255, 213, 79, 0.08), transparent 26%),
+    linear-gradient(135deg, #071a3d 0%, #0f1e46 55%, #101b4d 100%);
   border-bottom: 1px solid rgba(255, 204, 0, 0.22);
   box-shadow: 0 10px 28px rgba(16, 27, 77, 0.18);
+  min-height: calc(74px + env(safe-area-inset-top));
+  position: relative;
+}
+
+.ke-app-header::before,
+.ke-app-header::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+}
+
+.ke-app-header::before {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.06), transparent 65%);
+  border-radius: 50%;
+  bottom: -52px;
+  height: 120px;
+  right: 24px;
+  width: 260px;
+}
+
+.ke-app-header::after {
+  border-radius: 50%;
+  border-top: 2px solid rgba(255, 204, 0, 0.75);
+  bottom: -36px;
+  height: 90px;
+  right: -48px;
+  transform: rotate(-8deg);
+  width: 220px;
 }
 
 .ke-app-header-inner {
   gap: 12px;
-  min-height: calc(76px + env(safe-area-inset-top));
-  padding: calc(10px + env(safe-area-inset-top)) 18px 10px;
+  min-height: calc(74px + env(safe-area-inset-top));
+  padding: calc(8px + env(safe-area-inset-top)) 16px 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.ke-app-header-brand {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.ke-app-header-inner > :last-child {
+  position: relative;
+  z-index: 1;
 }
 
 .ke-brand-logo-badge {
   align-items: center;
   background: #ffffff;
-  border: 1px solid rgba(255, 204, 0, 0.45);
+  border: 1px solid rgba(255, 204, 0, 0.7);
   border-radius: 12px;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
   display: flex;
-  height: 50px;
+  height: 44px;
   justify-content: center;
-  padding: 0.34rem;
-  width: 50px;
+  padding: 0.28rem;
+  position: relative;
+  width: 44px;
+  z-index: 1;
 }
 
 .ke-brand-logo {
@@ -340,7 +386,7 @@ textarea {
 
 .ke-brand-title {
   color: #ffffff;
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: 0.1px;
   line-height: 1.08;
@@ -350,11 +396,14 @@ textarea {
 }
 
 .ke-brand-subtitle {
-  color: rgba(255, 255, 255, 0.88);
-  font-size: 15px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
   font-weight: 600;
-  line-height: 1.2;
-  margin-top: 4px;
+  line-height: 1.15;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ke-bottom-nav {
@@ -860,10 +909,10 @@ textarea {
   }
 
   .ke-brand-logo-badge {
-    border-radius: 14px;
-    height: 72px;
-    padding: 0.5rem;
-    width: 72px;
+    border-radius: 12px;
+    height: 48px;
+    padding: 0.3rem;
+    width: 48px;
   }
 
   .ke-brand-logo {
@@ -872,11 +921,11 @@ textarea {
   }
 
   .ke-brand-title {
-    font-size: 26px;
+    font-size: 21px;
   }
 
   .ke-brand-subtitle {
-    font-size: 20px;
+    font-size: 14px;
   }
 
   .ticket-detail-page {
@@ -914,26 +963,7 @@ textarea {
   }
 }
 
-@media (max-width: 380px) {
-  .ke-app-header-inner {
-    gap: 10px;
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
-  .ke-brand-logo-badge {
-    height: 42px;
-    width: 42px;
-  }
-
-  .ke-brand-title {
-    font-size: 18px;
-  }
-
-  .ke-brand-subtitle {
-    font-size: 12.5px;
-  }
-
+@media (max-width: 390px) {
   .create-ticket-page {
     padding-left: 16px;
     padding-right: 16px;
@@ -1001,12 +1031,12 @@ textarea {
 }
 
 .ke-app-header.ke-app-header-compact .ke-brand-title {
-  font-size: 21px;
+  font-size: 20px;
   line-height: 1.08;
 }
 
 .ke-app-header.ke-app-header-compact .ke-brand-subtitle {
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.15;
   margin-top: 3px;
 }
@@ -1219,12 +1249,12 @@ textarea {
   }
 
   .ke-app-header .ke-brand-title {
-    font-size: 21px;
+    font-size: 20px;
     line-height: 1.08;
   }
 
   .ke-app-header .ke-brand-subtitle {
-    font-size: 14px;
+    font-size: 13px;
     line-height: 1.15;
     margin-top: 3px;
   }
@@ -1393,6 +1423,35 @@ textarea {
 
   .ticket-detail-page :where(.fixed.inset-x-0) {
     padding: 8px 16px !important;
+  }
+}
+
+@media (max-width: 390px) {
+  .ke-app-header {
+    min-height: calc(70px + env(safe-area-inset-top));
+  }
+
+  .ke-app-header .ke-app-header-inner,
+  .ke-app-header.ke-app-header-compact .ke-app-header-inner {
+    gap: 10px;
+    min-height: calc(70px + env(safe-area-inset-top));
+    padding: calc(7px + env(safe-area-inset-top)) 14px 7px;
+  }
+
+  .ke-app-header .ke-brand-logo-badge,
+  .ke-app-header.ke-app-header-compact .ke-brand-logo-badge {
+    height: 40px;
+    width: 40px;
+  }
+
+  .ke-app-header .ke-brand-title,
+  .ke-app-header.ke-app-header-compact .ke-brand-title {
+    font-size: 18px;
+  }
+
+  .ke-app-header .ke-brand-subtitle,
+  .ke-app-header.ke-app-header-compact .ke-brand-subtitle {
+    font-size: 12px;
   }
 }
 

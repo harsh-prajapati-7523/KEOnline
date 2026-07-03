@@ -16,7 +16,6 @@ import {
   MessageCircle,
   Phone,
   PhoneCall,
-  Play,
   Plus,
   ShieldCheck,
   SlidersHorizontal,
@@ -111,8 +110,6 @@ function hasOwnerChange(historyItem) {
   return (previousOwner || newOwner) && String(previousOwner) !== String(newOwner);
 }
 
-const workflowActionKeys = ["PICK_TICKET", "START_WORK", "COMPLETE_TICKET", "CANCEL_TICKET"];
-
 function scheduleSecondaryWork(callback) {
   let idleId;
   let timeoutId;
@@ -157,30 +154,9 @@ function normalizeDynamicActions(data) {
 }
 
 function normalizeAvailableActions(data) {
-  const responseActions = data?.actions ?? data;
-  const source = Array.isArray(responseActions)
-    ? responseActions.map((action) => [action?.actionKey ?? action?.key ?? action?.action, action])
-    : Object.entries(responseActions ?? {}).map(([actionKey, action]) => [action?.actionKey ?? action?.key ?? action?.action ?? actionKey, action]);
-
-  const fixedActions = source.reduce((actions, [key, action]) => {
-    if (!workflowActionKeys.includes(key) || typeof action !== "object" || action === null) return actions;
-    return {
-      ...actions,
-      [key]: {
-        ...action,
-        available: action?.available === true,
-      },
-    };
-  }, {});
-
   return {
-    ...fixedActions,
     dynamicActions: normalizeDynamicActions(data),
   };
-}
-
-function isWorkflowActionAvailable(availableActions, actionKey) {
-  return availableActions?.[actionKey]?.available === true;
 }
 
 function hasMaxTwoDecimals(value) {
@@ -904,21 +880,6 @@ export default function TicketDetail() {
     setChargeActionMessage("");
   };
 
-  const isTicketOwner = ticket?.pickedByEmployeeId
-    && currentEmployeeId
-    && String(ticket.pickedByEmployeeId) === currentEmployeeId;
-  const canPickTicket = isWorkflowActionAvailable(availableActions, "PICK_TICKET")
-    && hasAccess("PICK_TICKET");
-  const canStartWork = isWorkflowActionAvailable(availableActions, "START_WORK")
-    && hasAccess("START_WORK");
-  const canComplete = ticket?.status === "IN_PROGRESS"
-    && isWorkflowActionAvailable(availableActions, "COMPLETE_TICKET")
-    && hasAccess("COMPLETE_TICKET")
-    && (["SUPER_ADMIN", "ADMIN"].includes(currentRole) || isTicketOwner);
-  const canCancel = ["SUPER_ADMIN", "ADMIN"].includes(currentRole)
-    && isWorkflowActionAvailable(availableActions, "CANCEL_TICKET")
-    && hasAccess("CANCEL_TICKET")
-    && ["NEW", "PICKED", "IN_PROGRESS"].includes(ticket?.status);
   const canViewCustomerHistory = hasAccess("VIEW_CUSTOMER_HISTORY");
   const canAssignTicket = hasAccess("ASSIGN_TICKET");
   const canViewCharges = hasAccess("VIEW_CHARGES");
@@ -927,12 +888,11 @@ export default function TicketDetail() {
     && !["NEW", "CANCELLED"].includes(ticket.status)
     && (["SUPER_ADMIN", "ADMIN"].includes(currentRole)
       ? ["PICKED", "IN_PROGRESS", "COMPLETED"].includes(ticket.status)
-      : ["PICKED", "IN_PROGRESS"].includes(ticket.status) && isTicketOwner);
+      : ["PICKED", "IN_PROGRESS"].includes(ticket.status)
+        && ticket?.pickedByEmployeeId
+        && currentEmployeeId
+        && String(ticket.pickedByEmployeeId) === currentEmployeeId);
   const canDeleteCharge = hasAccess("DELETE_CHARGE") && ["SUPER_ADMIN", "ADMIN"].includes(currentRole);
-  const hasVisibleWorkflowAction = (canPickTicket && ["NEW", "PICKED"].includes(ticket?.status))
-    || (canStartWork && ticket?.status === "PICKED")
-    || canComplete
-    || canCancel;
   const dynamicActions = Array.isArray(availableActions?.dynamicActions) ? availableActions.dynamicActions : [];
   const hasDynamicActions = dynamicActions.length > 0;
   const hasLoadedAvailableActions = Boolean(availableActions) && !availableActionsLoading && !availableActionsError;
@@ -1008,48 +968,6 @@ export default function TicketDetail() {
     const secondaryActions = [];
     const dangerActions = [];
 
-    if (canStartWork && ticket.status === "PICKED") {
-      primaryActions.push({
-        key: `start-${ticketId}`,
-        label: processingKeys[`start-${ticketId}`] ? "Starting..." : "Start Work",
-        icon: Play,
-        onClick: () => runTicketAction(`start-${ticketId}`, "start-work", null, "Work started on ticket.", "Unable to update ticket. Please try again."),
-        disabled: processingKeys[`start-${ticketId}`],
-      });
-    }
-
-    if (canComplete) {
-      primaryActions.push({
-        key: `complete-${ticketId}`,
-        label: processingKeys[`complete-${ticketId}`] ? "Completing..." : "Mark Completed",
-        icon: Check,
-        onClick: () => setShowCompleteConfirmation(true),
-        disabled: processingKeys[`complete-${ticketId}`],
-      });
-    }
-
-    if (canPickTicket && ticket.status === "NEW") {
-      secondaryActions.push({
-        key: `pick-${ticketId}`,
-        label: processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take This Ticket",
-        icon: User,
-        onClick: () => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again."),
-        disabled: processingKeys[`pick-${ticketId}`],
-        tone: primaryActions.length > 0 ? "outline" : "primary",
-      });
-    }
-
-    if (canPickTicket && ticket.status === "PICKED") {
-      secondaryActions.push({
-        key: `pick-${ticketId}`,
-        label: processingKeys[`pick-${ticketId}`] ? "Taking..." : "Take This Ticket",
-        icon: User,
-        onClick: () => runTicketAction(`pick-${ticketId}`, "pick", null, "Ticket picked successfully.", "Unable to update ticket. Please try again."),
-        disabled: processingKeys[`pick-${ticketId}`],
-        tone: "outline",
-      });
-    }
-
     dynamicActions.forEach((action) => {
       secondaryActions.push({
         key: `dynamic-${action.transitionId}`,
@@ -1061,23 +979,11 @@ export default function TicketDetail() {
       });
     });
 
-    if (canCancel) {
-      dangerActions.push({
-        key: `cancel-${ticketId}`,
-        label: processingKeys[`cancel-${ticketId}`] ? "Cancelling..." : "Cancel Ticket",
-        icon: Trash2,
-        onClick: () => setShowCancelConfirmation(true),
-        disabled: processingKeys[`cancel-${ticketId}`],
-        tone: "danger",
-        full: true,
-      });
-    }
-
     return { primaryActions, secondaryActions, dangerActions };
   };
 
   const renderWorkflowActions = () => {
-    const hasNoActions = hasLoadedAvailableActions && !hasVisibleWorkflowAction && !hasDynamicActions;
+    const hasNoActions = hasLoadedAvailableActions && !hasDynamicActions;
     const actionsPending = availableActionsLoading || (!availableActions && !availableActionsError);
     const { primaryActions, secondaryActions, dangerActions } = getWorkflowActionGroups();
 

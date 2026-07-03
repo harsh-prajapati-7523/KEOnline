@@ -185,10 +185,41 @@ function StateBadge({ enabled, trueLabel = "Enabled", falseLabel = "Disabled" })
   return <Badge tone={enabled ? "green" : "red"}>{enabled ? trueLabel : falseLabel}</Badge>;
 }
 
-function ScopeBadge({ value }) {
-  if (value === "full") return <Badge tone="green">Full</Badge>;
-  if (value === "partial") return <Badge tone="yellow">Partial</Badge>;
-  return <Badge tone="red">None</Badge>;
+function getActionPermissionDisplay(actionKey, role, roleAccessByRoleId) {
+  if (role?.roleKey === "SUPER_ADMIN") {
+    return { label: "System/default", tone: "blue", detail: "Super admin access is always available." };
+  }
+
+  const state = actionAccessState(actionKey, role, roleAccessByRoleId);
+  if (state === "full") {
+    return { label: "Allowed", tone: "green", detail: "This role can use the action." };
+  }
+  return { label: "Not allowed", tone: "red", detail: "This role cannot use the action unless permission is enabled." };
+}
+
+function getTransitionEffectiveAccessDisplay(transition, role, roleAccessByRoleId, roleRulesByTransitionId) {
+  const actionState = actionAccessState(transition?.actionKey, role, roleAccessByRoleId);
+  const roleRules = roleRulesByTransitionId[transition?.id] || [];
+  const hasRestrictions = roleRules.length > 0;
+  const rule = roleRules.find((item) => String(item.roleId) === String(role?.id));
+  const scopeState = roleRuleState(transition?.id, role?.id, roleRulesByTransitionId);
+
+  if (!hasRestrictions) {
+    return actionState === "full"
+      ? { label: "Open to action-authorized roles", tone: "green", detail: "No transition restriction is configured, and this role has action permission.", rule, nextActive: true }
+      : { label: "Not allowed", tone: "red", detail: "No transition restriction is configured, but this role lacks action permission.", rule, nextActive: true };
+  }
+
+  if (actionState === "full" && scopeState === "full") {
+    return { label: "Allowed by restriction", tone: "green", detail: "This role has action permission and an active transition restriction.", rule, nextActive: false };
+  }
+  if (actionState === "full") {
+    return { label: "Blocked: restriction disabled", tone: "yellow", detail: "This role has action permission, but the transition restriction does not include it.", rule, nextActive: true };
+  }
+  if (scopeState === "full") {
+    return { label: "Blocked: lacks action permission", tone: "red", detail: "This role is included in the transition restriction but lacks base action permission.", rule, nextActive: false };
+  }
+  return { label: "Not allowed", tone: "red", detail: "This role lacks action permission and is not included in the transition restriction.", rule, nextActive: true };
 }
 
 function DetailRow({ label, value }) {
@@ -4353,13 +4384,22 @@ export default function WorkflowManagement() {
           )}
 
           {activeTab === "roleAccess" && (
-            <div className="space-y-5">
-              <div>
-                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">Selected Category Action Access</h2>
-                <TableShell minWidth="min-w-[900px]">
+            <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_26rem]">
+              <section className="min-w-0 space-y-3">
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                  <h2 className="text-base font-extrabold text-blue-950">Action Permission</h2>
+                  <p className="mt-1 text-sm font-semibold text-blue-950">
+                    This controls which roles can use each workflow action.
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                    Action permission decides who can use an action. Transition role scope is optional and narrows that action permission for a specific transition.
+                  </p>
+                </div>
+
+                <TableShell minWidth="min-w-[960px]">
                   <thead>
                     <tr>
-                      <HeaderCell>Action</HeaderCell>
+                      <HeaderCell>Workflow Action</HeaderCell>
                       {activeRoles.map((role) => <HeaderCell key={role.id}>{role.displayName || role.roleKey}</HeaderCell>)}
                     </tr>
                   </thead>
@@ -4369,83 +4409,148 @@ export default function WorkflowManagement() {
                         <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
                         {activeRoles.map((role) => {
                           const protectedRole = role.roleKey === "SUPER_ADMIN";
+                          const permission = getActionPermissionDisplay(action.actionKey, role, roleAccessByRoleId);
                           const accessState = actionAccessState(action.actionKey, role, roleAccessByRoleId);
                           const isSavingThisRule = savingRoleAccessKey === `${role.id}:${action.actionKey}`;
                           return (
-                          <BodyCell key={role.id}>
-                            <div className="flex flex-col gap-2">
-                              <ScopeBadge value={accessState} />
-                              <button
-                                type="button"
-                                onClick={() => toggleRoleActionAccess(role, action)}
-                                disabled={protectedRole || isSavingThisRule}
-                                className="inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                              >
-                                {isSavingThisRule ? "Saving..." : accessState === "full" ? "Disable" : "Enable"}
-                              </button>
-                            </div>
-                          </BodyCell>
+                            <BodyCell key={role.id}>
+                              <div className="flex flex-col gap-2">
+                                <Badge tone={permission.tone}>{permission.label}</Badge>
+                                <p className="max-w-48 text-xs font-semibold text-slate-600">{permission.detail}</p>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRoleActionAccess(role, action)}
+                                  disabled={protectedRole || isSavingThisRule}
+                                  title={protectedRole ? "Super admin permission is protected." : permission.detail}
+                                  className="inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                  {isSavingThisRule ? "Saving..." : accessState === "full" ? "Disable" : "Enable"}
+                                </button>
+                              </div>
+                            </BodyCell>
                           );
                         })}
                       </tr>
                     ))}
-                    {selectedCategoryConfiguredActions.length === 0 && <EmptyRows colSpan={activeRoles.length + 1}>No selected-category workflow actions available for role access matrix.</EmptyRows>}
+                    {selectedCategoryConfiguredActions.length === 0 && <EmptyRows colSpan={activeRoles.length + 1}>No selected-category workflow actions available for role access.</EmptyRows>}
                   </tbody>
                 </TableShell>
-              </div>
+              </section>
 
-              <div>
-                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">Selected Category Optional Transition Restrictions</h2>
-                <p className="mb-3 max-w-4xl text-sm font-semibold text-slate-600">
-                  Action permission decides who can use an action. Transition role scope is optional and narrows that action permission for a specific transition. If no transition role scope is configured, all roles with action permission can use the transition.
-                </p>
-                <TableShell minWidth="min-w-[1040px]">
-                  <thead>
-                    <tr>
-                      <HeaderCell>Action / Transition</HeaderCell>
-                      {activeRoles.map((role) => <HeaderCell key={role.id}>{role.displayName || role.roleKey}</HeaderCell>)}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedCategoryConfiguredTransitions.map((transition) => {
-                      const from = getStatusLabel(transition, "from");
-                      const to = getStatusLabel(transition, "to");
-                      return (
-                        <tr key={transition.id} onClick={() => openTransitionDrawer(transition)} className="cursor-pointer hover:bg-blue-50/50">
-                          <BodyCell>
-                            <BusinessKeyLabel label={transition.displayName || actionByKey[transition.actionKey]?.displayName} technicalKey={transition.actionKey} />
-                            <span className="mt-1 block text-xs font-semibold text-slate-600">{from.label} to {to.label}</span>
-                          </BodyCell>
-                          {activeRoles.map((role) => {
-                            const roleRules = roleRulesByTransitionId[transition.id] || [];
-                            const rule = roleRules.find((item) => String(item.roleId) === String(role.id));
-                            const scopeState = roleRuleState(transition.id, role.id, roleRulesByTransitionId);
-                            return (
-                              <BodyCell key={role.id}>
-                                <div className="flex flex-col gap-2">
-                                  <ScopeBadge value={combinedTransitionRoleState(transition, role, roleAccessByRoleId, roleRulesByTransitionId)} />
+              <aside className="rounded-lg border border-slate-200 bg-white shadow-sm 2xl:sticky 2xl:top-4 2xl:max-h-[calc(100vh-2rem)] 2xl:overflow-y-auto">
+                <div className="border-b border-slate-200 px-4 py-4">
+                  <p className="text-xs font-extrabold uppercase text-slate-500">Selected Transition Restriction</p>
+                  <h2 className="mt-1 text-lg font-extrabold text-blue-950">Transition Role Scope</h2>
+                  <p className="mt-2 text-sm font-semibold text-slate-600">
+                    Optional. Use this only when this transition should be limited to selected roles.
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">
+                    If no transition role scope is configured, all roles with action permission can use the transition.
+                  </p>
+                </div>
+
+                <div className="space-y-4 px-4 py-4">
+                  <label className="block text-sm font-bold text-slate-700">
+                    <span className="mb-1 block">Transition</span>
+                    <select
+                      value={selectedInspectorTransition?.id || ""}
+                      onChange={(event) => setSelectedTransitionId(event.target.value)}
+                      className="min-h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950"
+                    >
+                      {transitionsTabRows.length === 0 && <option value="">No selected-category transitions</option>}
+                      {transitionsTabRows.map((transition) => {
+                        const from = getStatusLabel(transition, "from");
+                        const to = getStatusLabel(transition, "to");
+                        const label = transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey);
+                        return (
+                          <option key={transition.id} value={transition.id}>
+                            {label} - {from.label} to {to.label}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+
+                  {!selectedInspectorTransition && (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-600">
+                      Select or create a selected-category transition before configuring transition restrictions.
+                    </div>
+                  )}
+
+                  {selectedInspectorTransition && (() => {
+                    const transition = selectedInspectorTransition;
+                    const from = getStatusLabel(transition, "from");
+                    const to = getStatusLabel(transition, "to");
+                    const actionLabel = transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey);
+                    const roleRules = roleRulesByTransitionId[transition.id] || [];
+                    const accessSummary = getTransitionAccessSummary(transition, activeRoles, roleAccessByRoleId, roleRulesByTransitionId);
+                    const hasRestrictions = roleRules.length > 0;
+                    const activeRestrictionCount = roleRules.filter((rule) => rule.active).length;
+
+                    return (
+                      <>
+                        <section>
+                          <h3 className="text-sm font-extrabold text-blue-950">Transition</h3>
+                          <dl className="mt-2">
+                            <DetailRow label="From" value={from.label} />
+                            <DetailRow label="Action" value={actionLabel} />
+                            <DetailRow label="To" value={to.label} />
+                          </dl>
+                        </section>
+
+                        <section className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                          <h3 className="text-sm font-extrabold text-blue-950">Effective Access Summary</h3>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge tone={hasRestrictions ? "yellow" : "green"}>
+                              {hasRestrictions ? "Restricted to selected roles" : "Open to action-authorized roles"}
+                            </Badge>
+                            <Badge tone={accessSummary.tone}>{accessSummary.label}</Badge>
+                          </div>
+                          <p className="mt-2 text-sm font-semibold text-slate-700">
+                            {hasRestrictions
+                              ? `${activeRestrictionCount}/${roleRules.length} transition role restrictions are active. Roles still need action permission before they can execute.`
+                              : "No transition-specific restriction is configured. Every role with action permission can use this transition."}
+                          </p>
+                        </section>
+
+                        <section>
+                          <h3 className="text-sm font-extrabold text-blue-950">Roles For This Transition</h3>
+                          <div className="mt-2 space-y-2">
+                            {activeRoles.map((role) => {
+                              const effective = getTransitionEffectiveAccessDisplay(transition, role, roleAccessByRoleId, roleRulesByTransitionId);
+                              const protectedRole = role.roleKey === "SUPER_ADMIN";
+                              const canToggleRestriction = !protectedRole && (effective.nextActive || effective.rule);
+                              return (
+                                <div key={role.id} className="rounded-lg border border-slate-200 px-3 py-3">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <BusinessKeyLabel label={role.displayName} technicalKey={role.roleKey} subtle />
+                                    <Badge tone={effective.tone}>{effective.label}</Badge>
+                                  </div>
+                                  <p className="mt-2 text-xs font-semibold text-slate-600">{effective.detail}</p>
                                   <button
                                     type="button"
-                                    onClick={(event) => {
-                                      event.stopPropagation();
-                                      requestRuleChange({ scope: "role", transition, role, rule, nextActive: scopeState !== "full" });
-                                    }}
-                                    disabled={isSavingRule || (scopeState === "full" && !rule)}
-                                    className="inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                    onClick={() => requestRuleChange({ scope: "role", transition, role, rule: effective.rule, nextActive: effective.nextActive })}
+                                    disabled={isSavingRule || !canToggleRestriction}
+                                    title={protectedRole ? "Super admin restriction controls are protected." : "Change optional transition role scope for this transition."}
+                                    className="mt-3 inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                                   >
-                                    {scopeState === "full" ? "Remove Restriction" : "Restrict by Role"}
+                                    {effective.nextActive ? "Add Restriction" : "Remove Restriction"}
                                   </button>
                                 </div>
-                              </BodyCell>
-                            );
-                          })}
-                        </tr>
-                      );
-                    })}
-                    {selectedCategoryConfiguredTransitions.length === 0 && <EmptyRows colSpan={activeRoles.length + 1}>No selected-category workflow transitions available for role rule matrix.</EmptyRows>}
-                  </tbody>
-                </TableShell>
-              </div>
+                              );
+                            })}
+                            {activeRoles.length === 0 && (
+                              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-600">
+                                No active roles are available for access review.
+                              </div>
+                            )}
+                          </div>
+                        </section>
+                      </>
+                    );
+                  })()}
+                </div>
+              </aside>
             </div>
           )}
 

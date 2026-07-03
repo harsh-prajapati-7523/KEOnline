@@ -265,6 +265,49 @@ function isProtectedTransition(transition) {
   return Boolean(transition?.systemTransition || transition?.protectedTransition);
 }
 
+function getTransitionRuntimeState(transition, selectedCategoryId, categoryRulesByTransitionId, transitionIssueRows = [], actionByKey = {}) {
+  const selectedRule = getSelectedCategoryRule(transition, selectedCategoryId, categoryRulesByTransitionId);
+  const blockingIssues = transitionIssueRows.filter((row) => !row.warning);
+  const warningIssues = transitionIssueRows.filter((row) => row.warning);
+  const action = actionByKey[transition?.actionKey];
+  const inactiveMetadata = transition?.fromStatusActive === false || transition?.toStatusActive === false || action?.active === false;
+
+  if (!transition?.active || (selectedCategoryId && selectedRule && !selectedRule.active) || (selectedCategoryId && !selectedRule)) {
+    return { label: "Inactive", tone: "slate", detail: "Transition metadata or the selected-category rule is inactive." };
+  }
+  if (blockingIssues.length > 0 || inactiveMetadata) {
+    return { label: "Blocked", tone: "red", detail: blockingIssues[0]?.guidance?.fix || "Validation or inactive metadata is blocking this path." };
+  }
+  if (warningIssues.length > 0) {
+    return { label: "Warning", tone: "yellow", detail: warningIssues[0]?.guidance?.fix || "Validation reported a non-blocking warning for this path." };
+  }
+  return { label: "Executable", tone: "green", detail: "Active path with an active selected-category rule and no validation blocker." };
+}
+
+function getTransitionAccessSummary(transition, activeRoles, roleAccessByRoleId, roleRulesByTransitionId) {
+  const roleRules = roleRulesByTransitionId[transition?.id] || [];
+  const actionAuthorizedCount = activeRoles.filter((role) => actionAccessState(transition?.actionKey, role, roleAccessByRoleId) === "full").length;
+  const executableRoleCount = activeRoles.filter((role) => combinedTransitionRoleState(transition, role, roleAccessByRoleId, roleRulesByTransitionId) === "full").length;
+
+  if (activeRoles.length === 0) {
+    return { label: "No active roles", detail: "No active role records are loaded for access review.", tone: "red" };
+  }
+  if (roleRules.length === 0) {
+    return {
+      label: `${actionAuthorizedCount}/${activeRoles.length} roles`,
+      detail: "Open to roles with action permission; no transition-specific restriction is configured.",
+      tone: actionAuthorizedCount > 0 ? "green" : "red",
+    };
+  }
+
+  const activeRuleCount = roleRules.filter((rule) => rule.active).length;
+  return {
+    label: `${executableRoleCount}/${activeRoles.length} roles`,
+    detail: `${activeRuleCount}/${roleRules.length} transition restrictions are active.`,
+    tone: executableRoleCount > 0 ? "yellow" : "red",
+  };
+}
+
 function normalizeKey(value) {
   return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
 }
@@ -1513,8 +1556,8 @@ function getValidationGuidance(issue, transition, actionByKey) {
       targetTabs: ["Statuses", "Transitions"],
     },
     MISSING_ROLE_TRANSITION_SCOPE_COVERAGE: {
-      explanation: "Current validation reports this transition has no role coverage.",
-      fix: "Check existing Role Access configuration for the action and any transition controls currently available in the UI. This phase does not add new role-specific transition behavior.",
+      explanation: "No transition-specific role scope is configured. This transition is open to all roles that have permission for this action.",
+      fix: "No fix is required. Use Role Access only if you want to restrict this transition to selected roles.",
       targetTabs: ["Role Access"],
     },
     MISSING_ROLE_ACCESS_GRANT: {
@@ -1798,7 +1841,7 @@ function MapDetailPanel({
       <MapPanelSection title="Rules Summary">
         <div className="flex flex-wrap gap-2">
           <Badge tone={categoryState.tone}>Category: {categoryState.label}</Badge>
-          <Badge tone={roleRules.length === 0 ? "green" : "blue"}>Roles: {roleRules.length === 0 ? "All roles" : `${roleRules.filter((rule) => rule.active).length}/${roleRules.length} active`}</Badge>
+          <Badge tone={roleRules.length === 0 ? "green" : "blue"}>Roles: {roleRules.length === 0 ? "Open to action-authorized" : `${roleRules.filter((rule) => rule.active).length}/${roleRules.length} restricted`}</Badge>
           <Badge tone={protectedRecord ? "yellow" : "blue"}>{protectedRecord ? "Protected" : "Custom"}</Badge>
         </div>
       </MapPanelSection>
@@ -1825,7 +1868,7 @@ function MapDetailPanel({
             </div>
           </MapDisclosureSection>
 
-          <MapDisclosureSection title="Role Rule Controls">
+          <MapDisclosureSection title="Role Restriction Controls">
             <div className="space-y-2">
               {managedRoles.map((role) => {
                 const rule = roleRules.find((item) => String(item.roleId) === String(role.id));
@@ -1938,7 +1981,10 @@ function DetailDrawer({
               </section>
 
               <section className="mt-5">
-                <h3 className="text-sm font-extrabold text-blue-950">Workflow Transition Role Rules</h3>
+                <h3 className="text-sm font-extrabold text-blue-950">Optional Transition Role Restrictions</h3>
+                <p className="mt-1 text-xs font-semibold text-slate-600">
+                  Without transition-specific restriction, this transition stays open to every role that has action permission.
+                </p>
                 <div className="mt-2 space-y-2">
                   {managedRoles.map((role) => {
                     const rule = roleRules.find((item) => String(item.roleId) === String(role.id));
@@ -2035,6 +2081,8 @@ export default function WorkflowManagement() {
   const [pendingTransitionChange, setPendingTransitionChange] = useState(null);
   const [pendingWorkflowModeChange, setPendingWorkflowModeChange] = useState(null);
   const [selectedMapItem, setSelectedMapItem] = useState(null);
+  const [selectedTransitionId, setSelectedTransitionId] = useState("");
+  const [transitionFilter, setTransitionFilter] = useState("all");
 
   const selectedCategory = useMemo(
     () => categories.find((category) => String(category.id) === String(selectedCategoryId)),
@@ -2113,15 +2161,18 @@ export default function WorkflowManagement() {
     [actions, categoryWorkflowActionKeys]
   );
 
-  const editableConfiguredTransitions = useMemo(
-    () => selectedCategoryConfiguredTransitions.filter((transition) => !isProtectedTransition(transition)),
-    [selectedCategoryConfiguredTransitions]
-  );
-
   const availableGlobalTransitions = useMemo(() => {
     const selectedTransitionIds = new Set(selectedCategoryConfiguredTransitions.map((transition) => String(transition.id)));
     return transitions.filter((transition) => !selectedTransitionIds.has(String(transition.id)));
   }, [selectedCategoryConfiguredTransitions, transitions]);
+
+  const transitionsTabRows = useMemo(() => {
+    if (!selectedCategoryId) return selectedCategoryConfiguredTransitions;
+    return transitions.filter((transition) => {
+      const rules = categoryRulesByTransitionId[transition.id] || [];
+      return rules.some((rule) => String(rule.categoryId) === String(selectedCategoryId));
+    });
+  }, [categoryRulesByTransitionId, selectedCategoryConfiguredTransitions, selectedCategoryId, transitions]);
 
   const actionByKey = useMemo(() => {
     const next = {};
@@ -2259,12 +2310,14 @@ export default function WorkflowManagement() {
       {
         id: "role-access",
         label: "Role/action permission is configured",
-        status: hasRoleActionCoverage && roleCoverageWarnings.length === 0 ? "complete" : hasRoleActionCoverage ? "warning" : "blocked",
-        badge: hasRoleActionCoverage && roleCoverageWarnings.length === 0 ? "Ready" : "Review access",
+        status: hasRoleActionCoverage ? "complete" : "blocked",
+        badge: hasRoleActionCoverage
+          ? roleCoverageWarnings.length > 0 ? "Open to roles" : "Ready"
+          : "Review access",
         detail: !hasRoleActionCoverage
           ? "At least one active role needs existing action permission for each configured workflow action."
           : roleCoverageWarnings.length > 0
-          ? "Validation reports missing role coverage on one or more transitions; review the existing Role Access controls."
+          ? "Optional transition restrictions are not configured on one or more transitions; those transitions are open to action-authorized roles."
           : "Existing role/action permissions cover the configured workflow actions.",
       },
       {
@@ -2326,8 +2379,8 @@ export default function WorkflowManagement() {
     if (inactiveConfiguredTransitions.length > 0 || transitionsMissingSelectedCategoryRule.length > 0) {
       return { label: "Enable category paths", reason: "Review transition active state and selected-category rules.", tab: "transitions" };
     }
-    if (!hasRoleActionCoverage || roleCoverageWarnings.length > 0) {
-      return { label: "Check Role Access", reason: "Review existing role/action permission and transition controls.", tab: "roleAccess" };
+    if (!hasRoleActionCoverage) {
+      return { label: "Check Role Access", reason: "Review existing role/action permission.", tab: "roleAccess" };
     }
     if (!validationForSelectedCategory) {
       return { label: "Run validation", reason: "Confirm backend readiness for this category.", action: "validate" };
@@ -2349,7 +2402,6 @@ export default function WorkflowManagement() {
     inactiveConfiguredStatuses,
     inactiveConfiguredTransitions,
     readyToActivate,
-    roleCoverageWarnings,
     selectedCategoryConfiguredTransitions,
     selectedCategoryId,
     transitionsMissingSelectedCategoryRule,
@@ -2549,6 +2601,8 @@ export default function WorkflowManagement() {
     setTransitionForm(null);
     setTransitionFormError("");
     setSelectedMapItem(null);
+    setSelectedTransitionId("");
+    setTransitionFilter("all");
     setDrawerItem(null);
     setError("");
     setStatusMessage("");
@@ -3392,6 +3446,58 @@ export default function WorkflowManagement() {
     };
   });
 
+  const transitionIssueRowsById = useMemo(() => {
+    const next = {};
+    validationGuidanceRows.forEach((row) => {
+      const transitionId = row.issue?.transitionId ?? row.transition?.id;
+      if (transitionId == null) return;
+      const key = String(transitionId);
+      next[key] = [...(next[key] || []), row];
+    });
+    return next;
+  }, [validationGuidanceRows]);
+
+  const transitionRuntimeById = useMemo(() => {
+    const next = {};
+    transitionsTabRows.forEach((transition) => {
+      next[String(transition.id)] = getTransitionRuntimeState(
+        transition,
+        selectedCategoryId,
+        categoryRulesByTransitionId,
+        transitionIssueRowsById[String(transition.id)] || [],
+        actionByKey
+      );
+    });
+    return next;
+  }, [actionByKey, categoryRulesByTransitionId, selectedCategoryId, transitionIssueRowsById, transitionsTabRows]);
+
+  const transitionRuntimeCounts = useMemo(() => {
+    const counts = { executable: 0, warning: 0, blocked: 0, inactive: 0 };
+    transitionsTabRows.forEach((transition) => {
+      const runtime = transitionRuntimeById[String(transition.id)];
+      const key = String(runtime?.label || "").toLowerCase();
+      if (counts[key] != null) counts[key] += 1;
+    });
+    return counts;
+  }, [transitionRuntimeById, transitionsTabRows]);
+
+  const filteredTransitionsTabRows = useMemo(() => {
+    if (transitionFilter === "custom") {
+      return transitionsTabRows.filter((transition) => !transition.systemTransition && !isProtectedTransition(transition));
+    }
+    if (transitionFilter === "all") return transitionsTabRows;
+    return transitionsTabRows.filter((transition) => String(transitionRuntimeById[String(transition.id)]?.label || "").toLowerCase() === transitionFilter);
+  }, [transitionFilter, transitionRuntimeById, transitionsTabRows]);
+
+  const selectedInspectorTransition = useMemo(() => {
+    if (selectedTransitionId) {
+      const selected = transitionsTabRows.find((transition) => String(transition.id) === String(selectedTransitionId))
+        || availableGlobalTransitions.find((transition) => String(transition.id) === String(selectedTransitionId));
+      if (selected) return selected;
+    }
+    return filteredTransitionsTabRows[0] || transitionsTabRows[0] || null;
+  }, [availableGlobalTransitions, filteredTransitionsTabRows, selectedTransitionId, transitionsTabRows]);
+
   const sidebarItems = [
     { label: "Dashboard", icon: LayoutDashboard, onClick: () => navigate("/employee-dashboard") },
     { label: "Workflows", icon: Workflow, active: true },
@@ -3633,12 +3739,18 @@ export default function WorkflowManagement() {
           )}
 
           {activeTab === "transitions" && (
-            <div className="space-y-3">
-	              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-	                <div className="flex flex-wrap gap-2">
-	                  <Badge tone="blue">Configured editable: {editableConfiguredTransitions.length}</Badge>
-	                  <Badge tone="slate">Available global: {availableGlobalTransitions.length}</Badge>
-	                </div>
+            <div className="space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <h2 className="text-base font-extrabold text-blue-950">Selected Category Transitions</h2>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Badge tone="green">Executable: {transitionRuntimeCounts.executable}</Badge>
+                    <Badge tone="yellow">Warning: {transitionRuntimeCounts.warning}</Badge>
+                    <Badge tone="red">Blocked: {transitionRuntimeCounts.blocked}</Badge>
+                    <Badge tone="slate">Inactive: {transitionRuntimeCounts.inactive}</Badge>
+                    <Badge tone="blue">Available global: {availableGlobalTransitions.length}</Badge>
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -3657,113 +3769,132 @@ export default function WorkflowManagement() {
 	                  Create Transition
 	                </button>
                 </div>
-	              </div>
-	              <div>
-	                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">Selected Category Transitions</h2>
-	              <TableShell minWidth="min-w-[1180px]">
-	                <thead>
-                  <tr>
-                    <HeaderCell>From Status</HeaderCell>
-                    <HeaderCell>Action</HeaderCell>
-                    <HeaderCell>To Status</HeaderCell>
-                    <HeaderCell>Category Rule</HeaderCell>
-                    <HeaderCell>Roles Enabled</HeaderCell>
-                    <HeaderCell>Active</HeaderCell>
-                    <HeaderCell>Protected/System</HeaderCell>
-                    <HeaderCell>Sort Order</HeaderCell>
-                    <HeaderCell>Actions</HeaderCell>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={9}>Loading workflow transitions for selected category...</EmptyRows>}
-                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredTransitions.length === 0 && (
-                    <EmptyRows colSpan={9}>
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <span>No workflow transitions are configured for this category yet.</span>
-                        <button
-                          type="button"
-                          onClick={openWorkflowBuilder}
-                          disabled={!selectedCategoryId}
-                          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
-                        >
-                          <Workflow size={16} aria-hidden="true" />
-                          Build Workflow
-                        </button>
-                      </div>
-                    </EmptyRows>
-                  )}
-                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredTransitions.map((transition) => {
-                    const from = getStatusLabel(transition, "from");
-                    const to = getStatusLabel(transition, "to");
-                    const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
-                    const selectedCategoryRule = (categoryRulesByTransitionId[transition.id] || [])
-                      .find((rule) => String(rule.categoryId) === String(selectedCategoryId));
-                    const roleRules = roleRulesByTransitionId[transition.id] || [];
-                    const activeRoleRules = roleRules.filter((rule) => rule.active);
-                    const protectedRecord = isProtectedTransition(transition);
+              </div>
 
-                    return (
-                      <tr key={transition.id} onClick={() => openTransitionDrawer(transition)} className="cursor-pointer hover:bg-blue-50/50">
-                        <BodyCell><BusinessKeyLabel label={from.label} technicalKey={from.key} subtle /></BodyCell>
-                        <BodyCell><BusinessKeyLabel label={transition.displayName || actionByKey[transition.actionKey]?.displayName} technicalKey={transition.actionKey} /></BodyCell>
-                        <BodyCell><BusinessKeyLabel label={to.label} technicalKey={to.key} subtle /></BodyCell>
-                        <BodyCell><Badge tone={categoryState.tone}>{categoryState.label}</Badge></BodyCell>
-                        <BodyCell>{roleRules.length === 0 ? <Badge tone="green">All roles</Badge> : <Badge tone="yellow">{activeRoleRules.length}/{roleRules.length} scoped</Badge>}</BodyCell>
-                        <BodyCell><StateBadge enabled={transition.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
-                        <BodyCell>
-                          <div className="flex flex-wrap gap-1.5">
-                            <Badge tone={transition.systemTransition ? "blue" : "slate"}>{transition.systemTransition ? "System" : "Custom"}</Badge>
-                            <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
-                          </div>
-                        </BodyCell>
-                        <BodyCell>{transition.sortOrder ?? "Not set"}</BodyCell>
-                        <BodyCell>
-                          <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  ["all", `All (${transitionsTabRows.length})`],
+                  ["executable", `Executable (${transitionRuntimeCounts.executable})`],
+                  ["warning", `Warning (${transitionRuntimeCounts.warning})`],
+                  ["blocked", `Blocked (${transitionRuntimeCounts.blocked})`],
+                  ["inactive", `Inactive (${transitionRuntimeCounts.inactive})`],
+                  ["custom", "Custom only"],
+                ].map(([filterId, label]) => (
+                  <button
+                    key={filterId}
+                    type="button"
+                    onClick={() => setTransitionFilter(filterId)}
+                    className={`min-h-9 rounded-lg border px-3 py-1.5 text-xs font-extrabold ${
+                      transitionFilter === filterId
+                        ? "border-blue-950 bg-blue-950 text-white"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-blue-50"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+                <div className="min-w-0 space-y-4">
+                  <TableShell minWidth="min-w-[1040px]">
+                    <thead>
+                      <tr>
+                        <HeaderCell>From</HeaderCell>
+                        <HeaderCell>Action</HeaderCell>
+                        <HeaderCell>To</HeaderCell>
+                        <HeaderCell>Runtime</HeaderCell>
+                        <HeaderCell>Access</HeaderCell>
+                        <HeaderCell>Category Rule</HeaderCell>
+                        <HeaderCell>Actions</HeaderCell>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={7}>Loading workflow transitions for selected category...</EmptyRows>}
+                      {!isLoading && !isLoadingCategoryWorkflow && transitionsTabRows.length === 0 && (
+                        <EmptyRows colSpan={7}>
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <span>No workflow transitions are configured for this category yet.</span>
                             <button
                               type="button"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                openTransitionForm(transition);
-                              }}
-                              disabled={protectedRecord}
-                              title={protectedRecord ? "System/protected transitions cannot be edited or disabled." : "Edit transition"}
-                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                              onClick={openWorkflowBuilder}
+                              disabled={!selectedCategoryId}
+                              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
                             >
-                              Edit
+                              <Workflow size={16} aria-hidden="true" />
+                              Build Workflow
                             </button>
-	                            <button
-	                              type="button"
-	                              onClick={(event) => {
-	                                event.stopPropagation();
-	                                requestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: false });
-	                              }}
-	                              disabled={!selectedCategoryRule?.active || isSavingRule}
-	                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-200 px-3 py-2 text-xs font-extrabold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
-	                            >
-	                              Disable Category Rule
-	                            </button>
-	                            <button
-	                              type="button"
-	                              onClick={(event) => {
-	                                event.stopPropagation();
-	                                requestTransitionStateChange(transition, !transition.active);
-	                              }}
-	                              disabled={protectedRecord}
-	                              title={protectedRecord ? "System/protected transitions cannot be edited or disabled." : transition.active ? "Disable transition metadata" : "Enable transition metadata"}
-	                              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50"
-	                            >
-	                              {transition.active ? "Disable Transition" : "Enable Transition"}
-	                            </button>
                           </div>
-                        </BodyCell>
-                      </tr>
-                    );
-                  })}
-	                </tbody>
-	              </TableShell>
-	              </div>
-	              {!isLoading && !isLoadingCategoryWorkflow && (
-	              <details className="rounded-lg border border-slate-200 bg-white px-4 py-3" open>
+                        </EmptyRows>
+                      )}
+                      {!isLoading && !isLoadingCategoryWorkflow && transitionsTabRows.length > 0 && filteredTransitionsTabRows.length === 0 && (
+                        <EmptyRows colSpan={7}>No selected-category transitions match this filter.</EmptyRows>
+                      )}
+                      {!isLoading && !isLoadingCategoryWorkflow && filteredTransitionsTabRows.map((transition) => {
+                        const from = getStatusLabel(transition, "from");
+                        const to = getStatusLabel(transition, "to");
+                        const categoryState = getCategoryRuleState(transition.id, selectedCategoryId, categoryRulesByTransitionId);
+                        const runtimeState = transitionRuntimeById[String(transition.id)] || getTransitionRuntimeState(transition, selectedCategoryId, categoryRulesByTransitionId, [], actionByKey);
+                        const accessSummary = getTransitionAccessSummary(transition, activeRoles, roleAccessByRoleId, roleRulesByTransitionId);
+                        const protectedRecord = isProtectedTransition(transition);
+                        const isSelected = String(selectedInspectorTransition?.id) === String(transition.id);
+
+                        return (
+                          <tr
+                            key={transition.id}
+                            onClick={() => setSelectedTransitionId(String(transition.id))}
+                            className={`cursor-pointer hover:bg-blue-50/50 ${isSelected ? "bg-blue-50/70" : ""}`}
+                          >
+                            <BodyCell><BusinessKeyLabel label={from.label} technicalKey={from.key} subtle /></BodyCell>
+                            <BodyCell><BusinessKeyLabel label={transition.displayName || actionByKey[transition.actionKey]?.displayName} technicalKey={transition.actionKey} /></BodyCell>
+                            <BodyCell><BusinessKeyLabel label={to.label} technicalKey={to.key} subtle /></BodyCell>
+                            <BodyCell>
+                              <div className="space-y-1">
+                                <Badge tone={runtimeState.tone}>{runtimeState.label}</Badge>
+                                <p className="max-w-56 text-xs font-semibold text-slate-600">{runtimeState.detail}</p>
+                              </div>
+                            </BodyCell>
+                            <BodyCell>
+                              <div className="space-y-1">
+                                <Badge tone={accessSummary.tone}>{accessSummary.label}</Badge>
+                                <p className="max-w-56 text-xs font-semibold text-slate-600">{accessSummary.detail}</p>
+                              </div>
+                            </BodyCell>
+                            <BodyCell><Badge tone={categoryState.tone}>{categoryState.label}</Badge></BodyCell>
+                            <BodyCell>
+                              <div className="flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    setSelectedTransitionId(String(transition.id));
+                                  }}
+                                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
+                                >
+                                  Details
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    openTransitionForm(transition);
+                                  }}
+                                  disabled={protectedRecord}
+                                  title={protectedRecord ? "System/protected transitions cannot be edited or disabled." : "Edit transition"}
+                                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                >
+                                  Edit
+                                </button>
+                              </div>
+                            </BodyCell>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </TableShell>
+
+                  {!isLoading && !isLoadingCategoryWorkflow && (
+                  <details className="rounded-lg border border-slate-200 bg-white px-4 py-3">
 	                <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Available / Global Transitions</summary>
 	                <p className="mt-2 text-sm font-semibold text-slate-600">These transitions exist as workflow metadata but are not enabled for the selected category yet. Enable the category rule to include one in this category workflow and map.</p>
 	                <div className="mt-3">
@@ -3840,8 +3971,137 @@ export default function WorkflowManagement() {
 	                  </TableShell>
 	                </div>
 	              </details>
-	              )}
+                  )}
+                </div>
+
+                <aside className="rounded-lg border border-slate-200 bg-white shadow-sm 2xl:sticky 2xl:top-4 2xl:max-h-[calc(100vh-2rem)] 2xl:overflow-y-auto">
+                  {!selectedInspectorTransition && (
+                    <div className="px-4 py-5 text-sm font-semibold text-slate-600">
+                      Select a transition to review runtime readiness, access, validation, and technical metadata.
+                    </div>
+                  )}
+                  {selectedInspectorTransition && (() => {
+                    const transition = selectedInspectorTransition;
+                    const from = getStatusLabel(transition, "from");
+                    const to = getStatusLabel(transition, "to");
+                    const selectedCategoryRule = getSelectedCategoryRule(transition, selectedCategoryId, categoryRulesByTransitionId);
+                    const categoryState = getRuleVisualState(selectedCategoryRule);
+                    const issueRowsForTransition = transitionIssueRowsById[String(transition.id)] || [];
+                    const runtimeState = transitionRuntimeById[String(transition.id)] || getTransitionRuntimeState(transition, selectedCategoryId, categoryRulesByTransitionId, issueRowsForTransition, actionByKey);
+                    const accessSummary = getTransitionAccessSummary(transition, activeRoles, roleAccessByRoleId, roleRulesByTransitionId);
+                    const roleRules = roleRulesByTransitionId[transition.id] || [];
+                    const protectedRecord = isProtectedTransition(transition);
+                    return (
+                      <div>
+                        <div className="border-b border-slate-200 px-4 py-4">
+                          <p className="text-xs font-extrabold uppercase text-slate-500">Transition Inspector</p>
+                          <h3 className="mt-1 break-words text-lg font-extrabold text-blue-950">
+                            {transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey)}
+                          </h3>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Badge tone={runtimeState.tone}>{runtimeState.label}</Badge>
+                            <Badge tone={categoryState.tone}>Rule: {categoryState.label}</Badge>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4 px-4 py-4">
+                          <section>
+                            <h4 className="text-sm font-extrabold text-blue-950">Business Path</h4>
+                            <dl className="mt-2">
+                              <DetailRow label="From status" value={from.label} />
+                              <DetailRow label="Action" value={transition.displayName || actionByKey[transition.actionKey]?.displayName || formatLabel(transition.actionKey)} />
+                              <DetailRow label="To status" value={to.label} />
+                            </dl>
+                          </section>
+
+                          <section>
+                            <h4 className="text-sm font-extrabold text-blue-950">Runtime Readiness</h4>
+                            <p className="mt-2 text-sm font-semibold text-slate-700">{runtimeState.detail}</p>
+                            {issueRowsForTransition.length > 0 && (
+                              <div className="mt-3 space-y-2">
+                                {issueRowsForTransition.map((row, index) => (
+                                  <div key={`${row.issue?.code || "issue"}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <p className="text-xs font-extrabold uppercase text-slate-500">{row.issue?.code || "Validation issue"}</p>
+                                      <Badge tone={row.warning ? "yellow" : "red"}>{row.warning ? "Warning" : "Blocker"}</Badge>
+                                    </div>
+                                    <p className="mt-1 text-sm font-semibold text-slate-700">{row.issue?.message || row.guidance?.explanation}</p>
+                                    <p className="mt-1 text-xs font-bold text-blue-950">{row.guidance?.fix}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {issueRowsForTransition.length === 0 && (
+                              <p className="mt-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-bold text-green-700">
+                                No validation issue is currently attached to this transition.
+                              </p>
+                            )}
+                          </section>
+
+                          <section>
+                            <h4 className="text-sm font-extrabold text-blue-950">Access</h4>
+                            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                              <Badge tone={accessSummary.tone}>{accessSummary.label}</Badge>
+                              <p className="mt-2 text-sm font-semibold text-slate-700">{accessSummary.detail}</p>
+                              <p className="mt-2 text-xs font-semibold text-slate-600">
+                                Optional transition restrictions: {roleRules.length === 0 ? "not configured" : `${roleRules.filter((rule) => rule.active).length}/${roleRules.length} active`}.
+                              </p>
+                            </div>
+                          </section>
+
+                          <details className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+                            <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Technical Metadata</summary>
+                            <dl className="mt-2">
+                              <DetailRow label="Transition ID" value={transition.id} />
+                              <DetailRow label="From key" value={from.key || "UNKNOWN"} />
+                              <DetailRow label="Action key" value={transition.actionKey || "UNKNOWN"} />
+                              <DetailRow label="To key" value={to.key || "UNKNOWN"} />
+                              <DetailRow label="Transition active" value={transition.active ? "Active" : "Inactive"} />
+                              <DetailRow label="System / protected" value={`${transition.systemTransition ? "System" : "Custom"} / ${protectedRecord ? "Protected" : "Editable"}`} />
+                              <DetailRow label="Sort order" value={transition.sortOrder ?? "Not set"} />
+                            </dl>
+                          </details>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 border-t border-slate-200 px-4 py-4">
+                          <button
+                            type="button"
+                            onClick={() => openTransitionForm(transition)}
+                            disabled={protectedRecord}
+                            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => requestRuleChange({ scope: "category", transition, category: selectedCategory, rule: selectedCategoryRule, nextActive: !selectedCategoryRule?.active })}
+                            disabled={!selectedCategory || isSavingRule}
+                            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-200 px-3 py-2 text-xs font-extrabold text-amber-800 hover:bg-amber-50 disabled:opacity-50"
+                          >
+                            {selectedCategoryRule?.active ? "Disable Category Rule" : "Enable Category Rule"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => requestTransitionStateChange(transition, !transition.active)}
+                            disabled={protectedRecord}
+                            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-50"
+                          >
+                            {transition.active ? "Disable Transition" : "Enable Transition"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openTransitionDrawer(transition)}
+                            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50"
+                          >
+                            Full Details
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </aside>
 	            </div>
+            </div>
 	          )}
 
           {activeTab === "statuses" && (
@@ -4135,7 +4395,10 @@ export default function WorkflowManagement() {
               </div>
 
               <div>
-                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">Selected Category Transition Role Rules</h2>
+                <h2 className="mb-2 text-sm font-extrabold uppercase text-slate-600">Selected Category Optional Transition Restrictions</h2>
+                <p className="mb-3 max-w-4xl text-sm font-semibold text-slate-600">
+                  Action permission decides who can use an action. Transition role scope is optional and narrows that action permission for a specific transition. If no transition role scope is configured, all roles with action permission can use the transition.
+                </p>
                 <TableShell minWidth="min-w-[1040px]">
                   <thead>
                     <tr>
@@ -4170,7 +4433,7 @@ export default function WorkflowManagement() {
                                     disabled={isSavingRule || (scopeState === "full" && !rule)}
                                     className="inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                                   >
-                                    {scopeState === "full" ? "Disable Scope" : "Enable Scope"}
+                                    {scopeState === "full" ? "Remove Restriction" : "Restrict by Role"}
                                   </button>
                                 </div>
                               </BodyCell>

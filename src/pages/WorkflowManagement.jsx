@@ -102,6 +102,16 @@ function normalizeArray(data, key) {
   return Array.isArray(data) ? data : Array.isArray(data?.[key]) ? data[key] : [];
 }
 
+function normalizeRulesByTransitionId(data) {
+  const rulesByTransitionId = data?.rulesByTransitionId || {};
+  return Object.fromEntries(
+    Object.entries(rulesByTransitionId).map(([transitionId, rules]) => [
+      transitionId,
+      Array.isArray(rules) ? rules : [],
+    ])
+  );
+}
+
 function normalizeRules(rules, keyName = "accessKey") {
   const next = {};
   if (!Array.isArray(rules)) return next;
@@ -1982,32 +1992,31 @@ export default function WorkflowManagement() {
   ];
 
   const loadTransitionRules = useCallback(async (nextTransitions) => {
-    const categoryRuleEntries = await Promise.all(
-      nextTransitions.map(async (transition) => {
-        try {
-          const response = await fetch(`/volt/workflow/transitions/${transition.id}/category-rules`, { headers: authHeaders() });
-          if (!response.ok) throw new Error("Category rules request failed");
-          return [transition.id, normalizeArray(await response.json(), "rules")];
-        } catch {
-          return [transition.id, []];
-        }
-      })
+    const emptyRulesByTransitionId = Object.fromEntries(
+      nextTransitions.map((transition) => [String(transition.id), []])
     );
+    const [categoryResponse, roleResponse] = await Promise.all([
+      fetch("/volt/workflow/transition-category-rules", { headers: authHeaders() }),
+      fetch("/volt/workflow/transition-role-rules", { headers: authHeaders() }),
+    ]);
 
-    const roleRuleEntries = await Promise.all(
-      nextTransitions.map(async (transition) => {
-        try {
-          const response = await fetch(`/volt/workflow/transitions/${transition.id}/role-rules`, { headers: authHeaders() });
-          if (!response.ok) throw new Error("Role rules request failed");
-          return [transition.id, normalizeArray(await response.json(), "rules")];
-        } catch {
-          return [transition.id, []];
-        }
-      })
-    );
+    if (!categoryResponse.ok || !roleResponse.ok) {
+      throw new Error("Unable to load workflow transition rules.");
+    }
 
-    setCategoryRulesByTransitionId(Object.fromEntries(categoryRuleEntries));
-    setRoleRulesByTransitionId(Object.fromEntries(roleRuleEntries));
+    const [categoryData, roleData] = await Promise.all([
+      categoryResponse.json(),
+      roleResponse.json(),
+    ]);
+
+    setCategoryRulesByTransitionId({
+      ...emptyRulesByTransitionId,
+      ...normalizeRulesByTransitionId(categoryData),
+    });
+    setRoleRulesByTransitionId({
+      ...emptyRulesByTransitionId,
+      ...normalizeRulesByTransitionId(roleData),
+    });
   }, []);
 
   const loadSingleTransitionRules = useCallback(async (transitionId) => {

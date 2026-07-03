@@ -339,6 +339,44 @@ function getTransitionAccessSummary(transition, activeRoles, roleAccessByRoleId,
   };
 }
 
+function buildBusinessPathSummary(transitions) {
+  if (!Array.isArray(transitions) || transitions.length === 0) {
+    return { label: "No active workflow path configured", note: "Create or enable selected-category transitions to define the path." };
+  }
+
+  const sortedTransitions = [...transitions].sort((left, right) => {
+    const leftOrder = left.sortOrder ?? Number.MAX_SAFE_INTEGER;
+    const rightOrder = right.sortOrder ?? Number.MAX_SAFE_INTEGER;
+    return leftOrder - rightOrder || String(left.id).localeCompare(String(right.id));
+  });
+  const first = sortedTransitions[0];
+  const labels = [getStatusLabel(first, "from").label];
+  sortedTransitions.forEach((transition) => {
+    const nextLabel = getStatusLabel(transition, "to").label;
+    if (labels[labels.length - 1] !== nextLabel) labels.push(nextLabel);
+  });
+
+  return {
+    label: labels.join(" -> "),
+    note: `${sortedTransitions.length} active path${sortedTransitions.length === 1 ? "" : "s"} configured`,
+  };
+}
+
+function getStatusPathUsage(status, transitions) {
+  const statusId = String(status?.id ?? "");
+  const statusKey = String(status?.statusKey || "").toUpperCase();
+  const incoming = transitions.filter((transition) => String(transition.toStatusId ?? "") === statusId
+    || String(transition.toStatusKey || transition.toStatus || "").toUpperCase() === statusKey).length;
+  const outgoing = transitions.filter((transition) => String(transition.fromStatusId ?? "") === statusId
+    || String(transition.fromStatusKey || transition.fromStatus || "").toUpperCase() === statusKey).length;
+
+  return { incoming, outgoing, label: `${incoming} in / ${outgoing} out` };
+}
+
+function getActionTransitionUsage(action, transitions) {
+  return transitions.filter((transition) => transition.actionKey === action?.actionKey);
+}
+
 function normalizeKey(value) {
   return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
 }
@@ -1117,15 +1155,6 @@ function getCategoryRuleLabel(rule, selectedCategoryId) {
   return "Unconfigured";
 }
 
-function isCancelTransition(transition) {
-  return [
-    transition?.actionKey,
-    transition?.displayName,
-    transition?.toStatusKey,
-    transition?.toStatusDisplayName,
-  ].some((value) => String(value || "").toUpperCase().includes("CANCEL"));
-}
-
 function layoutWorkflowElements(nodes, edges, direction) {
   const graph = new dagre.graphlib.Graph();
   graph.setDefaultEdgeLabel(() => ({}));
@@ -1170,7 +1199,7 @@ function WorkflowStatusFlowNode({ data, selected }) {
         {protectedRecord && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[0.62rem] font-extrabold uppercase text-slate-700">Protected</span>}
         {isInactive && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[0.62rem] font-extrabold uppercase text-slate-700">Inactive</span>}
       </div>
-      <p className="mt-1 truncate text-[0.66rem] font-bold uppercase text-slate-500">{data.status.statusKey || "UNKNOWN"}</p>
+      <p className="mt-1 truncate text-[0.66rem] font-bold uppercase text-slate-500">{data.status.behaviorBucket ? formatLabel(data.status.behaviorBucket) : "Behavior not set"}</p>
     </div>
   );
 }
@@ -1181,6 +1210,7 @@ function buildWorkflowMapData({
   actionByKey,
   categoryRulesByTransitionId,
   selectedCategoryId,
+  transitionRuntimeById,
   showInactivePaths,
   layoutDirection,
 }) {
@@ -1238,24 +1268,31 @@ function buildWorkflowMapData({
     const toStatus = getTransitionStatus(transition, "to", statusById, statusByKey);
     const action = actionByKey[transition.actionKey];
     const disabled = !transition.active || Boolean(selectedCategoryId && !rule?.active);
-    const cancel = isCancelTransition(transition);
-    const edgeColor = disabled ? "#94a3b8" : cancel ? "#dc2626" : "#2563eb";
+    const runtimeState = transitionRuntimeById?.[String(transition.id)] || { label: disabled ? "Inactive" : "Executable", tone: disabled ? "slate" : "green" };
+    const edgeColor = runtimeState.label === "Blocked"
+      ? "#dc2626"
+      : runtimeState.label === "Warning"
+      ? "#d97706"
+      : runtimeState.label === "Inactive"
+      ? "#94a3b8"
+      : "#2563eb";
+    const displayLabel = transition.displayName || action?.displayName || formatLabel(transition.actionKey);
 
     return {
       id: transitionEdgeId(transition),
       source: statusNodeId(fromStatus),
       target: statusNodeId(toStatus),
-      label: transition.displayName || action?.displayName || formatLabel(transition.actionKey),
+      label: `${displayLabel} - ${runtimeState.label}`,
       type: "smoothstep",
-      animated: !disabled,
+      animated: runtimeState.label === "Executable",
       markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
       style: {
         stroke: edgeColor,
-        strokeWidth: disabled ? 1.5 : 2.4,
-        strokeDasharray: disabled ? "7 6" : undefined,
+        strokeWidth: runtimeState.label === "Inactive" ? 1.5 : 2.4,
+        strokeDasharray: runtimeState.label === "Inactive" ? "7 6" : undefined,
       },
       labelStyle: {
-        fill: disabled ? "#64748b" : "#0f172a",
+        fill: runtimeState.label === "Inactive" ? "#64748b" : "#0f172a",
         fontWeight: 800,
         fontSize: 12,
       },
@@ -1270,6 +1307,7 @@ function buildWorkflowMapData({
         toStatus,
         selectedCategoryRule: rule,
         categoryRuleLabel: getCategoryRuleLabel(rule, selectedCategoryId),
+        runtimeState,
       },
     };
   });
@@ -1281,12 +1319,24 @@ function buildWorkflowMapData({
   };
 }
 
-function ReadOnlyWorkflowMapDetails({ selectedItem, selectedCategory }) {
+function ReadOnlyWorkflowMapDetails({
+  selectedItem,
+  selectedCategory,
+  selectedCategoryId,
+  categoryRulesByTransitionId,
+  roleRulesByTransitionId,
+  activeRoles,
+  roleAccessByRoleId,
+  transitionIssueRowsById,
+  validationGuidanceRows,
+}) {
   if (!selectedItem) {
     return (
       <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <MapPanelSection title="Map Details">
-          <p className="text-sm font-semibold text-slate-600">Select a status node or transition arrow to inspect read-only workflow details.</p>
+        <MapPanelSection title="Map Inspector">
+          <p className="text-sm font-semibold text-slate-600">
+            Select a status or transition on the map to inspect readiness, access, category rule, and technical metadata.
+          </p>
         </MapPanelSection>
         <MapPanelSection title="Scope">
           <dl>
@@ -1300,20 +1350,54 @@ function ReadOnlyWorkflowMapDetails({ selectedItem, selectedCategory }) {
 
   if (selectedItem.type === "status") {
     const status = selectedItem.data.status;
+    const statusKey = String(status.statusKey || "").toUpperCase();
+    const statusId = String(status.id ?? "");
+    const statusIssues = validationGuidanceRows.filter((row) => {
+      const transition = row.transition;
+      if (!transition) return false;
+      return [transition.fromStatusId, transition.toStatusId].some((id) => id != null && String(id) === statusId)
+        || [transition.fromStatusKey || transition.fromStatus, transition.toStatusKey || transition.toStatus]
+          .some((key) => String(key || "").toUpperCase() === statusKey);
+    });
+
     return (
       <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
-        <MapPanelSection title="Status Details">
+        <MapPanelSection title="Selected Status">
+          <div className="flex flex-wrap gap-2">
+            <Badge tone={status.active ? "green" : "red"}>{status.active ? "Active" : "Inactive"}</Badge>
+            <Badge tone={status.terminal ? "green" : "slate"}>{status.terminal ? "Terminal" : "Non-terminal"}</Badge>
+            <Badge tone={isProtectedStatus(status) ? "yellow" : "blue"}>{isProtectedStatus(status) ? "Protected" : "Custom"}</Badge>
+          </div>
           <dl>
             <DetailRow label="Display Name" value={status.displayName || formatLabel(status.statusKey)} />
-            <DetailRow label="Status Key" value={status.statusKey} />
-            <DetailRow label="Active" value={status.active ? "Active" : "Inactive"} />
-            <DetailRow label="Terminal" value={status.terminal ? "Yes" : "No"} />
-            <DetailRow label="System / Protected" value={`${status.systemStatus ? "System" : "Custom"} / ${isProtectedStatus(status) ? "Protected" : "Editable"}`} />
             <DetailRow label="Behavior Bucket" value={status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"} />
+            <DetailRow label="Used in Selected Category Path" value={selectedItem.data.incomingCount || selectedItem.data.outgoingCount ? "Yes" : "No"} />
             <DetailRow label="Incoming Transitions" value={selectedItem.data.incomingCount} />
             <DetailRow label="Outgoing Transitions" value={selectedItem.data.outgoingCount} />
           </dl>
         </MapPanelSection>
+        <MapPanelSection title="Validation Issues">
+          {statusIssues.length === 0 && <p className="text-sm font-semibold text-slate-600">No validation issue is currently linked to this status.</p>}
+          <div className="space-y-2">
+            {statusIssues.map((row, index) => (
+              <div key={`${row.issue?.code || "issue"}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={row.warning ? "yellow" : "red"}>{row.warning ? "Warning" : "Blocker"}</Badge>
+                  <span className="break-all text-xs font-extrabold uppercase text-slate-500">{row.issue?.code || "ISSUE"}</span>
+                </div>
+                <p className="mt-1 text-sm font-semibold text-slate-700">{row.guidance.explanation}</p>
+              </div>
+            ))}
+          </div>
+        </MapPanelSection>
+        <MapDisclosureSection title="Technical Metadata">
+          <dl>
+            <DetailRow label="Status Key" value={status.statusKey} />
+            <DetailRow label="Status ID" value={status.id ?? "Not available"} />
+            <DetailRow label="System / Protected" value={`${status.systemStatus ? "System" : "Custom"} / ${isProtectedStatus(status) ? "Protected" : "Editable"}`} />
+            <DetailRow label="Sort Order" value={status.sortOrder ?? "Not set"} />
+          </dl>
+        </MapDisclosureSection>
       </aside>
     );
   }
@@ -1322,21 +1406,54 @@ function ReadOnlyWorkflowMapDetails({ selectedItem, selectedCategory }) {
   const fromStatus = selectedItem.data.fromStatus;
   const toStatus = selectedItem.data.toStatus;
   const action = selectedItem.data.action;
+  const runtimeState = selectedItem.data.runtimeState || { label: "Executable", tone: "green", detail: "No runtime blocker is currently known for this transition." };
+  const categoryState = getRuleVisualState(getSelectedCategoryRule(transition, selectedCategoryId, categoryRulesByTransitionId));
+  const accessSummary = getTransitionAccessSummary(transition, activeRoles, roleAccessByRoleId, roleRulesByTransitionId);
+  const roleRules = roleRulesByTransitionId[transition.id] || [];
+  const transitionIssues = transitionIssueRowsById[String(transition.id)] || [];
 
   return (
     <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
-      <MapPanelSection title="Transition Details">
+      <MapPanelSection title="Selected Transition">
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={runtimeState.tone}>{runtimeState.label}</Badge>
+          <Badge tone={categoryState.tone}>Rule: {categoryState.label}</Badge>
+          <Badge tone={accessSummary.tone}>{accessSummary.label}</Badge>
+        </div>
         <dl>
-          <DetailRow label="Transition / Action" value={transition.displayName || action?.displayName || formatLabel(transition.actionKey)} />
-          <DetailRow label="From Status" value={fromStatus.displayName || formatLabel(fromStatus.statusKey)} />
-          <DetailRow label="To Status" value={toStatus.displayName || formatLabel(toStatus.statusKey)} />
-          <DetailRow label="Action Key" value={transition.actionKey} />
-          <DetailRow label="Action Display Name" value={action?.displayName || transition.displayName || formatLabel(transition.actionKey)} />
-          <DetailRow label="Transition Active" value={transition.active ? "Active" : "Inactive"} />
-          <DetailRow label="System / Protected" value={`${transition.systemTransition ? "System" : "Custom"} / ${isProtectedTransition(transition) ? "Protected" : "Editable"}`} />
-          <DetailRow label="Selected Category Rule" value={selectedItem.data.categoryRuleLabel} />
+          <DetailRow label="From" value={fromStatus.displayName || formatLabel(fromStatus.statusKey)} />
+          <DetailRow label="Action" value={transition.displayName || action?.displayName || formatLabel(transition.actionKey)} />
+          <DetailRow label="To" value={toStatus.displayName || formatLabel(toStatus.statusKey)} />
+          <DetailRow label="Runtime Readiness" value={runtimeState.detail || runtimeState.label} />
+          <DetailRow label="Action Access Summary" value={accessSummary.detail} />
+          <DetailRow label="Optional Transition Restriction" value={roleRules.length === 0 ? "Not configured; open to action-authorized roles." : `${roleRules.filter((rule) => rule.active).length}/${roleRules.length} restrictions active.`} />
         </dl>
       </MapPanelSection>
+      <MapPanelSection title="Validation Issues">
+        {transitionIssues.length === 0 && <p className="text-sm font-semibold text-slate-600">No validation issue is currently linked to this transition.</p>}
+        <div className="space-y-2">
+          {transitionIssues.map((row, index) => (
+            <div key={`${row.issue?.code || "issue"}-${index}`} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone={row.warning ? "yellow" : "red"}>{row.warning ? "Warning" : "Blocker"}</Badge>
+                <span className="break-all text-xs font-extrabold uppercase text-slate-500">{row.issue?.code || "ISSUE"}</span>
+              </div>
+              <p className="mt-1 text-sm font-semibold text-slate-700">{row.guidance.explanation}</p>
+              <p className="mt-1 text-xs font-bold text-blue-950">{row.guidance.fix}</p>
+            </div>
+          ))}
+        </div>
+      </MapPanelSection>
+      <MapDisclosureSection title="Technical Metadata">
+        <dl>
+          <DetailRow label="Transition ID" value={transition.id} />
+          <DetailRow label="From Status Key" value={fromStatus.statusKey || transition.fromStatusKey || transition.fromStatus || "UNKNOWN"} />
+          <DetailRow label="Action Key" value={transition.actionKey} />
+          <DetailRow label="To Status Key" value={toStatus.statusKey || transition.toStatusKey || transition.toStatus || "UNKNOWN"} />
+          <DetailRow label="System / Protected" value={`${transition.systemTransition ? "System" : "Custom"} / ${isProtectedTransition(transition) ? "Protected" : "Editable"}`} />
+          <DetailRow label="Sort Order" value={transition.sortOrder ?? "Not set"} />
+        </dl>
+      </MapDisclosureSection>
     </aside>
   );
 }
@@ -1346,6 +1463,7 @@ function WorkflowMapView({
   transitions,
   configuredTransitionCount,
   actionByKey,
+  transitionRuntimeById,
   onSelectItem,
   selectedCategory,
   isLegacyWorkflowMode,
@@ -1361,9 +1479,10 @@ function WorkflowMapView({
     actionByKey,
     categoryRulesByTransitionId,
     selectedCategoryId,
+    transitionRuntimeById,
     showInactivePaths,
     layoutDirection,
-  }), [actionByKey, categoryRulesByTransitionId, layoutDirection, selectedCategoryId, showInactivePaths, statuses, transitions]);
+  }), [actionByKey, categoryRulesByTransitionId, layoutDirection, selectedCategoryId, showInactivePaths, statuses, transitionRuntimeById, transitions]);
 
   const hasNoStatuses = !isLoadingCategoryWorkflow && statuses.length === 0;
   const hasNoTransitions = !isLoadingCategoryWorkflow && transitions.length === 0;
@@ -1444,9 +1563,10 @@ function WorkflowMapView({
       </div>
 
       <div className="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
-        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm bg-blue-600" /> Active transition</span>
-        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm border border-slate-400 bg-white" /> Disabled/unconfigured</span>
-        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm bg-red-600" /> Cancel path</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm bg-blue-600" /> Executable transition</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm bg-yellow-600" /> Warning</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm bg-red-600" /> Blocked</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm border border-slate-400 bg-white" /> Inactive</span>
         <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded border-2 border-emerald-500 bg-emerald-50" /> Terminal status</span>
         <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded border-2 border-blue-300 bg-white" /> Normal status</span>
       </div>
@@ -2336,6 +2456,10 @@ export default function WorkflowManagement() {
     : categoryWorkflowConfig?.dbWorkflowEnabled
     ? categoryWorkflowTransitions.length > 0 ? "Active in Test" : "No Active Paths"
     : "Validation Needed";
+  const businessPathSummary = useMemo(
+    () => buildBusinessPathSummary(categoryWorkflowTransitions),
+    [categoryWorkflowTransitions]
+  );
   const summaryTiles = [
     { label: "Mode", value: workflowModeLabel, icon: Database, tone: "text-blue-600" },
     { label: "Status", value: workflowStatusLabel, icon: CheckCircle2, tone: categoryWorkflowConfig?.dbWorkflowEnabled && categoryWorkflowTransitions.length > 0 ? "text-emerald-600" : "text-amber-600" },
@@ -3791,6 +3915,7 @@ export default function WorkflowManagement() {
                   transitions={transitions}
                   configuredTransitionCount={selectedCategoryConfiguredTransitions.length}
                   actionByKey={actionByKey}
+                  transitionRuntimeById={transitionRuntimeById}
                   onSelectItem={setSelectedMapItem}
                   selectedCategory={selectedCategory}
                   isLegacyWorkflowMode={isLegacyWorkflowMode}
@@ -3803,22 +3928,29 @@ export default function WorkflowManagement() {
               <ReadOnlyWorkflowMapDetails
                 selectedItem={selectedMapItem}
                 selectedCategory={selectedCategory}
+                selectedCategoryId={selectedCategoryId}
+                categoryRulesByTransitionId={categoryRulesByTransitionId}
+                roleRulesByTransitionId={roleRulesByTransitionId}
+                activeRoles={activeRoles}
+                roleAccessByRoleId={roleAccessByRoleId}
+                transitionIssueRowsById={transitionIssueRowsById}
+                validationGuidanceRows={validationGuidanceRows}
               />
             </div>
           )}
 
           {activeTab === "overview" && (
             <div className="space-y-4">
-              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+              <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
                 <section className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                     <div>
-                      <p className="text-xs font-extrabold uppercase text-slate-500">Readiness Dashboard</p>
-                      <h2 className="mt-1 text-xl font-extrabold text-blue-950">
-                        {readyToActivate ? "Workflow is ready" : validationForSelectedCategory ? "Workflow needs fixes" : "Workflow needs validation"}
+                      <p className="text-xs font-extrabold uppercase text-slate-500">Business Readiness</p>
+                      <h2 className={`mt-1 text-2xl font-extrabold ${readyToActivate ? "text-green-700" : validationForSelectedCategory ? "text-red-700" : "text-blue-950"}`}>
+                        {readyToActivate ? "Workflow is ready" : validationForSelectedCategory ? "Workflow is not ready" : "Workflow has not been checked"}
                       </h2>
                       <p className="mt-2 text-sm font-semibold text-slate-600">
-                        {selectedCategory?.displayName || "No category selected"} uses {businessWorkflowMode(categoryWorkflowConfig).toLowerCase()}.
+                        {selectedCategory?.displayName || "No category selected"} uses {workflowModeLabel.toLowerCase()}.
                       </p>
                     </div>
                     <button
@@ -3831,52 +3963,72 @@ export default function WorkflowManagement() {
                     </button>
                   </div>
 
-                  <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="mt-4 grid gap-3 lg:grid-cols-4">
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                      <p className="text-xs font-extrabold uppercase text-slate-500">Current workflow mode</p>
-                      <p className="mt-1 text-sm font-extrabold text-blue-950">{businessWorkflowMode(categoryWorkflowConfig)}</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-600">
-                        {categoryWorkflowConfig?.dbWorkflowEnabled ? "DB workflow currently live" : "DB workflow is not live"}
+                      <p className="text-xs font-extrabold uppercase text-slate-500">Mode</p>
+                      <p className="mt-1 text-sm font-extrabold text-blue-950">{workflowModeLabel}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                      <p className="text-xs font-extrabold uppercase text-slate-500">DB Workflow</p>
+                      <p className={`mt-1 text-sm font-extrabold ${categoryWorkflowConfig?.dbWorkflowEnabled ? "text-green-700" : "text-amber-700"}`}>
+                        {categoryWorkflowConfig?.dbWorkflowEnabled ? "Live" : "Not live"}
                       </p>
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-                      <p className="text-xs font-extrabold uppercase text-slate-500">Main blocker</p>
-                      <p className="mt-1 text-sm font-extrabold text-blue-950">{nextBestAction?.reason || "No blocker found."}</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-600">Recommended next action: {nextBestAction?.label || "Review workflow"}</p>
+                      <p className="text-xs font-extrabold uppercase text-slate-500">Readiness</p>
+                      <p className={`mt-1 text-sm font-extrabold ${validationStatus === "Ready" ? "text-green-700" : validationStatus === "Not Ready" ? "text-red-700" : "text-slate-700"}`}>
+                        {validationStatus}
+                      </p>
                     </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                      <p className="text-xs font-extrabold uppercase text-slate-500">Issues</p>
+                      <p className="mt-1 text-sm font-extrabold text-blue-950">{blockingIssueCount} blockers / {warningCount} warnings</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                    <p className="text-xs font-extrabold uppercase text-blue-950">Next best action</p>
+                    <p className="mt-1 text-sm font-extrabold text-blue-950">{nextBestAction?.label || "Review workflow"}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-700">{nextBestAction?.reason || "No blocker found."}</p>
                   </div>
                 </section>
 
                 <section className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                  <p className="text-xs font-extrabold uppercase text-slate-500">Configuration Snapshot</p>
-                  <dl className="mt-3 space-y-3 text-sm font-semibold text-slate-700">
+                  <p className="text-xs font-extrabold uppercase text-slate-500">Active Path Summary</p>
+                  <h3 className="mt-1 text-lg font-extrabold text-blue-950">Workflow path</h3>
+                  <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                    <p className="break-words text-sm font-extrabold text-blue-950">{businessPathSummary.label}</p>
+                    <p className="mt-2 text-sm font-semibold text-slate-600">{businessPathSummary.note}</p>
+                  </div>
+                  <div className="mt-3 space-y-3 text-sm font-semibold text-slate-700">
                     <div className="flex items-center justify-between gap-3">
-                      <dt>Status metadata used</dt>
-                      <dd className="font-extrabold text-blue-950">{selectedCategoryConfiguredStatuses.length}</dd>
+                      <span>Terminal status</span>
+                      <span className="text-right font-extrabold text-blue-950">{terminalStatusLabel}</span>
                     </div>
                     <div className="flex items-center justify-between gap-3">
-                      <dt>Action metadata used</dt>
-                      <dd className="font-extrabold text-blue-950">{selectedCategoryConfiguredActions.length}</dd>
+                      <span>Configured actions</span>
+                      <span className="font-extrabold text-blue-950">{configuredActionCount}</span>
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt>Category transitions</dt>
-                      <dd className="font-extrabold text-blue-950">{selectedCategoryConfiguredTransitions.length}</dd>
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                      <dt>Validation</dt>
-                      <dd><Badge tone={validationStatus === "Ready" ? "green" : validationStatus === "Not Ready" ? "red" : "yellow"}>{validationStatus}</Badge></dd>
-                    </div>
-                  </dl>
+                  </div>
                 </section>
               </div>
 
               <details className="rounded-lg border border-slate-200 bg-white px-4 py-3">
                 <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Advanced Technical State</summary>
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <DetailRow label="Category ID" value={selectedCategory?.id || "Not selected"} />
                   <DetailRow label="Selected Category Key" value={selectedCategory?.categoryKey || "Not selected"} />
                   <DetailRow label="Raw Workflow Mode" value={categoryWorkflowConfig?.workflowMode || "Not loaded"} />
-                  <DetailRow label="DB Workflow Currently Live" value={categoryWorkflowConfig?.dbWorkflowEnabled ? "Yes" : "No"} />
-                  <DetailRow label="Fixed Workflow Actions Enabled" value={categoryWorkflowConfig?.fixedActionsEnabled ? "Yes" : "No"} />
+                  <DetailRow label="dbWorkflowEnabled" value={String(Boolean(categoryWorkflowConfig?.dbWorkflowEnabled))} />
+                  <DetailRow label="fixedActionsEnabled" value={String(Boolean(categoryWorkflowConfig?.fixedActionsEnabled))} />
+                  <DetailRow label="Raw Status Count" value={selectedCategoryConfiguredStatuses.length} />
+                  <DetailRow label="Raw Action Count" value={selectedCategoryConfiguredActions.length} />
+                  <DetailRow label="Raw Transition Count" value={selectedCategoryConfiguredTransitions.length} />
+                  <DetailRow label="Backend Validation State" value={validationForSelectedCategory ? JSON.stringify({ valid: validationResult.valid, readyToActivate: validationResult.readyToActivate }) : "Not run for selected category"} />
+                  <DetailRow label="Issue Codes" value={validationForSelectedCategory ? [...(validationResult.blockingIssues || validationResult.issues || []), ...(validationResult.warnings || [])].map((issue) => issue.code || "ISSUE").join(", ") || "None" : "Not available"} />
+                  <DetailRow label="Protected/System Statuses" value={`${selectedCategoryConfiguredStatuses.filter(isProtectedStatus).length} protected/system`} />
+                  <DetailRow label="Protected/System Actions" value={`${selectedCategoryConfiguredActions.filter(isProtectedAction).length} protected/system`} />
+                  <DetailRow label="Protected/System Transitions" value={`${selectedCategoryConfiguredTransitions.filter(isProtectedTransition).length} protected/system`} />
                 </div>
               </details>
             </div>
@@ -4250,7 +4402,13 @@ export default function WorkflowManagement() {
 
           {activeTab === "statuses" && (
             <div className="space-y-3">
-              <div className="flex justify-end">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                  <h2 className="text-base font-extrabold text-blue-950">Selected Category Statuses</h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                    Statuses describe where a ticket is in this workflow. Behavior bucket controls the underlying ticket behavior.
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => openStatusForm()}
@@ -4259,39 +4417,45 @@ export default function WorkflowManagement() {
                   Create Global Status Metadata
                 </button>
               </div>
-              <p className="text-sm font-semibold text-slate-600">Selected-category statuses below come from this category's transitions. New status metadata becomes available for transition creation, then appears here after a selected-category transition uses it.</p>
-              <TableShell minWidth="min-w-[1040px]">
+              <div className="flex flex-wrap gap-2">
+                <Badge tone="blue">Used in path: {selectedCategoryConfiguredStatuses.length}</Badge>
+                <Badge tone="green">Custom: {selectedCategoryConfiguredStatuses.filter((status) => !status.systemStatus && !isProtectedStatus(status)).length}</Badge>
+                <Badge tone="yellow">Protected: {selectedCategoryConfiguredStatuses.filter(isProtectedStatus).length}</Badge>
+                <Badge tone="red">Inactive: {selectedCategoryConfiguredStatuses.filter((status) => !status.active).length}</Badge>
+                <Badge tone="slate">Terminal: {selectedCategoryConfiguredStatuses.filter((status) => status.terminal).length}</Badge>
+              </div>
+              <TableShell minWidth="min-w-[980px]">
                 <thead>
                   <tr>
                     <HeaderCell>Display Name</HeaderCell>
-                    <HeaderCell>Status Key</HeaderCell>
                     <HeaderCell>Behavior Bucket</HeaderCell>
                     <HeaderCell>Terminal</HeaderCell>
                     <HeaderCell>Active</HeaderCell>
-                    <HeaderCell>System/Protected</HeaderCell>
-                    <HeaderCell>Sort Order</HeaderCell>
+                    <HeaderCell>Used In Path</HeaderCell>
                     <HeaderCell>Actions</HeaderCell>
                   </tr>
                 </thead>
                 <tbody>
-                  {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={8}>Loading workflow statuses for selected category...</EmptyRows>}
-                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredStatuses.length === 0 && <EmptyRows colSpan={8}>No workflow statuses are used by the selected category workflow yet.</EmptyRows>}
+                  {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={6}>Loading workflow statuses for selected category...</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredStatuses.length === 0 && <EmptyRows colSpan={6}>No workflow statuses are used by the selected category workflow yet.</EmptyRows>}
                   {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredStatuses.map((status) => {
                     const protectedRecord = isProtectedStatus(status);
+                    const usage = getStatusPathUsage(status, selectedCategoryConfiguredTransitions);
                     return (
                       <tr key={status.id ?? status.statusKey} onClick={() => openStatusDrawer(status)} className="cursor-pointer hover:bg-blue-50/50">
-                        <BodyCell><span className="font-bold text-blue-950">{status.displayName || formatLabel(status.statusKey)}</span></BodyCell>
-                        <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{status.statusKey || "UNKNOWN"}</span></BodyCell>
-                        <BodyCell>{status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"}</BodyCell>
-                        <BodyCell><Badge tone={status.terminal ? "red" : "slate"}>{status.terminal ? "Terminal" : "Non-terminal"}</Badge></BodyCell>
-                        <BodyCell><StateBadge enabled={status.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
                         <BodyCell>
-                          <div className="flex flex-wrap gap-1.5">
+                          <span className="font-bold text-blue-950">{status.displayName || formatLabel(status.statusKey)}</span>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
                             <Badge tone={status.systemStatus ? "blue" : "slate"}>{status.systemStatus ? "System" : "Custom"}</Badge>
                             <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
                           </div>
                         </BodyCell>
-                        <BodyCell>{status.sortOrder ?? "Not set"}</BodyCell>
+                        <BodyCell>{status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"}</BodyCell>
+                        <BodyCell><Badge tone={status.terminal ? "red" : "slate"}>{status.terminal ? "Terminal" : "Non-terminal"}</Badge></BodyCell>
+                        <BodyCell><StateBadge enabled={status.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
+                        <BodyCell>
+                          <Badge tone={usage.incoming || usage.outgoing ? "green" : "slate"}>{usage.label}</Badge>
+                        </BodyCell>
                         <BodyCell>
                           <div className="flex flex-wrap gap-2">
                             <button
@@ -4324,7 +4488,7 @@ export default function WorkflowManagement() {
                 </tbody>
               </TableShell>
               <details className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Advanced Global Status Metadata</summary>
+                <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Global / Advanced Status Metadata</summary>
                 <p className="mt-2 text-sm font-semibold text-slate-600">Global workflow statuses can be created, edited, enabled, or disabled here. These records may belong to another category until a transition and category rule use them.</p>
                 <div className="mt-3">
                   <TableShell minWidth="min-w-[1040px]">
@@ -4342,7 +4506,10 @@ export default function WorkflowManagement() {
                         const protectedRecord = isProtectedStatus(status);
                         return (
                           <tr key={status.id ?? status.statusKey} onClick={() => openStatusDrawer(status)} className="cursor-pointer hover:bg-blue-50/50">
-                            <BodyCell><span className="font-bold text-blue-950">{status.displayName || formatLabel(status.statusKey)}</span></BodyCell>
+                            <BodyCell>
+                              <span className="font-bold text-blue-950">{status.displayName || formatLabel(status.statusKey)}</span>
+                              <span className="mt-1 block text-xs font-semibold text-slate-500">ID: {status.id ?? "Not set"} / Sort: {status.sortOrder ?? "Not set"}</span>
+                            </BodyCell>
                             <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{status.statusKey || "UNKNOWN"}</span></BodyCell>
                             <BodyCell><StateBadge enabled={status.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
                             <BodyCell>
@@ -4370,8 +4537,13 @@ export default function WorkflowManagement() {
 
           {activeTab === "actions" && (
             <div className="space-y-3">
-              <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                <p className="text-sm font-semibold text-slate-600">Selected-category actions below come from this category's transitions. New action metadata becomes available for transition creation, then appears here after a selected-category transition uses it. Creating a custom action does not grant role access automatically.</p>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                  <h2 className="text-base font-extrabold text-blue-950">Selected Category Actions</h2>
+                  <p className="mt-1 text-sm font-semibold text-slate-700">
+                    Actions are buttons users click to move tickets between statuses. Role Access decides who can use each action.
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={() => openActionForm()}
@@ -4380,42 +4552,55 @@ export default function WorkflowManagement() {
                   Create Global Action Metadata
                 </button>
               </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge tone="blue">Used in path: {selectedCategoryConfiguredActions.length}</Badge>
+                <Badge tone="green">Custom: {selectedCategoryConfiguredActions.filter((action) => !action.systemAction && !isProtectedAction(action)).length}</Badge>
+                <Badge tone="yellow">Protected: {selectedCategoryConfiguredActions.filter(isProtectedAction).length}</Badge>
+                <Badge tone="red">Inactive: {selectedCategoryConfiguredActions.filter((action) => !action.active).length}</Badge>
+              </div>
               <TableShell minWidth="min-w-[1120px]">
                 <thead>
                   <tr>
-                    <HeaderCell>Display Name</HeaderCell>
-                    <HeaderCell>Action Key / Access Key</HeaderCell>
+                    <HeaderCell>Button Label / Display Name</HeaderCell>
+                    <HeaderCell>Used By Transition</HeaderCell>
                     <HeaderCell>Active</HeaderCell>
                     <HeaderCell>Requires Comment</HeaderCell>
-                    <HeaderCell>Confirmation Required</HeaderCell>
-                    <HeaderCell>System/Protected</HeaderCell>
-                    <HeaderCell>Sort Order</HeaderCell>
+                    <HeaderCell>Requires Confirmation</HeaderCell>
+                    <HeaderCell>Role Access Summary</HeaderCell>
                     <HeaderCell>Actions</HeaderCell>
                   </tr>
                 </thead>
                 <tbody>
-                  {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={8}>Loading workflow actions for selected category...</EmptyRows>}
-                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredActions.length === 0 && <EmptyRows colSpan={8}>No workflow actions are used by the selected category workflow yet.</EmptyRows>}
+                  {(isLoading || isLoadingCategoryWorkflow) && <EmptyRows colSpan={7}>Loading workflow actions for selected category...</EmptyRows>}
+                  {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredActions.length === 0 && <EmptyRows colSpan={7}>No workflow actions are used by the selected category workflow yet.</EmptyRows>}
                   {!isLoading && !isLoadingCategoryWorkflow && selectedCategoryConfiguredActions.map((action) => {
                     const protectedRecord = isProtectedAction(action);
-                    const metadata = accessKeyByKey[action.actionKey];
+                    const usedTransitions = getActionTransitionUsage(action, selectedCategoryConfiguredTransitions);
+                    const allowedRoleCount = activeRoles.filter((role) => actionAccessState(action.actionKey, role, roleAccessByRoleId) === "full").length;
                     return (
                       <tr key={action.id ?? action.actionKey} onClick={() => openActionDrawer(action)} className="cursor-pointer hover:bg-blue-50/50">
-                        <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
                         <BodyCell>
-                          <BusinessKeyLabel label={metadata?.displayName || action.displayName} technicalKey={action.actionKey} subtle />
-                          <span className="mt-1 block text-xs font-semibold text-slate-600">{metadata ? "Access metadata linked" : "Access metadata pending"}</span>
+                          <span className="font-bold text-blue-950">{action.buttonLabel || action.displayName || formatLabel(action.actionKey)}</span>
+                          <span className="mt-1 block text-xs font-semibold text-slate-600">{action.displayName || formatLabel(action.actionKey)}</span>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            <Badge tone={action.systemAction ? "blue" : "slate"}>{action.systemAction ? "System" : "Custom"}</Badge>
+                            <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
+                          </div>
+                        </BodyCell>
+                        <BodyCell>
+                          <div className="space-y-1">
+                            <Badge tone={usedTransitions.length > 0 ? "green" : "slate"}>{usedTransitions.length} transition{usedTransitions.length === 1 ? "" : "s"}</Badge>
+                            {usedTransitions.slice(0, 2).map((transition) => (
+                              <p key={transition.id} className="text-xs font-semibold text-slate-600">{getStatusLabel(transition, "from").label} to {getStatusLabel(transition, "to").label}</p>
+                            ))}
+                          </div>
                         </BodyCell>
                         <BodyCell><StateBadge enabled={action.active} trueLabel="Active" falseLabel="Inactive" /></BodyCell>
                         <BodyCell><Badge tone={action.requiresComment ? "yellow" : "slate"}>{action.requiresComment ? "Required" : "No"}</Badge></BodyCell>
                         <BodyCell><Badge tone={action.confirmationRequired ? "yellow" : "slate"}>{action.confirmationRequired ? "Required" : "No"}</Badge></BodyCell>
                         <BodyCell>
-                          <div className="flex flex-wrap gap-1.5">
-                            <Badge tone={action.systemAction ? "blue" : "slate"}>{action.systemAction ? "System" : "Custom"}</Badge>
-                            <Badge tone={protectedRecord ? "yellow" : "slate"}>{protectedRecord ? "Protected" : "Editable"}</Badge>
-                          </div>
+                          <Badge tone={allowedRoleCount > 0 ? "green" : "red"}>{allowedRoleCount}/{activeRoles.length} roles</Badge>
                         </BodyCell>
-                        <BodyCell>{action.sortOrder ?? "Not set"}</BodyCell>
                         <BodyCell>
                           <div className="flex flex-wrap gap-2">
                             <button
@@ -4448,7 +4633,7 @@ export default function WorkflowManagement() {
                 </tbody>
               </TableShell>
               <details className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Advanced Global Action Metadata</summary>
+                <summary className="cursor-pointer text-sm font-extrabold text-blue-950">Global / Advanced Action Metadata</summary>
                 <p className="mt-2 text-sm font-semibold text-slate-600">Global workflow actions can be created, edited, enabled, or disabled here. These records may belong to another category until a selected-category transition uses them.</p>
                 <div className="mt-3">
                   <TableShell minWidth="min-w-[1120px]">
@@ -4467,7 +4652,10 @@ export default function WorkflowManagement() {
                         const metadata = accessKeyByKey[action.actionKey];
                         return (
                           <tr key={action.id ?? action.actionKey} onClick={() => openActionDrawer(action)} className="cursor-pointer hover:bg-blue-50/50">
-                            <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
+                            <BodyCell>
+                              <BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} />
+                              <span className="mt-1 block text-xs font-semibold text-slate-500">ID: {action.id ?? "Not set"} / Sort: {action.sortOrder ?? "Not set"}</span>
+                            </BodyCell>
                             <BodyCell>
                               <BusinessKeyLabel label={metadata?.displayName || action.displayName} technicalKey={action.actionKey} subtle />
                               <span className="mt-1 block text-xs font-semibold text-slate-600">{metadata ? "Access metadata linked" : "Access metadata pending"}</span>

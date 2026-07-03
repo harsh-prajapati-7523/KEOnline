@@ -1659,6 +1659,97 @@ function getValidationGuidance(issue, transition, actionByKey) {
   };
 }
 
+function ValidationIssueCard({ row, severity, onOpenTransition, onGoToTab }) {
+  const { issue, transition, guidance } = row;
+  const severityTone = severity === "blocking" ? "red" : severity === "warning" ? "yellow" : "slate";
+  const severityLabel = severity === "blocking" ? "Blocking" : severity === "warning" ? "Warning" : "Informational";
+
+  return (
+    <article className={`rounded-lg border bg-white px-4 py-4 shadow-sm ${severity === "blocking" ? "border-red-200" : severity === "warning" ? "border-yellow-200" : "border-slate-200"}`}>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge tone={severityTone}>{severityLabel}</Badge>
+            {guidance.targetTabs.map((tabLabel) => <Badge key={tabLabel} tone="blue">{tabLabel}</Badge>)}
+          </div>
+          <h3 className="mt-3 text-base font-extrabold text-blue-950">{guidance.explanation}</h3>
+          <p className="mt-2 text-sm font-semibold text-slate-700">{guidance.fix}</p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {transition && (
+            <button
+              type="button"
+              onClick={() => onOpenTransition(transition)}
+              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200 px-3 py-2 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
+            >
+              Select Transition
+            </button>
+          )}
+          {guidance.targetTabs.map((tabLabel) => {
+            const targetTab = tabs.find((tab) => tab.label === tabLabel);
+            return (
+              <button
+                key={tabLabel}
+                type="button"
+                onClick={() => targetTab && onGoToTab(targetTab.id)}
+                disabled={!targetTab}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 px-3 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Open {tabLabel}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <dl className="mt-4 grid gap-3 border-t border-slate-100 pt-3 lg:grid-cols-[minmax(0,1fr)_12rem]">
+        <div>
+          <dt className="text-xs font-extrabold uppercase text-slate-500">Affected item</dt>
+          <dd className="mt-1 break-words text-sm font-bold text-blue-950">{guidance.affected}</dd>
+          {issue?.message && <p className="mt-1 text-xs font-semibold text-slate-500">Backend message: {issue.message}</p>}
+        </div>
+        <div>
+          <dt className="text-xs font-extrabold uppercase text-slate-500">Technical code</dt>
+          <dd className="mt-1 break-all text-xs font-extrabold uppercase text-slate-500">{issue?.code || "ISSUE"}</dd>
+          {issue?.transitionId && <p className="mt-1 text-xs font-bold text-slate-500">Transition #{issue.transitionId}</p>}
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function ValidationIssueSection({ title, description, rows, severity, emptyText, onOpenTransition, onGoToTab }) {
+  const tone = severity === "blocking" ? "border-red-200 bg-red-50 text-red-800" : severity === "warning" ? "border-yellow-200 bg-yellow-50 text-yellow-900" : "border-slate-200 bg-slate-50 text-slate-700";
+
+  return (
+    <section className="space-y-3">
+      <div className={`rounded-lg border px-4 py-3 ${tone}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-extrabold">{title}</h2>
+            <p className="mt-1 text-sm font-semibold">{description}</p>
+          </div>
+          <Badge tone={severity === "blocking" ? "red" : severity === "warning" ? "yellow" : "slate"}>{rows.length}</Badge>
+        </div>
+      </div>
+      {rows.length === 0 && (
+        <div className="rounded-lg border border-slate-200 bg-white px-4 py-4 text-sm font-semibold text-slate-600">
+          {emptyText}
+        </div>
+      )}
+      {rows.map((row, index) => (
+        <ValidationIssueCard
+          key={`${row.issue?.code || severity}-${row.issue?.transitionId ?? "none"}-${index}`}
+          row={row}
+          severity={severity}
+          onOpenTransition={onOpenTransition}
+          onGoToTab={onGoToTab}
+        />
+      ))}
+    </section>
+  );
+}
+
 function MapDetailPanel({
   selectedItem,
   selectedCategory,
@@ -3477,6 +3568,28 @@ export default function WorkflowManagement() {
     };
   });
 
+  const validationIssueGroups = useMemo(() => {
+    const blocking = [];
+    const warning = [];
+    const informational = [];
+
+    validationGuidanceRows.forEach((row) => {
+      if (row.warning) {
+        warning.push(row);
+        return;
+      }
+      blocking.push(row);
+    });
+
+    return { blocking, warning, informational };
+  }, [validationGuidanceRows]);
+
+  const openValidationTransition = (transition) => {
+    if (!transition?.id) return;
+    setSelectedTransitionId(String(transition.id));
+    setActiveTab("transitions");
+  };
+
   const transitionIssueRowsById = useMemo(() => {
     const next = {};
     validationGuidanceRows.forEach((row) => {
@@ -4556,98 +4669,134 @@ export default function WorkflowManagement() {
 
           {activeTab === "validation" && (
             <div className="space-y-4">
-              <div className="flex flex-col gap-3 border border-slate-200 bg-white px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-base font-extrabold text-blue-950">Selected Category Validation</h2>
-                  <p className="mt-1 text-sm font-semibold text-slate-600">
-                    {selectedCategory?.displayName || "No category selected"} / {selectedCategory?.categoryKey || "UNKNOWN"}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => runValidation()}
-                  disabled={!selectedCategoryId || isValidating}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
-                >
-                  <RefreshCw size={16} aria-hidden="true" />
-                  {isValidating ? "Validating..." : "Run Validation"}
-                </button>
-              </div>
-
-              {selectedValidationResult && (
-                <div className="grid gap-3 md:grid-cols-3">
-                  <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-xs font-extrabold uppercase text-slate-500">Validation Result</p>
-                    <p className={`mt-1 text-lg font-extrabold ${(selectedValidationResult.readyToActivate || selectedValidationResult.valid) ? "text-green-700" : "text-red-700"}`}>
-                      {(selectedValidationResult.readyToActivate || selectedValidationResult.valid) ? "Ready" : "Not Ready"}
+              <section className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-xs font-extrabold uppercase text-slate-500">Validation Summary</p>
+                    <h2 className={`mt-1 text-2xl font-extrabold ${readyToActivate ? "text-green-700" : selectedValidationResult ? "text-red-700" : "text-blue-950"}`}>
+                      {selectedValidationResult ? readyToActivate ? "Ready for runtime use" : "Not ready for activation" : "Validation not run"}
+                    </h2>
+                    <p className="mt-2 text-sm font-semibold text-slate-600">
+                      {selectedCategory?.displayName || "No category selected"} / {selectedCategory?.categoryKey || "UNKNOWN"}
+                    </p>
+                    <p className="mt-2 max-w-3xl text-sm font-semibold text-slate-700">
+                      {selectedValidationResult
+                        ? readyToActivate
+                          ? "Backend validation reports that this selected-category workflow is ready for runtime use."
+                          : "Blocking issues must be fixed before this workflow should be activated. Warnings are shown separately and do not block readiness."
+                        : "Run validation to check whether this workflow can be activated."}
                     </p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-xs font-extrabold uppercase text-slate-500">Blocking Issues</p>
-                    <p className="mt-1 text-lg font-extrabold text-blue-950">{(selectedValidationResult.blockingIssues || []).length}</p>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => runValidation()}
+                      disabled={!selectedCategoryId || isValidating}
+                      className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60"
+                    >
+                      <RefreshCw size={16} aria-hidden="true" />
+                      {isValidating ? "Validating..." : "Run Validation"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNextBestAction}
+                      disabled={nextBestAction?.disabled}
+                      className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50 disabled:opacity-50"
+                    >
+                      {nextBestAction?.label || "Review workflow"}
+                    </button>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-xs font-extrabold uppercase text-slate-500">Warnings</p>
-                    <p className="mt-1 text-lg font-extrabold text-blue-950">{(selectedValidationResult.warnings || []).length}</p>
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-extrabold uppercase text-slate-500">Result</p>
+                    <p className={`mt-1 text-lg font-extrabold ${readyToActivate ? "text-green-700" : selectedValidationResult ? "text-red-700" : "text-slate-700"}`}>
+                      {selectedValidationResult ? readyToActivate ? "Ready" : "Not Ready" : "Not run"}
+                    </p>
                   </div>
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3">
+                    <p className="text-xs font-extrabold uppercase text-red-700">Blocking Issues</p>
+                    <p className="mt-1 text-lg font-extrabold text-red-700">{validationIssueGroups.blocking.length}</p>
+                  </div>
+                  <div className="rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3">
+                    <p className="text-xs font-extrabold uppercase text-yellow-800">Warnings</p>
+                    <p className="mt-1 text-lg font-extrabold text-yellow-800">{validationIssueGroups.warning.length}</p>
+                  </div>
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                    <p className="text-xs font-extrabold uppercase text-blue-950">Primary Next Action</p>
+                    <p className="mt-1 text-sm font-extrabold text-blue-950">{nextBestAction?.label || "Review workflow"}</p>
+                    {nextBestAction?.reason && <p className="mt-1 text-xs font-semibold text-slate-700">{nextBestAction.reason}</p>}
+                  </div>
+                </div>
+              </section>
+
+              {!selectedValidationResult && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-5 text-sm font-semibold text-blue-950">
+                  Run validation to check whether this workflow can be activated.
                 </div>
               )}
 
-              <TableShell minWidth="min-w-[1180px]">
-                <thead>
-                  <tr>
-                    <HeaderCell>Issue Type</HeaderCell>
-                    <HeaderCell>Code</HeaderCell>
-                    <HeaderCell>Plain English Explanation</HeaderCell>
-                    <HeaderCell>Affected Item</HeaderCell>
-                    <HeaderCell>Suggested Fix</HeaderCell>
-                    <HeaderCell>Target Tab</HeaderCell>
-                  </tr>
-                </thead>
-                <tbody>
-                  {!selectedValidationResult && <EmptyRows colSpan={6}>Validation has not been run for the selected category. Run validation to confirm backend readiness and get fix guidance.</EmptyRows>}
-                  {selectedValidationResult && validationGuidanceRows.length === 0 && (
-                    <EmptyRows colSpan={6}>No validation issues found for the selected category.</EmptyRows>
-                  )}
-                  {validationGuidanceRows.map(({ issue, transition, guidance, warning }, index) => {
-                    return (
-                      <tr key={`${issue.code}-${issue.transitionId ?? "none"}-${index}`} className={transition ? "cursor-pointer hover:bg-blue-50/50" : ""} onClick={() => transition && openTransitionDrawer(transition)}>
-                        <BodyCell><Badge tone={warning ? "yellow" : "red"}>{warning ? "Warning" : "Blocking"}</Badge></BodyCell>
-                        <BodyCell><span className="break-all text-xs font-extrabold uppercase text-slate-600">{issue.code || "ISSUE"}</span></BodyCell>
-                        <BodyCell>
-                          <p className="font-semibold text-slate-800">{guidance.explanation}</p>
-                          {issue.message && <p className="mt-1 text-xs font-semibold text-slate-500">Backend message: {issue.message}</p>}
-                        </BodyCell>
-                        <BodyCell>
-                          <p className="font-semibold text-blue-950">{guidance.affected}</p>
-                          {issue.transitionId && <p className="mt-1 text-xs font-bold text-slate-500">Transition #{issue.transitionId}</p>}
-                        </BodyCell>
-                        <BodyCell><p className="font-semibold text-slate-700">{guidance.fix}</p></BodyCell>
-                        <BodyCell>
-                          <div className="flex flex-wrap gap-2">
-                            {guidance.targetTabs.map((tabLabel) => {
-                              const targetTab = tabs.find((tab) => tab.label === tabLabel);
-                              return (
-                                <button
-                                  key={tabLabel}
-                                  type="button"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    if (targetTab) setActiveTab(targetTab.id);
-                                  }}
-                                  className="inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-extrabold text-blue-950 hover:bg-blue-50"
-                                >
-                                  {tabLabel}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </BodyCell>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </TableShell>
+              {selectedValidationResult && (
+                <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_24rem]">
+                  <div className="space-y-5">
+                    <ValidationIssueSection
+                      title="Blocking Issues"
+                      description="Fix these before activation. They can prevent the workflow from being ready for runtime use."
+                      rows={validationIssueGroups.blocking}
+                      severity="blocking"
+                      emptyText="No blocking validation issues found."
+                      onOpenTransition={openValidationTransition}
+                      onGoToTab={setActiveTab}
+                    />
+                    <ValidationIssueSection
+                      title="Warnings"
+                      description="Warnings do not block readiness. Review them when you want stricter workflow setup."
+                      rows={validationIssueGroups.warning}
+                      severity="warning"
+                      emptyText="No non-blocking validation warnings found."
+                      onOpenTransition={openValidationTransition}
+                      onGoToTab={setActiveTab}
+                    />
+                    <ValidationIssueSection
+                      title="Informational"
+                      description="Informational notes are for review only and do not indicate a validation failure."
+                      rows={validationIssueGroups.informational}
+                      severity="informational"
+                      emptyText="No informational validation items found."
+                      onOpenTransition={openValidationTransition}
+                      onGoToTab={setActiveTab}
+                    />
+                  </div>
+
+                  <aside className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm 2xl:sticky 2xl:top-4 2xl:max-h-[calc(100vh-2rem)] 2xl:overflow-y-auto">
+                    <p className="text-xs font-extrabold uppercase text-slate-500">Fix Locations</p>
+                    <h2 className="mt-1 text-base font-extrabold text-blue-950">Where to make changes</h2>
+                    <div className="mt-4 space-y-3">
+                      {["Transitions", "Statuses", "Actions", "Role Access", "Map", "Overview"].map((tabLabel) => {
+                        const count = validationGuidanceRows.filter((row) => row.guidance.targetTabs.includes(tabLabel)).length;
+                        const targetTab = tabs.find((tab) => tab.label === tabLabel);
+                        return (
+                          <button
+                            key={tabLabel}
+                            type="button"
+                            onClick={() => targetTab && setActiveTab(targetTab.id)}
+                            disabled={!targetTab || count === 0}
+                            className="flex min-h-11 w-full items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2 text-left text-sm font-bold text-slate-700 hover:bg-blue-50 disabled:opacity-50"
+                          >
+                            <span>{tabLabel}</span>
+                            <Badge tone={count > 0 ? "blue" : "slate"}>{count}</Badge>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold text-slate-600">
+                      Technical issue codes remain visible inside each card for support/debugging, but the primary guidance is plain English and grouped by severity.
+                    </p>
+                  </aside>
+                </div>
+              )}
             </div>
           )}
         </section>

@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Background,
+  Controls,
+  Handle,
+  MarkerType,
+  Position,
+  ReactFlow,
+} from "@xyflow/react";
+import dagre from "dagre";
+import "@xyflow/react/dist/style.css";
+import {
   CheckCircle2,
   Database,
   Flag,
@@ -905,7 +915,7 @@ function WorkflowEdge({ edge, selected, onSelect }) {
   );
 }
 
-function WorkflowMapView({
+function LegacyWorkflowMapView({
   statuses,
   transitions,
   configuredTransitionCount,
@@ -977,6 +987,393 @@ function WorkflowMapView({
           </section>
         ))}
       </div>
+    </div>
+  );
+}
+
+const workflowMapNodeWidth = 190;
+const workflowMapNodeHeight = 86;
+const workflowNodeTypes = { workflowStatus: WorkflowStatusFlowNode };
+
+function statusNodeId(status) {
+  return String(status?.id ?? status?.statusKey ?? "unknown-status");
+}
+
+function transitionEdgeId(transition) {
+  return String(transition?.id ?? `${transition?.fromStatusId ?? transition?.fromStatusKey}-${transition?.actionKey}-${transition?.toStatusId ?? transition?.toStatusKey}`);
+}
+
+function getTransitionStatus(transition, direction, statusById, statusByKey) {
+  const id = direction === "from" ? transition.fromStatusId : transition.toStatusId;
+  const key = direction === "from" ? transition.fromStatusKey || transition.fromStatus : transition.toStatusKey || transition.toStatus;
+  const displayName = direction === "from" ? transition.fromStatusDisplayName : transition.toStatusDisplayName;
+  const active = direction === "from" ? transition.fromStatusActive : transition.toStatusActive;
+  const terminal = direction === "from" ? transition.fromStatusTerminal : transition.toStatusTerminal;
+  const existing = id != null ? statusById.get(String(id)) : statusByKey.get(String(key || "").toUpperCase());
+
+  return existing || {
+    id: id ?? key,
+    statusKey: key,
+    displayName: displayName || formatLabel(key),
+    active: active !== false,
+    terminal: Boolean(terminal),
+    systemStatus: false,
+    protectedStatus: false,
+  };
+}
+
+function getSelectedCategoryRule(transition, selectedCategoryId, categoryRulesByTransitionId) {
+  if (!selectedCategoryId || !transition?.id) return null;
+  return (categoryRulesByTransitionId[transition.id] || [])
+    .find((rule) => String(rule.categoryId) === String(selectedCategoryId)) || null;
+}
+
+function getCategoryRuleLabel(rule, selectedCategoryId) {
+  if (!selectedCategoryId) return "Global view";
+  if (rule?.active) return "Enabled";
+  if (rule) return "Disabled";
+  return "Unconfigured";
+}
+
+function isCancelTransition(transition) {
+  return [
+    transition?.actionKey,
+    transition?.displayName,
+    transition?.toStatusKey,
+    transition?.toStatusDisplayName,
+  ].some((value) => String(value || "").toUpperCase().includes("CANCEL"));
+}
+
+function layoutWorkflowElements(nodes, edges, direction) {
+  const graph = new dagre.graphlib.Graph();
+  graph.setDefaultEdgeLabel(() => ({}));
+  graph.setGraph({ rankdir: direction, nodesep: 56, ranksep: 96, marginx: 24, marginy: 24 });
+
+  nodes.forEach((node) => {
+    graph.setNode(node.id, { width: workflowMapNodeWidth, height: workflowMapNodeHeight });
+  });
+  edges.forEach((edge) => graph.setEdge(edge.source, edge.target));
+  dagre.layout(graph);
+
+  return nodes.map((node) => {
+    const positioned = graph.node(node.id);
+    return {
+      ...node,
+      position: {
+        x: positioned.x - workflowMapNodeWidth / 2,
+        y: positioned.y - workflowMapNodeHeight / 2,
+      },
+    };
+  });
+}
+
+function WorkflowStatusFlowNode({ data, selected }) {
+  const isTerminal = Boolean(data.status.terminal);
+  const isInactive = data.status.active === false;
+  const isCancel = String(data.status.statusKey || "").toUpperCase().includes("CANCEL");
+  const protectedRecord = isProtectedStatus(data.status);
+  const tone = isTerminal
+    ? "border-emerald-500 bg-emerald-50 text-emerald-950"
+    : isCancel
+    ? "border-red-300 bg-red-50 text-red-900"
+    : "border-blue-300 bg-white text-blue-950";
+
+  return (
+    <div className={`relative flex h-[86px] w-[190px] flex-col justify-center rounded-lg border-2 px-3 py-2 shadow-sm ${tone} ${isInactive ? "opacity-55" : ""} ${selected ? "ring-2 ring-blue-500 ring-offset-2" : ""}`}>
+      <Handle type="target" position={Position.Left} className="opacity-0" />
+      <Handle type="source" position={Position.Right} className="opacity-0" />
+      <p className="line-clamp-2 break-words text-sm font-extrabold leading-tight">{data.label}</p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {isTerminal && <span className="rounded bg-emerald-600 px-1.5 py-0.5 text-[0.62rem] font-extrabold uppercase text-white">End</span>}
+        {protectedRecord && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[0.62rem] font-extrabold uppercase text-slate-700">Protected</span>}
+        {isInactive && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-[0.62rem] font-extrabold uppercase text-slate-700">Inactive</span>}
+      </div>
+      <p className="mt-1 truncate text-[0.66rem] font-bold uppercase text-slate-500">{data.status.statusKey || "UNKNOWN"}</p>
+    </div>
+  );
+}
+
+function buildWorkflowMapData({
+  statuses,
+  transitions,
+  actionByKey,
+  categoryRulesByTransitionId,
+  selectedCategoryId,
+  showInactivePaths,
+  layoutDirection,
+}) {
+  const statusById = new Map();
+  const statusByKey = new Map();
+  statuses.forEach((status) => {
+    if (status?.id != null) statusById.set(String(status.id), status);
+    if (status?.statusKey) statusByKey.set(String(status.statusKey).toUpperCase(), status);
+  });
+
+  const visibleTransitions = transitions.filter((transition) => {
+    const rule = getSelectedCategoryRule(transition, selectedCategoryId, categoryRulesByTransitionId);
+    if (!selectedCategoryId) return showInactivePaths || transition.active;
+    if (showInactivePaths) return true;
+    return transition.active && rule?.active;
+  });
+
+  const mapStatuses = new Map();
+  visibleTransitions.forEach((transition) => {
+    const fromStatus = getTransitionStatus(transition, "from", statusById, statusByKey);
+    const toStatus = getTransitionStatus(transition, "to", statusById, statusByKey);
+    mapStatuses.set(statusNodeId(fromStatus), fromStatus);
+    mapStatuses.set(statusNodeId(toStatus), toStatus);
+  });
+
+  const incomingCounts = {};
+  const outgoingCounts = {};
+  visibleTransitions.forEach((transition) => {
+    const fromStatus = getTransitionStatus(transition, "from", statusById, statusByKey);
+    const toStatus = getTransitionStatus(transition, "to", statusById, statusByKey);
+    const fromId = statusNodeId(fromStatus);
+    const toId = statusNodeId(toStatus);
+    outgoingCounts[fromId] = (outgoingCounts[fromId] || 0) + 1;
+    incomingCounts[toId] = (incomingCounts[toId] || 0) + 1;
+  });
+
+  const nodes = [...mapStatuses.values()].map((status) => {
+    const id = statusNodeId(status);
+    return {
+      id,
+      type: "workflowStatus",
+      data: {
+        label: status.displayName || formatLabel(status.statusKey),
+        status,
+        incomingCount: incomingCounts[id] || 0,
+        outgoingCount: outgoingCounts[id] || 0,
+      },
+      position: { x: 0, y: 0 },
+    };
+  });
+
+  const edges = visibleTransitions.map((transition) => {
+    const rule = getSelectedCategoryRule(transition, selectedCategoryId, categoryRulesByTransitionId);
+    const fromStatus = getTransitionStatus(transition, "from", statusById, statusByKey);
+    const toStatus = getTransitionStatus(transition, "to", statusById, statusByKey);
+    const action = actionByKey[transition.actionKey];
+    const disabled = !transition.active || Boolean(selectedCategoryId && !rule?.active);
+    const cancel = isCancelTransition(transition);
+    const edgeColor = disabled ? "#94a3b8" : cancel ? "#dc2626" : "#2563eb";
+
+    return {
+      id: transitionEdgeId(transition),
+      source: statusNodeId(fromStatus),
+      target: statusNodeId(toStatus),
+      label: transition.displayName || action?.displayName || formatLabel(transition.actionKey),
+      type: "smoothstep",
+      animated: !disabled,
+      markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
+      style: {
+        stroke: edgeColor,
+        strokeWidth: disabled ? 1.5 : 2.4,
+        strokeDasharray: disabled ? "7 6" : undefined,
+      },
+      labelStyle: {
+        fill: disabled ? "#64748b" : "#0f172a",
+        fontWeight: 800,
+        fontSize: 12,
+      },
+      labelBgStyle: {
+        fill: "#ffffff",
+        fillOpacity: 0.92,
+      },
+      data: {
+        transition,
+        action,
+        fromStatus,
+        toStatus,
+        selectedCategoryRule: rule,
+        categoryRuleLabel: getCategoryRuleLabel(rule, selectedCategoryId),
+      },
+    };
+  });
+
+  return {
+    nodes: layoutWorkflowElements(nodes, edges, layoutDirection),
+    edges,
+    visibleTransitionCount: visibleTransitions.length,
+  };
+}
+
+function ReadOnlyWorkflowMapDetails({ selectedItem, selectedCategory }) {
+  if (!selectedItem) {
+    return (
+      <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <MapPanelSection title="Map Details">
+          <p className="text-sm font-semibold text-slate-600">Select a status node or transition arrow to inspect read-only workflow details.</p>
+        </MapPanelSection>
+        <MapPanelSection title="Scope">
+          <dl>
+            <DetailRow label="Selected Category" value={selectedCategory?.displayName || "Global workflow"} />
+            <DetailRow label="Category Key" value={selectedCategory?.categoryKey || "Not selected"} />
+          </dl>
+        </MapPanelSection>
+      </aside>
+    );
+  }
+
+  if (selectedItem.type === "status") {
+    const status = selectedItem.data.status;
+    return (
+      <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
+        <MapPanelSection title="Status Details">
+          <dl>
+            <DetailRow label="Display Name" value={status.displayName || formatLabel(status.statusKey)} />
+            <DetailRow label="Status Key" value={status.statusKey} />
+            <DetailRow label="Active" value={status.active ? "Active" : "Inactive"} />
+            <DetailRow label="Terminal" value={status.terminal ? "Yes" : "No"} />
+            <DetailRow label="System / Protected" value={`${status.systemStatus ? "System" : "Custom"} / ${isProtectedStatus(status) ? "Protected" : "Editable"}`} />
+            <DetailRow label="Behavior Bucket" value={status.behaviorBucket ? formatLabel(status.behaviorBucket) : "Not set"} />
+            <DetailRow label="Incoming Transitions" value={selectedItem.data.incomingCount} />
+            <DetailRow label="Outgoing Transitions" value={selectedItem.data.outgoingCount} />
+          </dl>
+        </MapPanelSection>
+      </aside>
+    );
+  }
+
+  const transition = selectedItem.data.transition;
+  const fromStatus = selectedItem.data.fromStatus;
+  const toStatus = selectedItem.data.toStatus;
+  const action = selectedItem.data.action;
+
+  return (
+    <aside className="sticky top-4 rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm">
+      <MapPanelSection title="Transition Details">
+        <dl>
+          <DetailRow label="Transition / Action" value={transition.displayName || action?.displayName || formatLabel(transition.actionKey)} />
+          <DetailRow label="From Status" value={fromStatus.displayName || formatLabel(fromStatus.statusKey)} />
+          <DetailRow label="To Status" value={toStatus.displayName || formatLabel(toStatus.statusKey)} />
+          <DetailRow label="Action Key" value={transition.actionKey} />
+          <DetailRow label="Action Display Name" value={action?.displayName || transition.displayName || formatLabel(transition.actionKey)} />
+          <DetailRow label="Transition Active" value={transition.active ? "Active" : "Inactive"} />
+          <DetailRow label="System / Protected" value={`${transition.systemTransition ? "System" : "Custom"} / ${isProtectedTransition(transition) ? "Protected" : "Editable"}`} />
+          <DetailRow label="Selected Category Rule" value={selectedItem.data.categoryRuleLabel} />
+        </dl>
+      </MapPanelSection>
+    </aside>
+  );
+}
+
+function WorkflowMapView({
+  statuses,
+  transitions,
+  configuredTransitionCount,
+  actionByKey,
+  onSelectItem,
+  selectedCategory,
+  isLegacyWorkflowMode,
+  isLoadingCategoryWorkflow,
+  categoryRulesByTransitionId,
+  selectedCategoryId,
+}) {
+  const [showInactivePaths, setShowInactivePaths] = useState(false);
+  const layoutDirection = window.matchMedia?.("(max-width: 767px)")?.matches ? "TB" : "LR";
+  const mapData = useMemo(() => buildWorkflowMapData({
+    statuses,
+    transitions,
+    actionByKey,
+    categoryRulesByTransitionId,
+    selectedCategoryId,
+    showInactivePaths,
+    layoutDirection,
+  }), [actionByKey, categoryRulesByTransitionId, layoutDirection, selectedCategoryId, showInactivePaths, statuses, transitions]);
+
+  const hasNoStatuses = !isLoadingCategoryWorkflow && statuses.length === 0;
+  const hasNoTransitions = !isLoadingCategoryWorkflow && transitions.length === 0;
+  const hasNoVisibleTransitions = !isLoadingCategoryWorkflow && transitions.length > 0 && mapData.visibleTransitionCount === 0;
+  const helperText = selectedCategoryId
+    ? "Showing active transitions for the selected category. Enable disabled/unconfigured to inspect hidden paths."
+    : "Showing global active transitions. Enable disabled/unconfigured to inspect inactive global paths.";
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-base font-extrabold text-blue-950">Workflow Map</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-600">{helperText}</p>
+          </div>
+          <label className="inline-flex min-h-10 items-center gap-2 text-sm font-bold text-slate-700">
+            <input
+              type="checkbox"
+              checked={showInactivePaths}
+              onChange={(event) => {
+                setShowInactivePaths(event.target.checked);
+                onSelectItem(null);
+              }}
+            />
+            Show disabled/unconfigured
+          </label>
+        </div>
+        {isLegacyWorkflowMode && (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900">
+            This category is currently LEGACY_FIXED. The map visualizes configured category rules for review only; it does not activate DB workflow.
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        {isLoadingCategoryWorkflow && (
+          <div className="flex min-h-[560px] items-center justify-center px-4 py-8 text-sm font-semibold text-blue-950">
+            Loading workflow map for {selectedCategory?.displayName || "the selected category"}...
+          </div>
+        )}
+        {hasNoStatuses && (
+          <div className="flex min-h-[560px] items-center justify-center px-4 py-8 text-sm font-semibold text-amber-900">
+            No workflow statuses found.
+          </div>
+        )}
+        {!hasNoStatuses && hasNoTransitions && (
+          <div className="flex min-h-[560px] items-center justify-center px-4 py-8 text-sm font-semibold text-amber-900">
+            No workflow transitions found.
+          </div>
+        )}
+        {!hasNoStatuses && !hasNoTransitions && hasNoVisibleTransitions && (
+          <div className="flex min-h-[560px] items-center justify-center px-4 py-8 text-center text-sm font-semibold text-slate-700">
+            {selectedCategoryId ? "No active transitions are configured for the selected category. Enable disabled/unconfigured to inspect hidden paths." : "No active global transitions found."}
+          </div>
+        )}
+        {!isLoadingCategoryWorkflow && !hasNoStatuses && !hasNoTransitions && !hasNoVisibleTransitions && (
+          <div className="h-[560px] min-h-[560px] overflow-hidden rounded-lg sm:h-[640px]">
+            <ReactFlow
+              nodes={mapData.nodes}
+              edges={mapData.edges}
+              nodeTypes={workflowNodeTypes}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              elementsSelectable
+              fitView
+              fitViewOptions={{ padding: 0.2 }}
+              minZoom={0.2}
+              onNodeClick={(_, node) => onSelectItem({ type: "status", data: node.data })}
+              onEdgeClick={(_, edge) => onSelectItem({ type: "transition", data: edge.data })}
+              onPaneClick={() => onSelectItem(null)}
+            >
+              <Background gap={20} color="#e2e8f0" />
+              <Controls showInteractive={false} />
+            </ReactFlow>
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm bg-blue-600" /> Active transition</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm border border-slate-400 bg-white" /> Disabled/unconfigured</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-6 rounded-sm bg-red-600" /> Cancel path</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded border-2 border-emerald-500 bg-emerald-50" /> Terminal status</span>
+        <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded border-2 border-blue-300 bg-white" /> Normal status</span>
+      </div>
+
+      {configuredTransitionCount === 0 && !showInactivePaths && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">
+          No active selected-category transitions are configured yet.
+        </p>
+      )}
     </div>
   );
 }
@@ -2655,11 +3052,10 @@ export default function WorkflowManagement() {
             <div className="grid gap-4 2xl:grid-cols-[minmax(0,1fr)_22rem]">
               <div className="min-w-0 space-y-3">
                 <WorkflowMapView
-                  statuses={categoryWorkflowStatuses}
-                  transitions={categoryWorkflowTransitions}
+                  statuses={statuses}
+                  transitions={transitions}
                   configuredTransitionCount={selectedCategoryConfiguredTransitions.length}
                   actionByKey={actionByKey}
-                  selectedItem={selectedMapItem}
                   onSelectItem={setSelectedMapItem}
                   selectedCategory={selectedCategory}
                   isLegacyWorkflowMode={isLegacyWorkflowMode}
@@ -2667,41 +3063,11 @@ export default function WorkflowManagement() {
                   categoryRulesByTransitionId={categoryRulesByTransitionId}
                   selectedCategoryId={selectedCategoryId}
                 />
-
-                <div className="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700">
-                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-blue-300 bg-blue-50" /> Open / Active</span>
-                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-yellow-300 bg-yellow-50" /> Waiting / Pending</span>
-                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-violet-300 bg-violet-50" /> Complete</span>
-                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-red-300 bg-red-50" /> Cancelled</span>
-                  <span className="inline-flex items-center gap-2"><span className="h-3 w-3 rounded-full border-2 border-green-400 bg-green-50" /> Terminal</span>
-                </div>
               </div>
 
-              <MapDetailPanel
+              <ReadOnlyWorkflowMapDetails
                 selectedItem={selectedMapItem}
                 selectedCategory={selectedCategory}
-                categoryWorkflowConfig={categoryWorkflowConfig}
-                isLegacyWorkflowMode={isLegacyWorkflowMode}
-                validationForSelectedCategory={validationForSelectedCategory}
-                readyToActivate={readyToActivate}
-                blockingIssueCount={blockingIssueCount}
-                warningCount={warningCount}
-                selectedCategoryId={selectedCategoryId}
-                categoryRulesByTransitionId={categoryRulesByTransitionId}
-                roleRulesByTransitionId={roleRulesByTransitionId}
-                managedRoles={managedRoles}
-                actionByKey={actionByKey}
-                configuredTransitions={categoryWorkflowTransitions}
-                onOpenStatusForm={openStatusForm}
-                onOpenTransitionForm={openTransitionForm}
-                onRequestMetadataStateChange={requestMetadataStateChange}
-                onRequestTransitionStateChange={requestTransitionStateChange}
-                onRequestRuleChange={requestRuleChange}
-                onRequestWorkflowModeChange={requestWorkflowModeChange}
-                activationTargetConfig={activationTargetConfig}
-                rollbackTargetConfig={rollbackTargetConfig}
-                isSavingRule={isSavingRule}
-                isSavingWorkflowMode={isSavingWorkflowMode}
               />
             </div>
           )}

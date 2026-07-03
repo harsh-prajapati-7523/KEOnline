@@ -1,0 +1,218 @@
+{
+  "url": "https://test.kumar-electricals.com/employee-login",
+  "testedAt": "2026-07-02T15:05:33.749Z",
+  "results": [
+    {
+      "id": "desktop-chrome",
+      "label": "Desktop Chromium",
+      "statusCode": 200,
+      "pass": true,
+      "headingVisible": true,
+      "employeeIdVisible": true,
+      "passwordVisible": true,
+      "loginButtonVisible": true,
+      "failedResponses": [],
+      "consoleErrors": [],
+      "screenshot": "/home/harsh/KE_Project/KEOnline/qa-artifacts/login-page-post-deploy-2026-07-02/desktop-chrome.png",
+      "metrics": {
+        "viewport": {
+          "width": 1440,
+          "height": 900
+        },
+        "rootScrollWidth": 1440,
+        "bodyScrollWidth": 1440,
+        "bodyScrollHeight": 924,
+        "horizontalOverflow": false,
+        "mainClass": "app-screen ke-login-page ke-login-page--premium",
+        "mainMinHeight": "900px",
+        "mainPaddingTop": "0px",
+        "mainPaddingBottom": "24px",
+        "titleRect": {
+          "top": 161,
+          "bottom": 186,
+          "left": 622,
+          "right": 818,
+          "width": 196,
+          "height": 25
+        },
+        "cardRect": {
+          "top": 256,
+          "bottom": 473,
+          "left": 524,
+          "right": 916,
+          "width": 392,
+          "height": 217
+        },
+        "buttonRect": {
+          "top": 423,
+          "bottom": 461,
+          "left": 536,
+          "right": 904,
+          "width": 368,
+          "height": 38
+        },
+        "buttonAboveViewportBottom": true,
+        "cardWithinHorizontalViewport": true
+      }
+    },
+    {
+      "id": "android-chrome",
+      "label": "Android Chrome emulation",
+      "statusCode": 200,
+      "pass": true,
+      "headingVisible": true,
+      "employeeIdVisible": true,
+      "passwordVisible": true,
+      "loginButtonVisible": true,
+      "failedResponses": [],
+      "consoleErrors": [],
+      "screenshot": "/home/harsh/KE_Project/KEOnline/qa-artifacts/login-page-post-deploy-2026-07-02/android-chrome.png",
+      "metrics": {
+        "viewport": {
+          "width": 393,
+          "height": 727
+        },
+        "rootScrollWidth": 393,
+        "bodyScrollWidth": 393,
+        "bodyScrollHeight": 751,
+        "horizontalOverflow": false,
+        "mainClass": "app-screen ke-login-page ke-login-page--premium",
+        "mainMinHeight": "727px",
+        "mainPaddingTop": "0px",
+        "mainPaddingBottom": "24px",
+        "titleRect": {
+          "top": 141,
+          "bottom": 164,
+          "left": 107,
+          "right": 286,
+          "width": 178,
+          "height": 22
+        },
+        "cardRect": {
+          "top": 212,
+          "bottom": 429,
+          "left": 21,
+          "right": 373,
+          "width": 352,
+          "height": 217
+        },
+        "buttonRect": {
+          "top": 379,
+          "bottom": 417,
+          "left": 33,
+          "right": 361,
+          "width": 328,
+          "height": 38
+        },
+        "buttonAboveViewportBottom": true,
+        "cardWithinHorizontalViewport": true
+      }
+    },
+    {
+      "id": "ios-safari",
+      "label": "iOS Safari emulation",
+      "statusCode": 200,
+      "pass": true,
+      "headingVisible": true,
+      "employeeIdVisible": true,
+      "passwordVisible": true,
+      "loginButtonVisible": true,
+      "failedResponses": [],
+      "consoleErrors": [],
+      "screenshot": "/home/harsh/KE_Project/KEOnline/qa-artifacts/login-page-post-deploy-2026-07-02/ios-safari.png",
+      "metrics": {
+        "viewport": {
+          "width": 390,
+          "height": 664
+        },
+        "rootScrollWidth": 390,
+        "bodyScrollWidth": 390,
+        "bodyScrollHeight": 688,
+        "horizontalOverflow": false,
+        "mainClass": "app-screen ke-login-page ke-login-page--premium",
+        "mainMinHeight": "664px",
+        "mainPaddingTop": "0px",
+        "mainPaddingBottom": "24px",
+        "titleRect": {
+          "top": 141,
+          "bottom": 164,
+          "left": 106,
+          "right": 284,
+          "width": 178,
+          "height": 22
+        },
+        "cardRect": {
+          "top": 212,
+          "bottom": 429,
+          "left": 19,
+          "right": 371,
+          "width": 352,
+          "height": 217
+        },
+        "buttonRect": {
+          "top": 379,
+          "bottom": 417,
+          "left": 31,
+          "right": 359,
+          "width": 328,
+          "height": 38
+        },
+        "buttonAboveViewportBottom": true,
+        "cardWithinHorizontalViewport": true
+      }
+    },
+    {
+      "id": "android-pwa-standalone",
+      "label": "Android PWA standalone emulation",
+      "statusCode": 200,
+      "pass": true,
+      "headingVisible": true,
+      "employeeIdVisible": true,
+      "passwordVisible": true,
+      "loginButtonVisible": true,
+      "failedResponses": [],
+      "consoleErrors": [],
+      "screenshot": "/home/harsh/KE_Project/KEOnline/qa-artifacts/login-page-post-deploy-2026-07-02/android-pwa-standalone.png",
+      "metrics": {
+        "viewport": {
+          "width": 393,
+          "height": 851
+        },
+        "rootScrollWidth": 393,
+        "bodyScrollWidth": 393,
+        "bodyScrollHeight": 875,
+        "horizontalOverflow": false,
+        "mainClass": "app-screen ke-login-page ke-login-page--premium",
+        "mainMinHeight": "851px",
+        "mainPaddingTop": "0px",
+        "mainPaddingBottom": "24px",
+        "titleRect": {
+          "top": 141,
+          "bottom": 164,
+          "left": 107,
+          "right": 286,
+          "width": 178,
+          "height": 22
+        },
+        "cardRect": {
+          "top": 212,
+          "bottom": 429,
+          "left": 21,
+          "right": 373,
+          "width": 352,
+          "height": 217
+        },
+        "buttonRect": {
+          "top": 379,
+          "bottom": 417,
+          "left": 33,
+          "right": 361,
+          "width": 328,
+          "height": 38
+        },
+        "buttonAboveViewportBottom": true,
+        "cardWithinHorizontalViewport": true
+      }
+    }
+  ]
+}

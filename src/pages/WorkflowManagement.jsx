@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
+  BaseEdge,
   Controls,
+  EdgeLabelRenderer,
   Handle,
   MarkerType,
   Position,
   ReactFlow,
+  getSmoothStepPath,
 } from "@xyflow/react";
 import dagre from "dagre";
 import "@xyflow/react/dist/style.css";
@@ -1114,6 +1117,7 @@ function LegacyWorkflowMapView({
 const workflowMapNodeWidth = 190;
 const workflowMapNodeHeight = 86;
 const workflowNodeTypes = { workflowStatus: WorkflowStatusFlowNode };
+const workflowEdgeTypes = { workflowTransition: WorkflowTransitionFlowEdge };
 
 function statusNodeId(status) {
   return String(status?.id ?? status?.statusKey ?? "unknown-status");
@@ -1204,6 +1208,59 @@ function WorkflowStatusFlowNode({ data, selected }) {
   );
 }
 
+function WorkflowTransitionFlowEdge({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  markerEnd,
+  style,
+  data,
+  selected,
+}) {
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+  const runtimeState = data?.runtimeState || { label: "Executable", tone: "green" };
+  const toneClass = runtimeState.tone === "red"
+    ? "border-red-200 bg-red-50 text-red-700"
+    : runtimeState.tone === "yellow"
+    ? "border-yellow-200 bg-yellow-50 text-yellow-800"
+    : runtimeState.tone === "slate"
+    ? "border-slate-200 bg-white text-slate-700"
+    : "border-blue-200 bg-white text-blue-950";
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={style} interactionWidth={36} />
+      <EdgeLabelRenderer>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            data?.onSelect?.();
+          }}
+          className={`nodrag nopan absolute rounded-lg border px-2 py-1 text-xs font-extrabold shadow-sm transition hover:border-blue-400 hover:bg-blue-50 ${toneClass} ${selected ? "ring-2 ring-blue-500 ring-offset-1" : ""}`}
+          style={{
+            transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)`,
+            pointerEvents: "all",
+          }}
+        >
+          {data?.displayLabel || "Transition"} · {runtimeState.label}
+        </button>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
 function buildWorkflowMapData({
   statuses,
   transitions,
@@ -1283,7 +1340,8 @@ function buildWorkflowMapData({
       source: statusNodeId(fromStatus),
       target: statusNodeId(toStatus),
       label: `${displayLabel} - ${runtimeState.label}`,
-      type: "smoothstep",
+      type: "workflowTransition",
+      interactionWidth: 36,
       animated: runtimeState.label === "Executable",
       markerEnd: { type: MarkerType.ArrowClosed, color: edgeColor },
       style: {
@@ -1308,6 +1366,7 @@ function buildWorkflowMapData({
         selectedCategoryRule: rule,
         categoryRuleLabel: getCategoryRuleLabel(rule, selectedCategoryId),
         runtimeState,
+        displayLabel,
       },
     };
   });
@@ -1483,6 +1542,16 @@ function WorkflowMapView({
     showInactivePaths,
     layoutDirection,
   }), [actionByKey, categoryRulesByTransitionId, layoutDirection, selectedCategoryId, showInactivePaths, statuses, transitionRuntimeById, transitions]);
+  const selectableEdges = useMemo(
+    () => mapData.edges.map((edge) => ({
+      ...edge,
+      data: {
+        ...edge.data,
+        onSelect: () => onSelectItem({ type: "transition", data: edge.data }),
+      },
+    })),
+    [mapData.edges, onSelectItem]
+  );
 
   const hasNoStatuses = !isLoadingCategoryWorkflow && statuses.length === 0;
   const hasNoTransitions = !isLoadingCategoryWorkflow && transitions.length === 0;
@@ -1543,8 +1612,9 @@ function WorkflowMapView({
           <div className="h-[560px] min-h-[560px] overflow-hidden rounded-lg sm:h-[640px]">
             <ReactFlow
               nodes={mapData.nodes}
-              edges={mapData.edges}
+              edges={selectableEdges}
               nodeTypes={workflowNodeTypes}
+              edgeTypes={workflowEdgeTypes}
               nodesDraggable={false}
               nodesConnectable={false}
               elementsSelectable

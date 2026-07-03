@@ -34,7 +34,6 @@ const tabs = [
   { id: "validation", label: "Validation" },
 ];
 
-const managedRoleKeys = ["SUPER_ADMIN", "ADMIN", "TECHNICIAN"];
 const protectedStatusKeys = ["NEW", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
 const protectedActionKeys = ["PICK_TICKET", "START_WORK", "COMPLETE_TICKET", "CANCEL_TICKET"];
 const behaviorBucketOptions = ["NEW", "IN_PROGRESS", "COMPLETED", "CANCELLED"];
@@ -1842,6 +1841,7 @@ export default function WorkflowManagement() {
   const [isSavingMetadata, setIsSavingMetadata] = useState(false);
   const [isSavingTransition, setIsSavingTransition] = useState(false);
   const [isSavingWorkflowMode, setIsSavingWorkflowMode] = useState(false);
+  const [savingRoleAccessKey, setSavingRoleAccessKey] = useState("");
   const [isLoadingCategoryWorkflow, setIsLoadingCategoryWorkflow] = useState(false);
   const [error, setError] = useState("");
   const [statusMessage, setStatusMessage] = useState("");
@@ -1959,8 +1959,8 @@ export default function WorkflowManagement() {
     return next;
   }, [accessKeys]);
 
-  const managedRoles = useMemo(
-    () => roles.filter((role) => managedRoleKeys.includes(role.roleKey)),
+  const activeRoles = useMemo(
+    () => roles.filter((role) => role.active),
     [roles]
   );
 
@@ -2272,10 +2272,89 @@ export default function WorkflowManagement() {
   const requestRuleChange = (change) => {
     if (!change?.transition?.id || !change.nextActive && !change.rule) return;
     if (change.scope === "category" && !change.category?.id) return;
-    if (change.scope === "role" && !managedRoleKeys.includes(change.role?.roleKey)) return;
+    if (change.scope === "role" && !change.role?.id) return;
     setError("");
     setStatusMessage("");
     setPendingRuleChange(change);
+  };
+
+  const refreshSingleRoleAccess = useCallback(async (role) => {
+    const [roleAccessResponse, dynamicAccessResponse] = await Promise.all([
+      fetch(`/volt/role-access/${role.id}`, { headers: authHeaders() }),
+      fetch(`/volt/role-access/${role.id}/dynamic`, { headers: authHeaders() }),
+    ]);
+
+    if (!roleAccessResponse.ok || !dynamicAccessResponse.ok) {
+      throw new Error("Role access was saved, but refreshed access data could not be loaded.");
+    }
+
+    const [roleAccess, dynamicAccess] = await Promise.all([
+      roleAccessResponse.json(),
+      dynamicAccessResponse.json(),
+    ]);
+
+    setRoleAccessByRoleId((current) => ({
+      ...current,
+      [role.id]: {
+        ...roleAccess,
+        dynamic: dynamicAccess,
+        rulesByKey: normalizeRules(roleAccess.rules),
+        dynamicRulesByKey: normalizeRules(dynamicAccess.rules),
+      },
+    }));
+  }, []);
+
+  const toggleRoleActionAccess = async (role, action) => {
+    if (!role?.id || !action?.actionKey || role.roleKey === "SUPER_ADMIN") return;
+
+    const access = roleAccessByRoleId[role.id];
+    const actionKey = action.actionKey;
+    const dynamicRule = access?.dynamicRulesByKey?.[actionKey];
+    const systemRule = access?.rulesByKey?.[actionKey];
+    const isDynamicRule = Boolean(dynamicRule) || !systemRule;
+    const currentAllowed = Boolean((isDynamicRule ? dynamicRule : systemRule)?.allowed);
+    const nextAllowed = !currentAllowed;
+
+    setSavingRoleAccessKey(`${role.id}:${actionKey}`);
+    setError("");
+    setStatusMessage("");
+
+    try {
+      const endpoint = isDynamicRule
+        ? `/volt/role-access/${role.id}/dynamic`
+        : `/volt/role-access/${role.id}`;
+      const sourceRules = isDynamicRule ? access?.dynamic?.rules : access?.rules;
+      const payload = {
+        rules: normalizeArray(sourceRules, "rules")
+          .filter((rule) => !isDynamicRule || rule.active)
+          .map((rule) => ({
+            accessKey: rule.accessKey,
+            allowed: rule.accessKey === actionKey ? nextAllowed : Boolean(rule.allowed),
+          })),
+      };
+
+      if (!payload.rules.some((rule) => rule.accessKey === actionKey)) {
+        payload.rules.push({ accessKey: actionKey, allowed: nextAllowed });
+      }
+
+      const response = await fetch(endpoint, {
+        method: "PATCH",
+        headers: authHeaders(true),
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readApiError(response, "Unable to save role access rule."));
+      }
+
+      await refreshSingleRoleAccess(role);
+      await runValidation();
+      setStatusMessage(`${role.displayName || role.roleKey} access for ${action.displayName || formatLabel(actionKey)} ${nextAllowed ? "enabled" : "disabled"}.`);
+    } catch (saveError) {
+      setError(saveError.message || "Unable to save role access rule.");
+    } finally {
+      setSavingRoleAccessKey("");
+    }
   };
 
   const confirmRuleChange = async () => {
@@ -3611,21 +3690,36 @@ export default function WorkflowManagement() {
                   <thead>
                     <tr>
                       <HeaderCell>Action</HeaderCell>
-                      {roles.map((role) => <HeaderCell key={role.id}>{role.displayName || role.roleKey}</HeaderCell>)}
+                      {activeRoles.map((role) => <HeaderCell key={role.id}>{role.displayName || role.roleKey}</HeaderCell>)}
                     </tr>
                   </thead>
                   <tbody>
                     {selectedCategoryConfiguredActions.map((action) => (
                       <tr key={action.id ?? action.actionKey}>
                         <BodyCell><BusinessKeyLabel label={action.displayName} technicalKey={action.actionKey} /></BodyCell>
-                        {roles.map((role) => (
+                        {activeRoles.map((role) => {
+                          const protectedRole = role.roleKey === "SUPER_ADMIN";
+                          const accessState = actionAccessState(action.actionKey, role, roleAccessByRoleId);
+                          const isSavingThisRule = savingRoleAccessKey === `${role.id}:${action.actionKey}`;
+                          return (
                           <BodyCell key={role.id}>
-                            <ScopeBadge value={actionAccessState(action.actionKey, role, roleAccessByRoleId)} />
+                            <div className="flex flex-col gap-2">
+                              <ScopeBadge value={accessState} />
+                              <button
+                                type="button"
+                                onClick={() => toggleRoleActionAccess(role, action)}
+                                disabled={protectedRole || isSavingThisRule}
+                                className="inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                {isSavingThisRule ? "Saving..." : accessState === "full" ? "Disable" : "Enable"}
+                              </button>
+                            </div>
                           </BodyCell>
-                        ))}
+                          );
+                        })}
                       </tr>
                     ))}
-                    {selectedCategoryConfiguredActions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No selected-category workflow actions available for role access matrix.</EmptyRows>}
+                    {selectedCategoryConfiguredActions.length === 0 && <EmptyRows colSpan={activeRoles.length + 1}>No selected-category workflow actions available for role access matrix.</EmptyRows>}
                   </tbody>
                 </TableShell>
               </div>
@@ -3636,7 +3730,7 @@ export default function WorkflowManagement() {
                   <thead>
                     <tr>
                       <HeaderCell>Action / Transition</HeaderCell>
-                      {roles.map((role) => <HeaderCell key={role.id}>{role.displayName || role.roleKey}</HeaderCell>)}
+                      {activeRoles.map((role) => <HeaderCell key={role.id}>{role.displayName || role.roleKey}</HeaderCell>)}
                     </tr>
                   </thead>
                   <tbody>
@@ -3649,15 +3743,33 @@ export default function WorkflowManagement() {
                             <BusinessKeyLabel label={transition.displayName || actionByKey[transition.actionKey]?.displayName} technicalKey={transition.actionKey} />
                             <span className="mt-1 block text-xs font-semibold text-slate-600">{from.label} to {to.label}</span>
                           </BodyCell>
-                          {roles.map((role) => (
-                            <BodyCell key={role.id}>
-                              <ScopeBadge value={combinedTransitionRoleState(transition, role, roleAccessByRoleId, roleRulesByTransitionId)} />
-                            </BodyCell>
-                          ))}
+                          {activeRoles.map((role) => {
+                            const roleRules = roleRulesByTransitionId[transition.id] || [];
+                            const rule = roleRules.find((item) => String(item.roleId) === String(role.id));
+                            const scopeState = roleRuleState(transition.id, role.id, roleRulesByTransitionId);
+                            return (
+                              <BodyCell key={role.id}>
+                                <div className="flex flex-col gap-2">
+                                  <ScopeBadge value={combinedTransitionRoleState(transition, role, roleAccessByRoleId, roleRulesByTransitionId)} />
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      requestRuleChange({ scope: "role", transition, role, rule, nextActive: scopeState !== "full" });
+                                    }}
+                                    disabled={isSavingRule || (scopeState === "full" && !rule)}
+                                    className="inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                  >
+                                    {scopeState === "full" ? "Disable Scope" : "Enable Scope"}
+                                  </button>
+                                </div>
+                              </BodyCell>
+                            );
+                          })}
                         </tr>
                       );
                     })}
-                    {selectedCategoryConfiguredTransitions.length === 0 && <EmptyRows colSpan={roles.length + 1}>No selected-category workflow transitions available for role rule matrix.</EmptyRows>}
+                    {selectedCategoryConfiguredTransitions.length === 0 && <EmptyRows colSpan={activeRoles.length + 1}>No selected-category workflow transitions available for role rule matrix.</EmptyRows>}
                   </tbody>
                 </TableShell>
               </div>
@@ -3733,7 +3845,7 @@ export default function WorkflowManagement() {
         item={drawerItem}
         onClose={() => setDrawerItem(null)}
         selectedCategory={selectedCategory}
-        managedRoles={managedRoles}
+        managedRoles={activeRoles}
         categoryRulesByTransitionId={categoryRulesByTransitionId}
         roleRulesByTransitionId={roleRulesByTransitionId}
         onRequestRuleChange={requestRuleChange}

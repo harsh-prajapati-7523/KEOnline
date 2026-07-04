@@ -532,7 +532,16 @@ export default function WorkflowBuilder() {
     setStatusMessage("");
     setRowErrors((current) => ({ ...current, [rowId]: "" }));
     setRowSaveStates((current) => ({ ...current, [rowId]: "Unsaved" }));
-    setRows((current) => current.map((row) => row.id === rowId ? { ...row, [field]: value } : row));
+    setRows((current) => current.map((row) => {
+      if (row.id !== rowId) return row;
+      if (field !== "toStatus") return { ...row, [field]: value };
+      const selectedStatus = resolveStatus(value);
+      return {
+        ...row,
+        toStatus: value,
+        toStatusTerminal: Boolean(selectedStatus?.terminal),
+      };
+    }));
   };
 
   const addRow = () => {

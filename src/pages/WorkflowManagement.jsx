@@ -1962,7 +1962,6 @@ function MapDetailPanel({
   onRequestRuleChange,
   onRequestWorkflowModeChange,
   activationTargetConfig,
-  rollbackTargetConfig,
   isSavingRule,
   isSavingWorkflowMode,
 }) {
@@ -1983,14 +1982,6 @@ function MapDetailPanel({
           className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-50"
         >
           Activate DB Workflow
-        </button>
-        <button
-          type="button"
-          onClick={() => onRequestWorkflowModeChange(rollbackTargetConfig)}
-          disabled={!selectedCategory?.id || !categoryWorkflowConfig || categoryWorkflowConfig.workflowMode === "LEGACY_FIXED" || isSavingWorkflowMode}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 px-4 py-2 text-sm font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
-        >
-          Rollback to Legacy
         </button>
       </div>
     </MapDisclosureSection>
@@ -2517,7 +2508,6 @@ export default function WorkflowManagement() {
   const warningCount = validationForSelectedCategory ? (validationResult.warnings || []).length : 0;
   const readyToActivate = Boolean(validationForSelectedCategory && validationResult.readyToActivate && blockingIssueCount === 0);
   const activationTargetConfig = { workflowMode: "DB_CONFIGURED", dbWorkflowEnabled: true, fixedActionsEnabled: false };
-  const rollbackTargetConfig = { workflowMode: "LEGACY_FIXED", dbWorkflowEnabled: false, fixedActionsEnabled: true };
   const configuredTerminalStatus = selectedCategoryConfiguredStatuses.find((status) => status.terminal);
   const terminalStatusLabel = configuredTerminalStatus?.displayName || "Not configured";
   const workflowModeLabel = businessWorkflowMode(categoryWorkflowConfig);

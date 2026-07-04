@@ -323,8 +323,6 @@ export default function TicketDetail() {
   const [showStatusDetails, setShowStatusDetails] = useState(false);
   const [showWorkflowHistory, setShowWorkflowHistory] = useState(false);
   const [expandedWorkflowHistoryId, setExpandedWorkflowHistoryId] = useState(null);
-  const [showCancelConfirmation, setShowCancelConfirmation] = useState(false);
-  const [showCompleteConfirmation, setShowCompleteConfirmation] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [activeDetailView, setActiveDetailView] = useState("ticket");
   const [assignableEmployees, setAssignableEmployees] = useState([]);
@@ -487,8 +485,6 @@ export default function TicketDetail() {
     setShowStatusDetails(false);
     setShowWorkflowHistory(false);
     setExpandedWorkflowHistoryId(null);
-    setShowCancelConfirmation(false);
-    setShowCompleteConfirmation(false);
     setShowAssignDialog(false);
     setActiveDetailView("ticket");
     setAssignForm({ employeeId: "", note: "" });
@@ -577,47 +573,6 @@ export default function TicketDetail() {
 
   const setProcessing = (key, value) => {
     setProcessingKeys((current) => ({ ...current, [key]: value }));
-  };
-
-  const ticketAction = async (path, body = null, successMessage) => {
-    const response = await fetch(`/volt/tickets/${ticketId}/${path}`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-        "Content-Type": "application/json",
-      },
-      body: body ? JSON.stringify(body) : null,
-    });
-
-    if (!response.ok) throw new Error("Ticket action failed");
-
-    await loadTicket();
-    await loadAvailableActions();
-    await loadWorkflowHistory(0, true);
-    if (showCharges) await loadCharges();
-    setStatusMessage(successMessage);
-  };
-
-  const runTicketAction = async (key, path, body, successMessage, errorMessage) => {
-    setProcessing(key, true);
-    setStatusMessage("");
-    try {
-      await ticketAction(path, body, successMessage);
-    } catch {
-      setStatusMessage(errorMessage);
-    } finally {
-      setProcessing(key, false);
-    }
-  };
-
-  const confirmCancelTicket = async () => {
-    setShowCancelConfirmation(false);
-    await runTicketAction(`cancel-${ticketId}`, "cancel", { cancellationReason: "Cancelled via ticket detail." }, "Ticket cancelled successfully.", "Unable to update ticket. Please try again.");
-  };
-
-  const confirmCompleteTicket = async () => {
-    setShowCompleteConfirmation(false);
-    await runTicketAction(`complete-${ticketId}`, "complete", { completionRemark: "Completed via UI." }, "Ticket completed successfully.", "Unable to update ticket. Please try again.");
   };
 
   const loadAssignableEmployees = async () => {
@@ -1425,40 +1380,6 @@ export default function TicketDetail() {
             {chargeActionMessage && !chargeActionMessage.startsWith("Unable") && (
               <div className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-xl bg-blue-950 px-4 py-3 text-sm font-bold text-white shadow-2xl sm:bottom-4" role="status">
                 {chargeActionMessage}
-              </div>
-            )}
-
-            {showCompleteConfirmation && (
-              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="complete-ticket-title">
-                <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl">
-                  <h2 id="complete-ticket-title" className="text-lg font-extrabold text-blue-950">Mark this ticket completed?</h2>
-                  <p className="mt-2 text-sm font-semibold text-gray-600">Use this only after the customer work is finished.</p>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => setShowCompleteConfirmation(false)} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50">
-                      Go Back
-                    </button>
-                    <button type="button" onClick={confirmCompleteTicket} disabled={processingKeys[`complete-${ticketId}`]} className="ke-primary-action min-h-11 rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60">
-                      Mark Completed
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {showCancelConfirmation && (
-              <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 px-3 py-4 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="cancel-ticket-title">
-                <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl">
-                  <h2 id="cancel-ticket-title" className="text-lg font-extrabold text-blue-950">Cancel this ticket?</h2>
-                  <p className="mt-2 text-sm font-semibold text-gray-600">This will mark the ticket as cancelled.</p>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button type="button" onClick={() => setShowCancelConfirmation(false)} className="min-h-11 rounded-xl border border-blue-950 px-4 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50">
-                      Keep Ticket
-                    </button>
-                    <button type="button" onClick={confirmCancelTicket} disabled={processingKeys[`cancel-${ticketId}`]} className="ke-danger-action min-h-11 rounded-xl px-4 py-2 text-sm font-bold disabled:opacity-60">
-                      Cancel Ticket
-                    </button>
-                  </div>
-                </div>
               </div>
             )}
 

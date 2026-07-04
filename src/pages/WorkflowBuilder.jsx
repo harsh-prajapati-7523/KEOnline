@@ -242,6 +242,7 @@ export default function WorkflowBuilder() {
       key: status.statusKey || String(status.id),
       label: status.displayName || formatLabel(status.statusKey),
       terminal: Boolean(status.terminal),
+      behaviorBucket: status.behaviorBucket,
     })),
     [statuses]
   );
@@ -281,6 +282,18 @@ export default function WorkflowBuilder() {
         || String(displayName || "").toLowerCase() === lookup;
     }) || null;
   }, [statuses]);
+
+  const selectedStartStatus = useMemo(() => resolveStatus(startStatus), [resolveStatus, startStatus]);
+
+  const statusMatchesStart = useCallback((value, status) => {
+    const startLookup = normalizeText(startStatus).toLowerCase();
+    if (!startLookup) return false;
+    const valueLookup = normalizeText(value).toLowerCase();
+    const displayName = status?.displayName || formatLabel(status?.statusKey);
+    return valueLookup === startLookup
+      || String(status?.statusKey || "").toLowerCase() === startLookup
+      || String(displayName || "").toLowerCase() === startLookup;
+  }, [startStatus]);
 
   const resolveAction = useCallback((value) => {
     const lookup = value.trim().toLowerCase();
@@ -342,22 +355,44 @@ export default function WorkflowBuilder() {
       if (fromStatus?.terminal) issues.push("Terminal status cannot be used as From Status.");
       const duplicateKey = `${fromStatus?.id || fromValue.toLowerCase()}|${action?.actionKey || actionValue.toLowerCase()}|${toStatus?.id || toValue.toLowerCase()}`;
       if (fromValue && actionValue && toValue && (duplicateKeys.get(duplicateKey) || 0) > 1) issues.push("Duplicate workflow line in builder.");
+      const fromStatusIsStart = statusMatchesStart(fromValue, fromStatus);
       byRowId[row.id] = {
         ok: issues.length === 0,
         issues,
         fromStatus,
         action,
         toStatus,
-        newFromStatus: fromStatus ? null : { displayName: fromValue, statusKey: generatedFromStatus?.key || "", terminal: false, behaviorBucket: "IN_PROGRESS" },
+        newFromStatus: fromStatus ? null : { displayName: fromValue, statusKey: generatedFromStatus?.key || "", terminal: false, behaviorBucket: fromStatusIsStart ? "NEW" : "IN_PROGRESS" },
         newAction: action ? null : { displayName: actionValue, actionKey: generatedAction?.key || "" },
         newToStatus: toStatus ? null : { displayName: toValue, statusKey: generatedToStatus?.key || "", terminal: Boolean(row.toStatusTerminal), behaviorBucket: row.toStatusTerminal ? "COMPLETED" : "IN_PROGRESS" },
       };
     });
     return byRowId;
-  }, [actions, resolvedRows, selectedCategory?.id, statuses]);
+  }, [actions, resolvedRows, selectedCategory?.id, statusMatchesStart, statuses]);
+
+  const startStatusIssue = useMemo(() => {
+    if (!normalizeText(startStatus)) return "Choose which status will be NEW.";
+    if (selectedStartStatus?.terminal) return "The selected NEW status cannot be terminal.";
+    if (
+      selectedStartStatus
+      && selectedStartStatus.behaviorBucket !== "NEW"
+      && (selectedStartStatus.systemStatus || selectedStartStatus.protectedStatus)
+    ) {
+      return "The selected NEW status is protected. Choose an editable custom status or type a new one.";
+    }
+    if (rows.length > 0 && !resolvedRows.some(({ row, fromStatus }) => statusMatchesStart(row.fromStatus, fromStatus))) {
+      return "No workflow line starts from the selected NEW status.";
+    }
+    return "";
+  }, [resolvedRows, rows.length, selectedStartStatus, startStatus, statusMatchesStart]);
+
+  const startStatusNotice = useMemo(() => {
+    if (!selectedStartStatus || selectedStartStatus.behaviorBucket === "NEW" || startStatusIssue) return "";
+    return `${selectedStartStatus.displayName || formatLabel(selectedStartStatus.statusKey)} will be saved with behavior bucket NEW.`;
+  }, [selectedStartStatus, startStatusIssue]);
 
   const hasUnsavedRows = rows.some((row) => !["Saved", "Already exists"].includes(rowSaveStates[row.id]));
-  const saveDisabled = isLoading || isSaving || rows.length === 0 || !hasUnsavedRows || rows.some((row) => !rowValidation[row.id]?.ok);
+  const saveDisabled = isLoading || isSaving || rows.length === 0 || !hasUnsavedRows || Boolean(startStatusIssue) || rows.some((row) => !rowValidation[row.id]?.ok);
 
   const validationLabel = useMemo(() => {
     if (validationStale) return "Validation Stale";
@@ -570,6 +605,7 @@ export default function WorkflowBuilder() {
   };
 
   const createWorkflowStatus = async (statusDraft, sortOrder) => {
+    const behaviorBucket = statusDraft.behaviorBucket || (statusDraft.terminal ? "COMPLETED" : "IN_PROGRESS");
     const response = await fetch("/volt/workflow/statuses", {
       method: "POST",
       headers: authHeaders(true),
@@ -578,12 +614,29 @@ export default function WorkflowBuilder() {
         displayName: statusDraft.displayName,
         active: true,
         terminal: Boolean(statusDraft.terminal),
-        behaviorBucket: statusDraft.terminal ? "COMPLETED" : "IN_PROGRESS",
+        behaviorBucket,
         sortOrder,
       }),
     });
     if (!response.ok) {
       throw new Error(await readApiError(response, `Unable to create workflow status ${statusDraft.displayName}.`));
+    }
+    return response.json();
+  };
+
+  const updateWorkflowStatusBehavior = async (status, behaviorBucket) => {
+    const response = await fetch(`/volt/workflow/statuses/${status.id}`, {
+      method: "PATCH",
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        displayName: status.displayName,
+        terminal: Boolean(status.terminal),
+        behaviorBucket,
+        sortOrder: status.sortOrder,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(await readApiError(response, `Unable to set ${status.displayName || formatLabel(status.statusKey)} as the NEW status.`));
     }
     return response.json();
   };
@@ -627,7 +680,7 @@ export default function WorkflowBuilder() {
     }) || null;
   };
 
-  const buildStatusDraft = (displayName, metadataContext, terminal) => {
+  const buildStatusDraft = (displayName, metadataContext, terminal, behaviorBucket) => {
     const keys = new Set(metadataContext.statuses.map((status) => status.statusKey).filter(Boolean));
     const generated = uniqueGeneratedKey(displayName, keys, reservedStatusKeys, 50);
     if (generated.error) throw new Error(generated.error);
@@ -635,7 +688,7 @@ export default function WorkflowBuilder() {
       statusKey: generated.key,
       displayName,
       terminal,
-      behaviorBucket: terminal ? "COMPLETED" : "IN_PROGRESS",
+      behaviorBucket: behaviorBucket || (terminal ? "COMPLETED" : "IN_PROGRESS"),
     };
   };
 
@@ -653,10 +706,11 @@ export default function WorkflowBuilder() {
     let fromStatus = findStatusInContext(row.fromStatus, metadataContext);
     let action = findActionInContext(row.action, metadataContext);
     let toStatus = findStatusInContext(row.toStatus, metadataContext);
+    const fromStatusBehaviorBucket = statusMatchesStart(row.fromStatus, fromStatus) ? "NEW" : "IN_PROGRESS";
 
     if (!fromStatus) {
       setRowSaveStates((current) => ({ ...current, [row.id]: "Creating Status" }));
-      const draft = buildStatusDraft(normalizeText(row.fromStatus), metadataContext, false);
+      const draft = buildStatusDraft(normalizeText(row.fromStatus), metadataContext, false, fromStatusBehaviorBucket);
       fromStatus = await createWorkflowStatus(draft, (rowIndex + 1) * 10);
       metadataContext.statuses.push(fromStatus);
       setStatuses((current) => [...current, fromStatus]);
@@ -686,6 +740,22 @@ export default function WorkflowBuilder() {
     }
 
     return { fromStatus, action, toStatus };
+  };
+
+  const ensureSelectedStartStatusBehavior = async (metadataContext) => {
+    const status = findStatusInContext(startStatus, metadataContext);
+    if (!status || status.behaviorBucket === "NEW") return;
+    if (status.terminal) throw new Error("The selected NEW status cannot be terminal.");
+    if (status.systemStatus || status.protectedStatus) {
+      throw new Error("The selected NEW status is protected. Choose an editable custom status or type a new one.");
+    }
+    const updated = await updateWorkflowStatusBehavior(status, "NEW");
+    metadataContext.statuses = metadataContext.statuses.map((candidate) => (
+      candidate.id === updated.id ? updated : candidate
+    ));
+    setStatuses((current) => current.map((candidate) => (
+      candidate.id === updated.id ? updated : candidate
+    )));
   };
 
   const saveExistingTransitionRow = async ({ fromStatus, action, toStatus }, rowIndex) => {
@@ -796,6 +866,8 @@ export default function WorkflowBuilder() {
     let failedCount = 0;
 
     try {
+      await ensureSelectedStartStatusBehavior(metadataContext);
+
       for (const row of targetRows) {
         const rowIndex = rows.findIndex((candidate) => candidate.id === row.id);
         const validation = rowValidation[row.id];
@@ -847,16 +919,13 @@ export default function WorkflowBuilder() {
 
   const runClientTest = () => {
     const issues = [];
-    if (!startStatus.trim()) issues.push("Start status is required.");
+    if (startStatusIssue) issues.push(startStatusIssue);
     rows.forEach((row, index) => {
       if (!row.fromStatus.trim() || !row.action.trim() || !row.toStatus.trim()) {
         issues.push(`Line ${index + 1} needs From Status, Action, and To Status.`);
       }
     });
     if (terminalNames.length === 0) issues.push("At least one terminal status should be selected.");
-    if (rows.length > 0 && !rows.some((row) => row.fromStatus.trim().toLowerCase() === startStatus.trim().toLowerCase())) {
-      issues.push("No line starts from the selected start status.");
-    }
     setTestResult({
       ok: issues.length === 0,
       issues,
@@ -1011,6 +1080,9 @@ export default function WorkflowBuilder() {
                     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                       <Badge tone={rowValidation[row.id]?.fromStatus ? "green" : "yellow"}>{rowValidation[row.id]?.fromStatus ? "Existing" : "New"}</Badge>
                       <p className="mt-1">From: <span className="font-extrabold text-blue-950">{rowValidation[row.id]?.fromStatus?.statusKey || rowValidation[row.id]?.newFromStatus?.statusKey || "Pending"}</span></p>
+                      {!rowValidation[row.id]?.fromStatus && rowValidation[row.id]?.newFromStatus?.behaviorBucket && (
+                        <p className="mt-1 text-slate-500">Bucket: {rowValidation[row.id].newFromStatus.behaviorBucket}</p>
+                      )}
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2">
                       <Badge tone={rowValidation[row.id]?.action ? "green" : "yellow"}>{rowValidation[row.id]?.action ? "Existing" : "New"}</Badge>
@@ -1057,9 +1129,9 @@ export default function WorkflowBuilder() {
             </div>
 
             <label className="mt-4 block">
-              <span className="mb-1 block text-xs font-extrabold uppercase text-slate-500">Start Status</span>
+              <span className="mb-1 block text-xs font-extrabold uppercase text-slate-500">Which Status Will Be NEW</span>
               <input
-                className="min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950"
+                className={`min-h-11 w-full rounded-lg border bg-white px-3 py-2 text-sm font-semibold text-blue-950 outline-none focus:border-blue-950 ${startStatusIssue ? "border-amber-400" : "border-slate-300"}`}
                 value={startStatus}
                 onChange={(event) => setStartStatus(event.target.value)}
                 list="builder-start-statuses"
@@ -1067,6 +1139,8 @@ export default function WorkflowBuilder() {
               <datalist id="builder-start-statuses">
                 {statusOptions.map((status) => <option key={status.key} value={status.label}>{status.key}</option>)}
               </datalist>
+              {startStatusIssue && <p className="mt-1 text-xs font-semibold text-amber-700">{startStatusIssue}</p>}
+              {startStatusNotice && <p className="mt-1 text-xs font-semibold text-blue-700">{startStatusNotice}</p>}
             </label>
 
             <div className="mt-4">

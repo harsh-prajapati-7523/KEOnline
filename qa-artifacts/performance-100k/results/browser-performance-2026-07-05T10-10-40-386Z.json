@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-07-05T10:10:40.373Z",
+  "baseUrl": "https://test.kumar-electricals.com",
+  "viewport": {
+    "width": 390,
+    "height": 844,
+    "isMobile": true
+  },
+  "sampleSearch": "9000000001",
+  "sampleTicketId": null,
+  "results": [
+    {
+      "label": "login",
+      "durationMs": 36967.4
+    },
+    {
+      "label": "create-ticket-screen",
+      "durationMs": 1419.1
+    },
+    {
+      "label": "find-tickets-default",
+      "durationMs": 2169.8
+    },
+    {
+      "label": "find-tickets-search",
+      "durationMs": 552.1
+    },
+    {
+      "label": "open-ticket-screen",
+      "durationMs": 563.9
+    }
+  ]
+}

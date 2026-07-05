@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, ClipboardList, MapPin, MessageCircle, Package, Phone, Send, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SuggestionInput from "../components/SuggestionInput";
+import { hasAccess } from "../utils/access";
 
 const emptyForm = {
   customerName: "",
@@ -13,6 +14,11 @@ const emptyForm = {
 };
 
 const CUSTOMER_LOOKUP_DEBOUNCE_MS = 300;
+const PRODUCT_SUGGESTION_DEBOUNCE_MS = 275;
+
+function normalizeSuggestionValue(text) {
+  return text.trim().toLowerCase();
+}
 
 function validate(formData) {
   const errors = {};
@@ -128,12 +134,14 @@ export default function CreateTicket() {
   const [dynamicConfigError, setDynamicConfigError] = useState("");
   const [customerLookupStatus, setCustomerLookupStatus] = useState("idle");
   const [customerLookupMessage, setCustomerLookupMessage] = useState("");
+  const [productSuggestions, setProductSuggestions] = useState([]);
   const manuallyEditedCustomerFieldsRef = useRef({
     customerName: false,
     villageOrArea: false,
   });
   const lastCustomerLookupMobileRef = useRef("");
   const customerLookupRequestIdRef = useRef(0);
+  const productSuggestionRequestIdRef = useRef(0);
 
   const getFieldClassName = (fieldName, type = "input", extraClassName = "") => `form-${type} ${errors[fieldName] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
   const getDynamicFieldClassName = (fieldId, type = "input", extraClassName = "") => `form-${type} ${dynamicErrors[fieldId] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
@@ -291,6 +299,57 @@ export default function CreateTicket() {
     };
   }, [formData.mobileNumber]);
 
+  useEffect(() => {
+    const query = formData.productType.trim();
+    const token = localStorage.getItem("token");
+    const canUseSuggestions = hasAccess("USE_SMART_SUGGESTIONS");
+    const requestId = ++productSuggestionRequestIdRef.current;
+
+    if (!token || !canUseSuggestions) {
+      setProductSuggestions([]);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`/volt/suggestions/product-types?query=${encodeURIComponent(query)}`, {
+          headers: authHeaders(),
+          signal: controller.signal,
+        });
+
+        if (!response.ok) throw new Error("Product suggestion request failed");
+
+        const data = await response.json();
+        if (requestId !== productSuggestionRequestIdRef.current) return;
+
+        const normalizedQuery = normalizeSuggestionValue(query);
+        const seenSuggestions = new Set();
+        const nextSuggestions = Array.isArray(data)
+          ? data
+              .filter((suggestion) => typeof suggestion === "string" && suggestion.trim())
+              .filter((suggestion) => !normalizedQuery || normalizeSuggestionValue(suggestion) !== normalizedQuery)
+              .filter((suggestion) => {
+                const normalizedSuggestion = normalizeSuggestionValue(suggestion);
+                if (seenSuggestions.has(normalizedSuggestion)) return false;
+                seenSuggestions.add(normalizedSuggestion);
+                return true;
+              })
+              .slice(0, 5)
+          : [];
+        setProductSuggestions(nextSuggestions);
+      } catch {
+        if (requestId !== productSuggestionRequestIdRef.current || controller.signal.aborted) return;
+        setProductSuggestions([]);
+      }
+    }, PRODUCT_SUGGESTION_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [formData.productType]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     const nextValue = name === "mobileNumber" ? value.replace(/\D/g, "").slice(0, 10) : value;
@@ -382,7 +441,6 @@ export default function CreateTicket() {
     }
   };
 
-  const productChips = ["Battery", "Inverter", "UPS", "Fan", "Stabilizer"];
   const problemChips = ["Not charging", "No backup", "Not working", "Noise issue"];
 
   return (
@@ -485,16 +543,18 @@ export default function CreateTicket() {
                   <label htmlFor="product-type" className="form-label">Product Type</label>
                   <div className="input-with-icon">
                     <Package aria-hidden="true" />
-                    <SuggestionInput ref={setFieldRef("productType")} id="product-type" endpoint="/volt/suggestions/product-types" name="productType" value={formData.productType} onChange={handleChange} placeholder="e.g., Inverter, Battery" className={getFieldClassName("productType")} aria-invalid={Boolean(errors.productType)} aria-describedby={errors.productType ? "product-type-error" : undefined} />
+                    <input ref={setFieldRef("productType")} id="product-type" name="productType" value={formData.productType} onChange={handleChange} placeholder="e.g., Inverter, Battery" className={getFieldClassName("productType")} aria-invalid={Boolean(errors.productType)} aria-describedby={errors.productType ? "product-type-error" : undefined} autoComplete="off" />
                   </div>
                   <FieldError id="product-type-error" message={errors.productType} />
-                  <div className="quick-chip-row" aria-label="Product type shortcuts">
-                    {productChips.map((chip) => (
+                  {productSuggestions.length > 0 && (
+                  <div className="quick-chip-row" aria-label="Product type suggestions">
+                    {productSuggestions.map((chip) => (
                       <button key={chip} type="button" className="quick-chip" onClick={() => applyQuickValue("productType", chip)}>
                         {chip}
                       </button>
                     ))}
                   </div>
+                  )}
                 </div>
 
                 <div>

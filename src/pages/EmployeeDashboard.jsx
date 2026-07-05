@@ -24,6 +24,15 @@ const ROLE_LABELS = {
   EMPLOYEE: "Employee",
 };
 
+const ACCOUNT_ACTIONS = [
+  {
+    icon: KeyRound,
+    label: "Change Password",
+    path: "/change-password",
+    tone: "blue",
+  },
+];
+
 function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
   const [isOpening, setIsOpening] = useState(false);
   const iconToneClassNames = {
@@ -109,7 +118,7 @@ export default function EmployeeDashboard() {
   const canManageTicketFields = hasAnyAccess(["VIEW_TICKET_FIELD_MANAGEMENT", "MANAGE_TICKET_FIELDS"]);
   const canManageCategoryFieldConfiguration = hasAnyAccess(["VIEW_CATEGORY_FIELD_CONFIGURATION", "MANAGE_CATEGORY_FIELD_CONFIGS"]);
   const canManageDropdownSources = hasAnyAccess(["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]);
-  const hasDashboardActions = canCreateTicket || canViewTickets || canManageEmployees || canManageRoles || canManageRoleAccess
+  const hasDashboardActions = ACCOUNT_ACTIONS.length > 0 || canCreateTicket || canViewTickets || canManageEmployees || canManageRoles || canManageRoleAccess
     || canManageWorkflow || canManageTicketCategories || canManageTicketFields || canManageCategoryFieldConfiguration || canManageDropdownSources;
   const hasPrimaryActions = canCreateTicket || canViewTickets;
   const hasAdminActions = canManageEmployees || canManageRoles || canManageRoleAccess || canManageWorkflow
@@ -162,6 +171,14 @@ export default function EmployeeDashboard() {
         </header>
 
         <section className="mt-4 sm:mt-6" aria-label="Dashboard work areas">
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {ACCOUNT_ACTIONS.map((action) => (
+              <DashboardAction key={action.path} icon={action.icon} tone={action.tone} onClick={() => navigate(action.path)}>
+                {action.label}
+              </DashboardAction>
+            ))}
+          </div>
+
           {hasPrimaryActions && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {canCreateTicket && (

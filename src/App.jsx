@@ -17,6 +17,7 @@ const TicketCategoryManagement = lazy(() => import("./pages/TicketCategoryManage
 const TicketCategoryFieldManagement = lazy(() => import("./pages/TicketCategoryFieldManagement"));
 const TicketFieldManagement = lazy(() => import("./pages/TicketFieldManagement"));
 const DropdownSourceManagement = lazy(() => import("./pages/DropdownSourceManagement"));
+const ChangePassword = lazy(() => import("./pages/ChangePassword"));
 const CreateTicket = lazy(() => import("./pages/CreateTicket"));
 const MyTickets = lazy(() => import("./pages/MyTickets"));
 const OpenTicket = lazy(() => import("./pages/OpenTicket"));
@@ -314,6 +315,11 @@ function AppRoutes() {
           <Route path="/employee-dashboard" element={
             <ProtectedRoute>
               <EmployeeDashboard />
+            </ProtectedRoute>
+          }/>
+          <Route path="/change-password" element={
+            <ProtectedRoute>
+              <ChangePassword />
             </ProtectedRoute>
           }/>
           <Route path="/admin/employees" element={

@@ -144,15 +144,21 @@ async function ensureEmployee(page, role) {
 
 async function selectWorkflowCategory(page) {
   const categorySelect = page.getByRole('combobox', { name: /Category/i });
+  await page.waitForFunction((categoryName) => {
+    const selects = Array.from(document.querySelectorAll('select'));
+    return selects.some((select) => Array.from(select.options).some((option) => (
+      option.textContent || ''
+    ).toLowerCase().includes(categoryName.toLowerCase())));
+  }, category.name, { timeout: 30000 });
   await selectOptionByText(categorySelect, category.name);
   await page.waitForLoadState('networkidle');
   return categorySelect.inputValue();
 }
 
 async function buildWorkflow(page) {
-  await page.goto(`${baseURL}/admin/workflow`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseURL}/admin/workflow`, { waitUntil: 'domcontentloaded' });
   const categoryId = await selectWorkflowCategory(page);
-  await page.goto(`${baseURL}/admin/workflow/builder?categoryId=${encodeURIComponent(categoryId)}`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseURL}/admin/workflow/builder?categoryId=${encodeURIComponent(categoryId)}`, { waitUntil: 'domcontentloaded' });
   await page.waitForURL(/\/admin\/workflow\/builder/);
   await page.waitForLoadState('networkidle');
 
@@ -230,7 +236,7 @@ async function setWorkflowActionPermission(page, actionName, role, allowed) {
 }
 
 async function configureWorkflowRoleAccess(page) {
-  await page.goto(`${baseURL}/admin/workflow`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseURL}/admin/workflow`, { waitUntil: 'domcontentloaded' });
   await selectWorkflowCategory(page);
   await page.getByRole('button', { name: /^Role Access$/i }).click();
   await page.waitForLoadState('networkidle');
@@ -245,7 +251,7 @@ async function configureWorkflowRoleAccess(page) {
 }
 
 async function activateWorkflow(page) {
-  await page.goto(`${baseURL}/admin/workflow`, { waitUntil: 'networkidle' });
+  await page.goto(`${baseURL}/admin/workflow`, { waitUntil: 'domcontentloaded' });
   await selectWorkflowCategory(page);
   const mapTab = page.getByRole('button', { name: /^Map$/i });
   if (await mapTab.count()) await mapTab.click();

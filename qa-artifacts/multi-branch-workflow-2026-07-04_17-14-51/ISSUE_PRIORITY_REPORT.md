@@ -7,7 +7,7 @@ Source run: `qa-artifacts/multi-branch-workflow-2026-07-04_17-14-51`
 
 ### P0 - Custom-role workflow actions fail to load
 
-Status: Fix applied, verification pending  
+Status: Verified fixed on test deployment  
 Area: Backend  
 Observed API: `GET /volt/tickets/{id}/available-actions`  
 Observed result: `500 Internal Server Error` for custom role `QA_ALPHA_JUL04_1740`  
@@ -28,11 +28,14 @@ Likely cause:
 Progress:
 - Updated `AccessService.requireAllowed(...)` and `requireAnyAllowed(...)` with `noRollbackFor = ResponseStatusException.class`.
 - Purpose: permission denials used while hiding unavailable workflow actions should not poison the surrounding read transaction.
-- Verification pending by request: no build/test run.
+- Deployed verification passed.
+- `QA_ALPHA_JUL04_1740` calling `GET /volt/tickets/9/available-actions` now returns `200`.
+- Returned actions only included `QA_ROUTE_ALPHA_JUL04_1740`, correctly hiding the Beta branch.
+- Full UI rerun passed: Alpha and Beta users executed different paths for the same category.
 
 ### P1 - `/tickets/open` endpoint returns 500
 
-Status: Fix applied, verification pending  
+Status: Still failing on test deployment  
 Area: Backend / Routing  
 Observed API: `GET /volt/tickets/open`  
 Observed result:
@@ -54,11 +57,14 @@ Likely cause:
 Progress:
 - Constrained ticket-id controller mappings to numeric ids with `/{id:\d+}`.
 - This prevents literal paths such as `/volt/tickets/open` from being parsed as ticket ids.
-- Verification pending by request: no build/test run.
+- Deployed verification still fails.
+- `GET /volt/tickets/open` returned `500`.
+- Latest correlation ID: `2b685cae-759e-41c2-8554-06de2de5d87b`.
+- Needs further backend investigation.
 
 ### P1 - Workflow Builder can retain terminal flag on edited seeded rows
 
-Status: Fix applied, verification pending  
+Status: Fix applied, broad UI rerun passed  
 Area: Frontend  
 Observed behavior:
 - A seeded row originally targeting `Default Done` retained the terminal target behavior after the target was changed to an intermediate custom status.
@@ -76,7 +82,8 @@ Progress:
 - Updated `WorkflowBuilder.updateRow(...)` so changing `To Status` resets `toStatusTerminal` based on the newly selected target status.
 - If the selected target is an existing terminal status, the flag stays true.
 - If the user changes away to a new/intermediate target, stale terminal state is cleared.
-- Verification pending by request: no build/test run.
+- Full UI workflow rerun passed without recreating the stale terminal failure.
+- Targeted reproduction of this exact stale-terminal edit scenario is still recommended.
 
 ### P2 - Workflow Management did not expose Edit Workflow Path on test deployment
 
@@ -109,6 +116,8 @@ Recommended fix:
 - Make default transitions easy to disable from the category workflow screen, or add a warning when custom NEW branches coexist with default start.
 
 Progress:
+- Still observed in focused API check.
+- SUPER_ADMIN `GET /volt/tickets/9/available-actions` still returned default `Start` alongside `QA Route Alpha...` and `QA Route Beta...`.
 - Not started.
 
 ### P3 - Validation warnings for missing transition role scopes
@@ -127,4 +136,17 @@ Progress:
 
 ## Verification Status
 
-No build or tests have been run after fixes because the instruction was: `Do not build or test`.
+Post-deploy verification was run against `https://test.kumar-electricals.com`.
+
+Passed:
+- Custom-role available actions no longer return 500.
+- Alpha role sees only Alpha branch action.
+- Beta role sees only Beta branch action.
+- Full UI script completed successfully and updated the manual screenshots.
+
+Still failing:
+- `GET /volt/tickets/open` still returns 500.
+
+Not run:
+- Local build.
+- Local automated test suite.

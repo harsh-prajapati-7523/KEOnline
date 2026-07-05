@@ -158,7 +158,6 @@ function Navbar() {
   const location = useLocation();
   const active = location.pathname;
   const isEmployeeLogin = active === "/employee-login";
-  const isCreateTicket = active === "/tickets/new";
   const isDashboard = active === "/employee-dashboard";
   const isAuthenticated = Boolean(localStorage.getItem("token"));
   const employeeName = localStorage.getItem("employeeName") ?? "";
@@ -179,7 +178,7 @@ function Navbar() {
   if (isEmployeeLogin) return null;
 
   return (
-    <nav className={`ke-app-header ${isCreateTicket ? "ke-app-header-compact" : ""} ${isDashboard ? "ke-app-header-dashboard" : ""} w-full overflow-hidden text-white`}>
+    <nav className={`ke-app-header ${isDashboard ? "ke-app-header-dashboard" : ""} w-full overflow-hidden text-white`}>
       <KEWaveBackground className="app-header-wave">
         <div className="ke-app-header-inner mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-3 py-2 sm:gap-3 sm:px-4 sm:py-3">
           <div className="ke-app-header-brand flex min-w-0 items-center gap-2.5 text-left sm:gap-3">

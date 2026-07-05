@@ -24,15 +24,6 @@ const ROLE_LABELS = {
   EMPLOYEE: "Employee",
 };
 
-const ACCOUNT_ACTIONS = [
-  {
-    icon: KeyRound,
-    label: "Change Password",
-    path: "/change-password",
-    tone: "blue",
-  },
-];
-
 function DashboardAction({ children, icon: Icon, onClick, tone = "blue" }) {
   const [isOpening, setIsOpening] = useState(false);
   const iconToneClassNames = {
@@ -118,9 +109,6 @@ export default function EmployeeDashboard() {
   const canManageTicketFields = hasAnyAccess(["VIEW_TICKET_FIELD_MANAGEMENT", "MANAGE_TICKET_FIELDS"]);
   const canManageCategoryFieldConfiguration = hasAnyAccess(["VIEW_CATEGORY_FIELD_CONFIGURATION", "MANAGE_CATEGORY_FIELD_CONFIGS"]);
   const canManageDropdownSources = hasAnyAccess(["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]);
-  const hasDashboardActions = ACCOUNT_ACTIONS.length > 0 || canCreateTicket || canViewTickets || canManageEmployees || canManageRoles || canManageRoleAccess
-    || canManageWorkflow || canManageTicketCategories || canManageTicketFields || canManageCategoryFieldConfiguration || canManageDropdownSources;
-  const hasPrimaryActions = canCreateTicket || canViewTickets;
   const hasAdminActions = canManageEmployees || canManageRoles || canManageRoleAccess || canManageWorkflow
     || canManageTicketCategories || canManageTicketFields || canManageCategoryFieldConfiguration || canManageDropdownSources;
 
@@ -171,38 +159,31 @@ export default function EmployeeDashboard() {
         </header>
 
         <section className="mt-4 sm:mt-6" aria-label="Dashboard work areas">
-          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {ACCOUNT_ACTIONS.map((action) => (
-              <DashboardAction key={action.path} icon={action.icon} tone={action.tone} onClick={() => navigate(action.path)}>
-                {action.label}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {canCreateTicket && (
+              <DashboardAction icon={PlusCircle} tone="yellow" onClick={() => navigate("/tickets/new")}>
+                Create Ticket
               </DashboardAction>
-            ))}
+            )}
+            {canViewTickets && (
+              <DashboardAction icon={ListChecks} tone="sky" onClick={() => navigate("/tickets/my")}>
+                My Tickets
+              </DashboardAction>
+            )}
+            {canViewTickets && (
+              <DashboardAction icon={Search} tone="indigo" onClick={() => navigate("/tickets/open")}>
+                Open Ticket
+              </DashboardAction>
+            )}
+            {canViewTickets && (
+              <DashboardAction icon={ClipboardList} tone="teal" onClick={() => navigate("/tickets/find")}>
+                Find Tickets
+              </DashboardAction>
+            )}
+            <DashboardAction icon={Settings2} tone="blue" onClick={() => navigate("/settings")}>
+              Settings
+            </DashboardAction>
           </div>
-
-          {hasPrimaryActions && (
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {canCreateTicket && (
-                <DashboardAction icon={PlusCircle} tone="yellow" onClick={() => navigate("/tickets/new")}>
-                  Create Ticket
-                </DashboardAction>
-              )}
-              {canViewTickets && (
-                <DashboardAction icon={ListChecks} tone="sky" onClick={() => navigate("/tickets/my")}>
-                  My Tickets
-                </DashboardAction>
-              )}
-              {canViewTickets && (
-                <DashboardAction icon={Search} tone="indigo" onClick={() => navigate("/tickets/open")}>
-                  Open Ticket
-                </DashboardAction>
-              )}
-              {canViewTickets && (
-                <DashboardAction icon={ClipboardList} tone="teal" onClick={() => navigate("/tickets/find")}>
-                  Find Tickets
-                </DashboardAction>
-              )}
-            </div>
-          )}
 
           {hasAdminActions && (
             <details className="dashboard-admin-panel mt-4 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm sm:p-5">
@@ -254,13 +235,6 @@ export default function EmployeeDashboard() {
             </details>
           )}
 
-          <div className={!hasPrimaryActions && !hasAdminActions ? "mt-4" : ""}>
-            {!hasDashboardActions && (
-              <p className="rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm font-semibold text-gray-600">
-                No actions available for your role.
-              </p>
-            )}
-          </div>
           {accessMessage && (
             <p className="mt-3 rounded-xl bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
               {accessMessage}

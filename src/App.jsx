@@ -17,6 +17,7 @@ const TicketCategoryManagement = lazy(() => import("./pages/TicketCategoryManage
 const TicketCategoryFieldManagement = lazy(() => import("./pages/TicketCategoryFieldManagement"));
 const TicketFieldManagement = lazy(() => import("./pages/TicketFieldManagement"));
 const DropdownSourceManagement = lazy(() => import("./pages/DropdownSourceManagement"));
+const Settings = lazy(() => import("./pages/Settings"));
 const ChangePassword = lazy(() => import("./pages/ChangePassword"));
 const CreateTicket = lazy(() => import("./pages/CreateTicket"));
 const MyTickets = lazy(() => import("./pages/MyTickets"));
@@ -320,6 +321,11 @@ function AppRoutes() {
           <Route path="/change-password" element={
             <ProtectedRoute>
               <ChangePassword />
+            </ProtectedRoute>
+          }/>
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <Settings />
             </ProtectedRoute>
           }/>
           <Route path="/admin/employees" element={

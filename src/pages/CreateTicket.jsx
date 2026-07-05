@@ -14,7 +14,7 @@ const emptyForm = {
 };
 
 const CUSTOMER_LOOKUP_DEBOUNCE_MS = 300;
-const PRODUCT_SUGGESTION_DEBOUNCE_MS = 100;
+const PRODUCT_SUGGESTION_DEBOUNCE_MS = 50;
 
 function normalizeSuggestionValue(text) {
   return text.trim().toLowerCase();
@@ -142,6 +142,8 @@ export default function CreateTicket() {
   const lastCustomerLookupMobileRef = useRef("");
   const customerLookupRequestIdRef = useRef(0);
   const productSuggestionRequestIdRef = useRef(0);
+  const productSuggestionCacheRef = useRef(new Map());
+  const skipProductSuggestionQueryRef = useRef(null);
 
   const getFieldClassName = (fieldName, type = "input", extraClassName = "") => `form-${type} ${errors[fieldName] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
   const getDynamicFieldClassName = (fieldId, type = "input", extraClassName = "") => `form-${type} ${dynamicErrors[fieldId] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
@@ -301,6 +303,7 @@ export default function CreateTicket() {
 
   useEffect(() => {
     const query = formData.productType.trim();
+    const normalizedQuery = normalizeSuggestionValue(query);
     const token = localStorage.getItem("token");
     const canUseSuggestions = hasAccess("USE_SMART_SUGGESTIONS");
     const requestId = ++productSuggestionRequestIdRef.current;
@@ -308,6 +311,16 @@ export default function CreateTicket() {
     if (!token || !canUseSuggestions) {
       setProductSuggestions([]);
       return undefined;
+    }
+
+    if (skipProductSuggestionQueryRef.current === normalizedQuery) {
+      skipProductSuggestionQueryRef.current = null;
+      return undefined;
+    }
+
+    const cachedSuggestions = productSuggestionCacheRef.current.get(normalizedQuery);
+    if (cachedSuggestions) {
+      setProductSuggestions(cachedSuggestions);
     }
 
     const controller = new AbortController();
@@ -323,7 +336,6 @@ export default function CreateTicket() {
         const data = await response.json();
         if (requestId !== productSuggestionRequestIdRef.current) return;
 
-        const normalizedQuery = normalizeSuggestionValue(query);
         const seenSuggestions = new Set();
         const nextSuggestions = Array.isArray(data)
           ? data
@@ -337,10 +349,10 @@ export default function CreateTicket() {
               })
               .slice(0, 5)
           : [];
+        productSuggestionCacheRef.current.set(normalizedQuery, nextSuggestions);
         setProductSuggestions(nextSuggestions);
       } catch {
         if (requestId !== productSuggestionRequestIdRef.current || controller.signal.aborted) return;
-        setProductSuggestions([]);
       }
     }, PRODUCT_SUGGESTION_DEBOUNCE_MS);
 
@@ -374,6 +386,10 @@ export default function CreateTicket() {
   };
 
   const applyQuickValue = (name, value) => {
+    if (name === "productType") {
+      skipProductSuggestionQueryRef.current = normalizeSuggestionValue(value);
+      setProductSuggestions([]);
+    }
     setFormData((current) => ({ ...current, [name]: value }));
     setErrors((current) => ({ ...current, [name]: "" }));
     setMessage("");

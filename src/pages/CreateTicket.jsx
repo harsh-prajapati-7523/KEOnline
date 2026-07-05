@@ -12,6 +12,8 @@ const emptyForm = {
   complaintDescription: "",
 };
 
+const CUSTOMER_LOOKUP_DEBOUNCE_MS = 300;
+
 function validate(formData) {
   const errors = {};
 
@@ -112,6 +114,7 @@ export default function CreateTicket() {
   const navigate = useNavigate();
   const fieldRefs = useRef({});
   const [formData, setFormData] = useState(emptyForm);
+  const formDataRef = useRef(emptyForm);
   const [categories, setCategories] = useState([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [categoryError, setCategoryError] = useState("");
@@ -123,6 +126,14 @@ export default function CreateTicket() {
   const [dynamicErrors, setDynamicErrors] = useState({});
   const [isLoadingDynamicFields, setIsLoadingDynamicFields] = useState(false);
   const [dynamicConfigError, setDynamicConfigError] = useState("");
+  const [customerLookupStatus, setCustomerLookupStatus] = useState("idle");
+  const [customerLookupMessage, setCustomerLookupMessage] = useState("");
+  const manuallyEditedCustomerFieldsRef = useRef({
+    customerName: false,
+    villageOrArea: false,
+  });
+  const lastCustomerLookupMobileRef = useRef("");
+  const customerLookupRequestIdRef = useRef(0);
 
   const getFieldClassName = (fieldName, type = "input", extraClassName = "") => `form-${type} ${errors[fieldName] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
   const getDynamicFieldClassName = (fieldId, type = "input", extraClassName = "") => `form-${type} ${dynamicErrors[fieldId] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
@@ -130,6 +141,10 @@ export default function CreateTicket() {
   const setFieldRef = (fieldName) => (element) => {
     if (element) fieldRefs.current[fieldName] = element;
   };
+
+  useEffect(() => {
+    formDataRef.current = formData;
+  }, [formData]);
 
   const loadCategories = useCallback(async () => {
     setIsLoadingCategories(true);
@@ -190,9 +205,103 @@ export default function CreateTicket() {
     };
   }, [formData.categoryId]);
 
+  useEffect(() => {
+    const mobileNumber = formData.mobileNumber;
+    const requestId = ++customerLookupRequestIdRef.current;
+
+    if (mobileNumber.length !== 10) {
+      window.queueMicrotask(() => {
+        if (requestId !== customerLookupRequestIdRef.current) return;
+        setCustomerLookupStatus("idle");
+        setCustomerLookupMessage("");
+      });
+      return undefined;
+    }
+
+    if (lastCustomerLookupMobileRef.current === mobileNumber) {
+      return undefined;
+    }
+
+    lastCustomerLookupMobileRef.current = mobileNumber;
+
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(async () => {
+      setCustomerLookupStatus("loading");
+      setCustomerLookupMessage("Checking previous tickets...");
+
+      try {
+        const response = await fetch(`/volt/tickets/customer-lookup?mobileNumber=${encodeURIComponent(mobileNumber)}`, {
+          headers: authHeaders(),
+          signal: controller.signal,
+        });
+
+        if (requestId !== customerLookupRequestIdRef.current) return;
+
+        if (response.status === 204) {
+          setCustomerLookupStatus("idle");
+          setCustomerLookupMessage("");
+          return;
+        }
+
+        if (!response.ok) throw new Error("Customer lookup failed");
+
+        const data = await response.json();
+        const currentFormData = formDataRef.current;
+        const nextFormData = { ...currentFormData };
+        const canFillCustomerName = currentFormData.customerName.trim() === "" || !manuallyEditedCustomerFieldsRef.current.customerName;
+        const canFillVillageOrArea = currentFormData.villageOrArea.trim() === "" || !manuallyEditedCustomerFieldsRef.current.villageOrArea;
+        let didFillCustomerDetails = false;
+
+        if (currentFormData.mobileNumber === mobileNumber && typeof data.customerName === "string" && data.customerName.trim() && canFillCustomerName) {
+          nextFormData.customerName = data.customerName;
+          didFillCustomerDetails = true;
+        }
+
+        if (currentFormData.mobileNumber === mobileNumber && typeof data.villageOrArea === "string" && data.villageOrArea.trim() && canFillVillageOrArea) {
+          nextFormData.villageOrArea = data.villageOrArea;
+          didFillCustomerDetails = true;
+        }
+
+        if (didFillCustomerDetails) {
+          setFormData(nextFormData);
+          setErrors((current) => ({
+            ...current,
+            customerName: nextFormData.customerName.trim() ? "" : current.customerName,
+            villageOrArea: nextFormData.villageOrArea.trim() ? "" : current.villageOrArea,
+          }));
+        }
+
+        if (didFillCustomerDetails) {
+          setCustomerLookupStatus("found");
+          setCustomerLookupMessage("Customer details found from previous ticket.");
+        } else {
+          setCustomerLookupStatus("idle");
+          setCustomerLookupMessage("");
+        }
+      } catch {
+        if (requestId !== customerLookupRequestIdRef.current || controller.signal.aborted) return;
+        setCustomerLookupStatus("failed");
+        setCustomerLookupMessage("Could not check previous tickets. You can continue.");
+      }
+    }, CUSTOMER_LOOKUP_DEBOUNCE_MS);
+
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [formData.mobileNumber]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     const nextValue = name === "mobileNumber" ? value.replace(/\D/g, "").slice(0, 10) : value;
+    if (name === "mobileNumber" && nextValue !== formData.mobileNumber) {
+      lastCustomerLookupMobileRef.current = "";
+      setCustomerLookupStatus("idle");
+      setCustomerLookupMessage("");
+    }
+    if (name === "customerName" || name === "villageOrArea") {
+      manuallyEditedCustomerFieldsRef.current[name] = true;
+    }
     setFormData((current) => ({ ...current, [name]: nextValue }));
     setErrors((current) => ({ ...current, [name]: "" }));
     setMessage("");
@@ -324,9 +433,24 @@ export default function CreateTicket() {
                   <label htmlFor="mobile-number" className="sr-only">Mobile Number</label>
                   <div className="input-with-icon">
                     <Phone aria-hidden="true" />
-                    <input ref={setFieldRef("mobileNumber")} id="mobile-number" name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} placeholder="Enter 10-digit mobile number" className={getFieldClassName("mobileNumber")} aria-invalid={Boolean(errors.mobileNumber)} aria-describedby={errors.mobileNumber ? "mobile-number-error" : undefined} />
+                    <input ref={setFieldRef("mobileNumber")} id="mobile-number" name="mobileNumber" type="tel" inputMode="numeric" maxLength={10} value={formData.mobileNumber} onChange={handleChange} placeholder="Enter 10-digit mobile number" className={getFieldClassName("mobileNumber")} aria-invalid={Boolean(errors.mobileNumber)} aria-describedby={[errors.mobileNumber ? "mobile-number-error" : "", customerLookupMessage ? "mobile-lookup-helper" : ""].filter(Boolean).join(" ") || undefined} />
                   </div>
                   <FieldError id="mobile-number-error" message={errors.mobileNumber} />
+                  {customerLookupMessage && (
+                    <p
+                      id="mobile-lookup-helper"
+                      role={customerLookupStatus === "failed" ? "status" : undefined}
+                      className={`mt-1 text-sm font-semibold ${
+                        customerLookupStatus === "failed"
+                          ? "text-yellow-700"
+                          : customerLookupStatus === "found"
+                            ? "text-green-700"
+                            : "text-gray-600"
+                      }`}
+                    >
+                      {customerLookupMessage}
+                    </p>
+                  )}
                 </div>
 
                 <div>

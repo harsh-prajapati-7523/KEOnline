@@ -158,6 +158,8 @@ export default function CreateTicket() {
   const speechStartedAtRef = useRef(0);
   const speechStreamRef = useRef(null);
   const speechStopTimeoutRef = useRef(null);
+  const speechPressActiveRef = useRef(false);
+  const speechStartPendingRef = useRef(false);
 
   const getFieldClassName = (fieldName, type = "input", extraClassName = "") => `form-${type} ${errors[fieldName] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
   const getDynamicFieldClassName = (fieldId, type = "input", extraClassName = "") => `form-${type} ${dynamicErrors[fieldId] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
@@ -436,11 +438,15 @@ export default function CreateTicket() {
   };
 
   const startProblemRecording = async () => {
+    if (speechStartPendingRef.current || mediaRecorderRef.current?.state === "recording") {
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === "undefined") {
       setSpeechMessage("Voice typing is not supported on this browser. Please type manually.");
       return;
     }
 
+    speechStartPendingRef.current = true;
     try {
       setSpeechMessage("Listening...");
       speechChunksRef.current = [];
@@ -460,6 +466,7 @@ export default function CreateTicket() {
       recorder.onstop = async () => {
         window.clearTimeout(speechStopTimeoutRef.current);
         setIsRecordingProblem(false);
+        mediaRecorderRef.current = null;
         speechStreamRef.current?.getTracks().forEach((track) => track.stop());
         speechStreamRef.current = null;
 
@@ -495,6 +502,13 @@ export default function CreateTicket() {
 
       recorder.start();
       setIsRecordingProblem(true);
+      speechStartPendingRef.current = false;
+
+      if (!speechPressActiveRef.current) {
+        stopProblemRecording();
+        return;
+      }
+
       speechStopTimeoutRef.current = window.setTimeout(() => {
         stopProblemRecording();
       }, SPEECH_RECORDING_MAX_MS);
@@ -503,15 +517,38 @@ export default function CreateTicket() {
       setSpeechMessage("Mic permission denied or unavailable. Please type manually.");
       speechStreamRef.current?.getTracks().forEach((track) => track.stop());
       speechStreamRef.current = null;
+    } finally {
+      speechStartPendingRef.current = false;
     }
   };
 
-  const toggleProblemRecording = () => {
-    if (isRecordingProblem) {
-      stopProblemRecording();
-    } else {
-      startProblemRecording();
-    }
+  const handleProblemRecordingPress = (event) => {
+    if (event.type === "pointerdown" && event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    speechPressActiveRef.current = true;
+    startProblemRecording();
+  };
+
+  const handleProblemRecordingRelease = (event) => {
+    event.preventDefault();
+    speechPressActiveRef.current = false;
+    stopProblemRecording();
+  };
+
+  const handleProblemRecordingKeyDown = (event) => {
+    if (event.key !== " " && event.key !== "Enter") return;
+    if (event.repeat) return;
+    event.preventDefault();
+    speechPressActiveRef.current = true;
+    startProblemRecording();
+  };
+
+  const handleProblemRecordingKeyUp = (event) => {
+    if (event.key !== " " && event.key !== "Enter") return;
+    event.preventDefault();
+    speechPressActiveRef.current = false;
+    stopProblemRecording();
   };
 
   const handleSubmit = async (event) => {
@@ -697,7 +734,20 @@ export default function CreateTicket() {
                     <label htmlFor="complaint-description" className="form-label">
                       Problem Details <span className="optional-badge">Optional</span>
                     </label>
-                    <button type="button" className="quick-chip" onClick={toggleProblemRecording} aria-label={isRecordingProblem ? "Stop voice typing" : "Start Hindi voice typing"} title={isRecordingProblem ? "Stop voice typing" : "Start Hindi voice typing"}>
+                    <button
+                      type="button"
+                      className="quick-chip"
+                      onPointerDown={handleProblemRecordingPress}
+                      onPointerUp={handleProblemRecordingRelease}
+                      onPointerCancel={handleProblemRecordingRelease}
+                      onKeyDown={handleProblemRecordingKeyDown}
+                      onKeyUp={handleProblemRecordingKeyUp}
+                      onContextMenu={(event) => event.preventDefault()}
+                      aria-label="Hold to voice type in Hindi"
+                      aria-pressed={isRecordingProblem}
+                      title="Hold to voice type in Hindi"
+                      style={{ touchAction: "none" }}
+                    >
                       {isRecordingProblem ? <Square size={14} aria-hidden="true" /> : <Mic size={14} aria-hidden="true" />}
                     </button>
                   </div>

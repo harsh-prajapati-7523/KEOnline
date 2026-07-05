@@ -14,7 +14,7 @@ const emptyForm = {
 };
 
 const CUSTOMER_LOOKUP_DEBOUNCE_MS = 300;
-const PRODUCT_SUGGESTION_DEBOUNCE_MS = 275;
+const PRODUCT_SUGGESTION_DEBOUNCE_MS = 100;
 
 function normalizeSuggestionValue(text) {
   return text.trim().toLowerCase();

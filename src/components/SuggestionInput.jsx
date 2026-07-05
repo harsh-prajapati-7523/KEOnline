@@ -3,6 +3,10 @@ import { hasAccess } from "../utils/access";
 
 const DEBOUNCE_MS = 275;
 
+function normalizeSuggestionValue(text) {
+  return text.trim().toLowerCase();
+}
+
 const SuggestionInput = forwardRef(function SuggestionInput({
   endpoint,
   name,
@@ -42,7 +46,13 @@ const SuggestionInput = forwardRef(function SuggestionInput({
         const data = await response.json();
         if (requestId !== requestIdRef.current) return;
 
-        const nextSuggestions = Array.isArray(data) ? data.slice(0, 5) : [];
+        const normalizedQuery = normalizeSuggestionValue(query);
+        const nextSuggestions = Array.isArray(data)
+          ? data
+              .filter((suggestion) => typeof suggestion === "string")
+              .filter((suggestion) => normalizeSuggestionValue(suggestion) !== normalizedQuery)
+              .slice(0, 5)
+          : [];
         setSuggestions(nextSuggestions);
         setIsOpen(nextSuggestions.length > 0);
       } catch {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, ChevronDown, ClipboardList, MapPin, MessageCircle, Package, Phone, Send, User } from "lucide-react";
+import { ArrowLeft, ChevronDown, ClipboardList, MapPin, MessageCircle, Mic, Package, Phone, Send, Square, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import SuggestionInput from "../components/SuggestionInput";
 import { hasAccess } from "../utils/access";
@@ -15,9 +15,16 @@ const emptyForm = {
 
 const CUSTOMER_LOOKUP_DEBOUNCE_MS = 300;
 const PRODUCT_SUGGESTION_DEBOUNCE_MS = 50;
+const SPEECH_RECORDING_MAX_MS = 30_000;
 
 function normalizeSuggestionValue(text) {
   return text.trim().toLowerCase();
+}
+
+function getSupportedSpeechMimeType() {
+  if (typeof window.MediaRecorder === "undefined") return "";
+  return ["audio/webm;codecs=opus", "audio/webm", "audio/ogg;codecs=opus", "audio/mp4"]
+    .find((mimeType) => window.MediaRecorder.isTypeSupported(mimeType)) || "";
 }
 
 function validate(formData) {
@@ -135,6 +142,8 @@ export default function CreateTicket() {
   const [customerLookupStatus, setCustomerLookupStatus] = useState("idle");
   const [customerLookupMessage, setCustomerLookupMessage] = useState("");
   const [productSuggestions, setProductSuggestions] = useState([]);
+  const [isRecordingProblem, setIsRecordingProblem] = useState(false);
+  const [speechMessage, setSpeechMessage] = useState("");
   const manuallyEditedCustomerFieldsRef = useRef({
     customerName: false,
     villageOrArea: false,
@@ -144,6 +153,11 @@ export default function CreateTicket() {
   const productSuggestionRequestIdRef = useRef(0);
   const productSuggestionCacheRef = useRef(new Map());
   const skipProductSuggestionQueryRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const speechChunksRef = useRef([]);
+  const speechStartedAtRef = useRef(0);
+  const speechStreamRef = useRef(null);
+  const speechStopTimeoutRef = useRef(null);
 
   const getFieldClassName = (fieldName, type = "input", extraClassName = "") => `form-${type} ${errors[fieldName] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
   const getDynamicFieldClassName = (fieldId, type = "input", extraClassName = "") => `form-${type} ${dynamicErrors[fieldId] ? "ke-form-control-invalid" : ""} ${extraClassName}`.trim();
@@ -155,6 +169,12 @@ export default function CreateTicket() {
   useEffect(() => {
     formDataRef.current = formData;
   }, [formData]);
+
+  useEffect(() => () => {
+    window.clearTimeout(speechStopTimeoutRef.current);
+    mediaRecorderRef.current?.state === "recording" && mediaRecorderRef.current.stop();
+    speechStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
 
   const loadCategories = useCallback(async () => {
     setIsLoadingCategories(true);
@@ -395,6 +415,105 @@ export default function CreateTicket() {
     setMessage("");
   };
 
+  const appendProblemDetails = (text) => {
+    const nextText = text.trim();
+    if (!nextText) return;
+    setFormData((current) => {
+      const currentDescription = current.complaintDescription.trim();
+      return {
+        ...current,
+        complaintDescription: currentDescription ? `${currentDescription} ${nextText}` : nextText,
+      };
+    });
+    setMessage("");
+  };
+
+  const stopProblemRecording = () => {
+    window.clearTimeout(speechStopTimeoutRef.current);
+    if (mediaRecorderRef.current?.state === "recording") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const startProblemRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof window.MediaRecorder === "undefined") {
+      setSpeechMessage("Voice typing is not supported on this browser. Please type manually.");
+      return;
+    }
+
+    try {
+      setSpeechMessage("Listening...");
+      speechChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      speechStreamRef.current = stream;
+      const mimeType = getSupportedSpeechMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+      speechStartedAtRef.current = Date.now();
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          speechChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        window.clearTimeout(speechStopTimeoutRef.current);
+        setIsRecordingProblem(false);
+        speechStreamRef.current?.getTracks().forEach((track) => track.stop());
+        speechStreamRef.current = null;
+
+        const durationSeconds = Math.max(1, Math.ceil((Date.now() - speechStartedAtRef.current) / 1000));
+        const audio = new Blob(speechChunksRef.current, { type: mimeType || recorder.mimeType });
+        if (audio.size === 0) {
+          setSpeechMessage("Could not hear clearly. Please try again.");
+          return;
+        }
+
+        setSpeechMessage("Converting speech...");
+        const formDataPayload = new FormData();
+        formDataPayload.append("audio", audio, "problem-details.webm");
+        formDataPayload.append("durationSeconds", String(durationSeconds));
+
+        try {
+          const response = await fetch("/volt/speech/transcribe", {
+            method: "POST",
+            headers: authHeaders(),
+            body: formDataPayload,
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            setSpeechMessage(data.message || "Voice typing is temporarily unavailable. Please type manually.");
+            return;
+          }
+          appendProblemDetails(typeof data.text === "string" ? data.text : "");
+          setSpeechMessage("");
+        } catch {
+          setSpeechMessage("Voice typing is temporarily unavailable. Please type manually.");
+        }
+      };
+
+      recorder.start();
+      setIsRecordingProblem(true);
+      speechStopTimeoutRef.current = window.setTimeout(() => {
+        stopProblemRecording();
+      }, SPEECH_RECORDING_MAX_MS);
+    } catch {
+      setIsRecordingProblem(false);
+      setSpeechMessage("Mic permission denied or unavailable. Please type manually.");
+      speechStreamRef.current?.getTracks().forEach((track) => track.stop());
+      speechStreamRef.current = null;
+    }
+  };
+
+  const toggleProblemRecording = () => {
+    if (isRecordingProblem) {
+      stopProblemRecording();
+    } else {
+      startProblemRecording();
+    }
+  };
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (isSubmitting) return;
@@ -574,13 +693,19 @@ export default function CreateTicket() {
                 </div>
 
                 <div>
-                  <label htmlFor="complaint-description" className="form-label">
-                    Problem Details <span className="optional-badge">Optional</span>
-                  </label>
+                  <div className="flex items-center justify-between gap-2">
+                    <label htmlFor="complaint-description" className="form-label">
+                      Problem Details <span className="optional-badge">Optional</span>
+                    </label>
+                    <button type="button" className="quick-chip" onClick={toggleProblemRecording} aria-label={isRecordingProblem ? "Stop voice typing" : "Start Hindi voice typing"} title={isRecordingProblem ? "Stop voice typing" : "Start Hindi voice typing"}>
+                      {isRecordingProblem ? <Square size={14} aria-hidden="true" /> : <Mic size={14} aria-hidden="true" />}
+                    </button>
+                  </div>
                   <div className="input-with-icon textarea">
                     <MessageCircle aria-hidden="true" />
                     <textarea id="complaint-description" name="complaintDescription" rows="3" value={formData.complaintDescription} onChange={handleChange} placeholder="Example: not charging" className={getFieldClassName("complaintDescription", "textarea")} />
                   </div>
+                  {speechMessage && <p className="mt-1 text-sm font-semibold text-gray-600">{speechMessage}</p>}
                   <div className="quick-chip-row" aria-label="Problem detail shortcuts">
                     {problemChips.map((chip) => (
                       <button key={chip} type="button" className="quick-chip" onClick={() => applyQuickValue("complaintDescription", chip)}>

@@ -62,7 +62,7 @@ function PasswordField({
       <label htmlFor={id} className="ke-form-label">
         {label}
       </label>
-      <div className={`ke-form-control ${error ? "ke-form-control-invalid" : ""}`}>
+      <div className={`flex min-h-12 w-full items-center rounded-xl border bg-white px-3 py-1.5 ${error ? "border-red-600 shadow-[0_0_0_1px_rgba(220,38,38,0.12)]" : "border-blue-100 focus-within:border-blue-950 focus-within:shadow-[0_0_0_3px_rgba(16,27,77,0.1)]"}`}>
         <Icon className="mr-3 shrink-0 text-blue-950" size={20} aria-hidden="true" />
         <input
           id={id}
@@ -74,12 +74,12 @@ function PasswordField({
           autoComplete={autoComplete}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
-          className="min-h-11 min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-500"
+          className="min-h-10 min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-500"
         />
         <button
           type="button"
           onClick={toggleShowPassword}
-          className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-blue-950 hover:bg-blue-50"
+          className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl p-0 text-blue-950 hover:bg-blue-50"
           aria-label={showPassword ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
         >
           {showPassword ? <EyeOff size={19} aria-hidden="true" /> : <Eye size={19} aria-hidden="true" />}

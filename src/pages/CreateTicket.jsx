@@ -15,7 +15,7 @@ const emptyForm = {
 
 const CUSTOMER_LOOKUP_DEBOUNCE_MS = 300;
 const PRODUCT_SUGGESTION_DEBOUNCE_MS = 50;
-const SPEECH_RECORDING_MAX_MS = 30_000;
+const SPEECH_RECORDING_MAX_MS = 15_000;
 
 function normalizeSuggestionValue(text) {
   return text.trim().toLowerCase();

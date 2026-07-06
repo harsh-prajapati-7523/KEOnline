@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { User, Lock, ShieldCheck } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess } from "../utils/access";
-import { persistAuthSession } from "../utils/auth";
+import { getValidToken, isPinLoginAvailable, persistAuthSession } from "../utils/auth";
 
 export default function EmployeeLogin() {
   const navigate = useNavigate();
@@ -15,6 +15,21 @@ export default function EmployeeLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    let isCurrent = true;
+    if (getValidToken()) return undefined;
+
+    isPinLoginAvailable().then((available) => {
+      if (isCurrent && available) {
+        navigate("/pin-login", { replace: true, state: location.state });
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [location.state, navigate]);
 
   const handleEmployeeIdChange = (event) => {
     setEmployeeId(event.target.value);
@@ -155,14 +170,6 @@ export default function EmployeeLogin() {
             >
               <ShieldCheck size={22} />
               {isSubmitting ? "Logging in..." : "Login"}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => navigate("/pin-login")}
-              className="mt-3 w-full rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 transition hover:bg-blue-50"
-            >
-              Login with PIN
             </button>
 
             {error && (

@@ -6,8 +6,8 @@ import PinLogin from "./pages/PinLogin";
 import PinSetup from "./pages/PinSetup";
 import KEWaveBackground from "./components/KEWaveBackground";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { fetchCurrentAccess, hasAnyAccess } from "./utils/access";
-import { getTokenExpiryMs, getValidToken, logoutSession, onAuthExpired, refreshAccessToken } from "./utils/auth";
+import { hasAnyAccess } from "./utils/access";
+import { clearAuthSession, getTokenExpiryMs, getValidToken, isPinLoginAvailable, logoutSession, onAuthExpired } from "./utils/auth";
 
 const HomePage = lazy(() => import("./pages/Home"));
 const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
@@ -93,9 +93,9 @@ function AuthExpiryWatcher() {
   const location = useLocation();
 
   useEffect(() => {
-    const unsubscribe = onAuthExpired(() => {
+    const unsubscribe = onAuthExpired(async () => {
       if (location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
-        navigate("/employee-login", { replace: true });
+        navigate(await isPinLoginAvailable() ? "/pin-login" : "/employee-login", { replace: true });
       }
     });
 
@@ -107,13 +107,11 @@ function AuthExpiryWatcher() {
     if (!token) {
       if (location.pathname !== "/" && location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
         let isCurrent = true;
-        refreshAccessToken()
-          .then(() => fetchCurrentAccess().catch(() => {}))
-          .catch(() => {
-            if (isCurrent) {
-              navigate("/employee-login", { replace: true });
-            }
-          });
+        isPinLoginAvailable().then((available) => {
+          if (isCurrent) {
+            navigate(available ? "/pin-login" : "/employee-login", { replace: true });
+          }
+        });
         return () => {
           isCurrent = false;
         };
@@ -126,13 +124,9 @@ function AuthExpiryWatcher() {
 
     const timeoutMs = Math.max(0, expiryMs - Date.now());
     const timeoutId = window.setTimeout(async () => {
-      try {
-        await refreshAccessToken();
-        await fetchCurrentAccess().catch(() => {});
-      } catch {
-        if (location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
-          navigate("/pin-login", { replace: true });
-        }
+      clearAuthSession();
+      if (location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
+        navigate(await isPinLoginAvailable() ? "/pin-login" : "/employee-login", { replace: true });
       }
     }, timeoutMs);
 

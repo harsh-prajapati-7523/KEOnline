@@ -94,6 +94,20 @@ export async function refreshAccessToken() {
   return refreshPromise;
 }
 
+export async function isPinLoginAvailable() {
+  try {
+    const response = await fetch("/volt/auth/pin/status", {
+      method: "POST",
+      credentials: "include",
+    });
+    if (!response.ok) return false;
+    const data = await response.json();
+    return data.pinLoginAvailable === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function logoutSession() {
   try {
     await fetch("/volt/auth/logout", {
@@ -127,26 +141,10 @@ export function installAuthFetchInterceptor() {
   window.fetch = async (input, init) => {
     const response = await originalFetch(input, init);
     if (response.status === 401 && isVoltRequest(input) && !isAuthRequest(input)) {
-      try {
-        const data = await refreshAccessToken();
-        const retryInit = withAuthorizationHeader(init, data.accessToken || data.token);
-        return originalFetch(input, retryInit);
-      } catch {
-        notifyAuthExpired();
-      }
+      notifyAuthExpired();
     }
     return response;
   };
-}
-
-function withAuthorizationHeader(init, token) {
-  if (!token) return init;
-
-  const nextInit = { ...(init || {}) };
-  const headers = new Headers(nextInit.headers || {});
-  headers.set("Authorization", `Bearer ${token}`);
-  nextInit.headers = headers;
-  return nextInit;
 }
 
 function isAuthRequest(input) {

@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { fetchCurrentAccess, getStoredAccess, hasAccess, hasAnyAccess } from "../utils/access";
-import { getValidToken, refreshAccessToken } from "../utils/auth";
+import { getValidToken, isPinLoginAvailable } from "../utils/auth";
 
 export default function ProtectedRoute({ children, allowedRoles, accessKey, anyAccessKey }) {
   const location = useLocation();
-  const [isRefreshingSession, setIsRefreshingSession] = useState(false);
-  const [refreshFailed, setRefreshFailed] = useState(false);
-  const [, setSessionRefreshKey] = useState(0);
+  const [isCheckingSession, setIsCheckingSession] = useState(false);
+  const [authRedirectPath, setAuthRedirectPath] = useState("");
   const [isLoadingAccess, setIsLoadingAccess] = useState(false);
   const [, setAccessRefreshKey] = useState(0);
   const token = getValidToken();
@@ -16,28 +15,23 @@ export default function ProtectedRoute({ children, allowedRoles, accessKey, anyA
 
   useEffect(() => {
     let isCurrent = true;
-    if (token || refreshFailed) return undefined;
+    if (token || authRedirectPath) return undefined;
 
-    setIsRefreshingSession(true);
-    refreshAccessToken()
-      .then(() => {
+    setIsCheckingSession(true);
+    isPinLoginAvailable()
+      .then((available) => {
         if (!isCurrent) return;
-        setRefreshFailed(false);
-        setSessionRefreshKey((current) => current + 1);
-      })
-      .catch(() => {
-        if (!isCurrent) return;
-        setRefreshFailed(true);
+        setAuthRedirectPath(available ? "/pin-login" : "/employee-login");
       })
       .finally(() => {
         if (!isCurrent) return;
-        setIsRefreshingSession(false);
+        setIsCheckingSession(false);
       });
 
     return () => {
       isCurrent = false;
     };
-  }, [refreshFailed, token]);
+  }, [authRedirectPath, token]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -58,10 +52,10 @@ export default function ProtectedRoute({ children, allowedRoles, accessKey, anyA
   }, [needsAccess, role, token]);
 
   if (!token) {
-    if (isRefreshingSession && !refreshFailed) {
-      return <main className="min-h-screen bg-gray-50 px-4 py-6 text-sm font-semibold text-gray-600">Restoring session...</main>;
+    if (isCheckingSession || !authRedirectPath) {
+      return <main className="min-h-screen bg-gray-50 px-4 py-6 text-sm font-semibold text-gray-600">Checking session...</main>;
     }
-    return <Navigate to="/employee-login" replace state={{ from: location }} />;
+    return <Navigate to={authRedirectPath} replace state={{ from: location }} />;
   }
 
   if (allowedRoles && !allowedRoles.includes(role)) {

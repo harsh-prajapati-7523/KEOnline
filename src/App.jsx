@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { Download, Home, LayoutDashboard, ListChecks, LogIn, LogOut, PlusCircle, X } from "lucide-react";
+import { Download, Home, LayoutDashboard, ListChecks, Lock, LogIn, PlusCircle, X } from "lucide-react";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import PinLogin from "./pages/PinLogin";
 import PinSetup from "./pages/PinSetup";
@@ -328,9 +328,9 @@ function AuthenticatedBottomNav() {
   const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
   const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
 
-  const logout = async () => {
-    await logoutSession();
-    navigate("/employee-login", { replace: true });
+  const lockApp = () => {
+    clearAccessSession();
+    navigate("/pin-login", { replace: true, state: { from: location } });
   };
 
   const itemClassName = (isActive) => `flex min-h-14 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-2 py-1 text-[0.72rem] font-bold transition ${
@@ -356,9 +356,9 @@ function AuthenticatedBottomNav() {
             Find
           </button>
         )}
-        <button type="button" onClick={logout} className={itemClassName(false)} aria-label="Logout">
-          <LogOut size={17} aria-hidden="true" />
-          Logout
+        <button type="button" onClick={lockApp} className={itemClassName(false)} aria-label="Lock">
+          <Lock size={17} aria-hidden="true" />
+          Lock
         </button>
       </div>
     </nav>

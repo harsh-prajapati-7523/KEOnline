@@ -1,5 +1,7 @@
-import { ArrowLeft, ChevronRight, KeyRound, Settings2 } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, ChevronRight, KeyRound, LogOut, Settings2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { logoutSession } from "../utils/auth";
 
 function IconBubble({ icon: Icon, tone = "slate" }) {
   const toneClassNames = {
@@ -36,6 +38,18 @@ function SettingsRow({ icon, label, value, onClick, tone = "slate" }) {
 export default function Settings() {
   const navigate = useNavigate();
   const employeeName = localStorage.getItem("employeeName") || "Employee";
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    const confirmed = window.confirm("Logout from this device?\n\nYou will need your password to login again.");
+    if (!confirmed) return;
+
+    setIsLoggingOut(true);
+    await logoutSession();
+    navigate("/employee-login", { replace: true });
+  };
 
   return (
     <main id="main-content" className="ke-page-main ticket-detail-page bg-gray-50 lg:px-8">
@@ -65,6 +79,28 @@ export default function Settings() {
               tone="blue"
               onClick={() => navigate("/change-password")}
             />
+          </section>
+
+          <section className="min-w-0 rounded-2xl border border-red-100 bg-white p-4 shadow-sm" aria-label="Logout">
+            <div className="flex min-w-0 items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-700">
+                <LogOut size={20} aria-hidden="true" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-sm font-extrabold text-slate-900">Logout</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-600">
+                  Logout from this device. You will need your password to login again.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="mt-4 inline-flex min-h-11 items-center justify-center rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-extrabold text-red-700 transition hover:bg-red-50 disabled:opacity-60"
+                >
+                  {isLoggingOut ? "Logging out..." : "Logout"}
+                </button>
+              </div>
+            </div>
           </section>
         </div>
       </div>

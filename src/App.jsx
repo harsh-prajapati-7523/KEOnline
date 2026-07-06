@@ -2,10 +2,12 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { BrowserRouter, Navigate, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Download, Home, LayoutDashboard, ListChecks, LogIn, LogOut, PlusCircle, X } from "lucide-react";
 import EmployeeLogin from "./pages/EmployeeLogin";
+import PinLogin from "./pages/PinLogin";
+import PinSetup from "./pages/PinSetup";
 import KEWaveBackground from "./components/KEWaveBackground";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { hasAnyAccess } from "./utils/access";
-import { clearAuthSession, getTokenExpiryMs, getValidToken, onAuthExpired } from "./utils/auth";
+import { fetchCurrentAccess, hasAnyAccess } from "./utils/access";
+import { getTokenExpiryMs, getValidToken, logoutSession, onAuthExpired, refreshAccessToken } from "./utils/auth";
 
 const HomePage = lazy(() => import("./pages/Home"));
 const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
@@ -92,7 +94,7 @@ function AuthExpiryWatcher() {
 
   useEffect(() => {
     const unsubscribe = onAuthExpired(() => {
-      if (location.pathname !== "/employee-login") {
+      if (location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
         navigate("/employee-login", { replace: true });
       }
     });
@@ -103,8 +105,18 @@ function AuthExpiryWatcher() {
   useEffect(() => {
     const token = getValidToken();
     if (!token) {
-      if (location.pathname !== "/" && location.pathname !== "/employee-login") {
-        navigate("/employee-login", { replace: true });
+      if (location.pathname !== "/" && location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
+        let isCurrent = true;
+        refreshAccessToken()
+          .then(() => fetchCurrentAccess().catch(() => {}))
+          .catch(() => {
+            if (isCurrent) {
+              navigate("/employee-login", { replace: true });
+            }
+          });
+        return () => {
+          isCurrent = false;
+        };
       }
       return undefined;
     }
@@ -113,9 +125,15 @@ function AuthExpiryWatcher() {
     if (!expiryMs) return undefined;
 
     const timeoutMs = Math.max(0, expiryMs - Date.now());
-    const timeoutId = window.setTimeout(() => {
-      clearAuthSession();
-      navigate("/employee-login", { replace: true });
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        await refreshAccessToken();
+        await fetchCurrentAccess().catch(() => {});
+      } catch {
+        if (location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
+          navigate("/pin-login", { replace: true });
+        }
+      }
     }, timeoutMs);
 
     return () => window.clearTimeout(timeoutId);
@@ -130,7 +148,7 @@ function InstallAppPrompt() {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    if (location.pathname === "/employee-login") return undefined;
+    if (location.pathname === "/employee-login" || location.pathname === "/pin-login" || location.pathname === "/pin-setup") return undefined;
     if (isStandaloneDisplay()) return undefined;
 
     const handleBeforeInstallPrompt = (event) => {
@@ -165,7 +183,7 @@ function InstallAppPrompt() {
     }
   };
 
-  if (location.pathname === "/employee-login" || !installPromptEvent || !isVisible) return null;
+  if (location.pathname === "/employee-login" || location.pathname === "/pin-login" || location.pathname === "/pin-setup" || !installPromptEvent || !isVisible) return null;
 
   return (
     <aside className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-2xl border border-blue-100 bg-white p-3 text-blue-950 shadow-2xl sm:bottom-4 sm:right-4 sm:left-auto sm:mx-0 sm:w-full" aria-label="Install RiseTicket app">
@@ -197,13 +215,13 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const active = location.pathname;
-  const isEmployeeLogin = active === "/employee-login";
+  const isAuthPage = active === "/employee-login" || active === "/pin-login" || active === "/pin-setup";
   const isDashboard = active === "/employee-dashboard";
   const isAuthenticated = Boolean(getValidToken());
   const employeeName = localStorage.getItem("employeeName") ?? "";
 
-  const logout = () => {
-    clearAuthSession();
+  const logout = async () => {
+    await logoutSession();
     navigate("/employee-login", { replace: true });
   };
 
@@ -211,7 +229,7 @@ function Navbar() {
     isActive ? "ke-nav-active" : "bg-white/10 hover:bg-white/20"
   }`;
 
-  if (isEmployeeLogin) return null;
+  if (isAuthPage) return null;
 
   return (
     <nav className={`ke-app-header ${isDashboard ? "ke-app-header-dashboard" : ""} w-full overflow-hidden text-white`}>
@@ -276,13 +294,13 @@ function AuthenticatedBottomNav() {
   const active = location.pathname;
   const isAuthenticated = Boolean(getValidToken());
 
-  if (!isAuthenticated || active === "/employee-login") return null;
+  if (!isAuthenticated || active === "/employee-login" || active === "/pin-login" || active === "/pin-setup") return null;
 
   const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
   const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
 
-  const logout = () => {
-    clearAuthSession();
+  const logout = async () => {
+    await logoutSession();
     navigate("/employee-login", { replace: true });
   };
 
@@ -344,6 +362,12 @@ function AppRoutes() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/employee-login" element={<EmployeeLogin />} />
+          <Route path="/pin-login" element={<PinLogin />} />
+          <Route path="/pin-setup" element={
+            <ProtectedRoute>
+              <PinSetup />
+            </ProtectedRoute>
+          }/>
           <Route path="/employee-dashboard" element={
             <ProtectedRoute>
               <EmployeeDashboard />

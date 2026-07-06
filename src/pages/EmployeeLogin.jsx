@@ -1,13 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { User, Lock, ShieldCheck } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess } from "../utils/access";
-
-const LOGIN_MODE = {
-  PIN: "PIN",
-  PASSWORD: "PASSWORD",
-};
+import { persistAuthSession } from "../utils/auth";
 
 export default function EmployeeLogin() {
   const navigate = useNavigate();
@@ -16,64 +12,17 @@ export default function EmployeeLogin() {
     ? `${location.state.from.pathname || ""}${location.state.from.search || ""}${location.state.from.hash || ""}`
     : "/employee-dashboard";
   const [employeeId, setEmployeeId] = useState("");
-  const [credential, setCredential] = useState("");
-  const [loginMode, setLoginMode] = useState(LOGIN_MODE.PIN);
-  const [isCheckingLoginMode, setIsCheckingLoginMode] = useState(false);
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const isPasswordMode = loginMode === LOGIN_MODE.PASSWORD;
-  const credentialLabel = isPasswordMode ? "Password" : "6 Digit PIN";
-  const credentialPlaceholder = isPasswordMode ? "Enter Password" : "Enter 6 Digit PIN";
-
-  useEffect(() => {
-    const trimmedEmployeeId = employeeId.trim();
-    if (!trimmedEmployeeId) {
-      setLoginMode(LOGIN_MODE.PIN);
-      setIsCheckingLoginMode(false);
-      return undefined;
-    }
-
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(async () => {
-      setIsCheckingLoginMode(true);
-      try {
-        const response = await fetch(`/volt/auth/employee-login-mode?employeeId=${encodeURIComponent(trimmedEmployeeId)}`, {
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error("Unable to check login mode");
-        const data = await response.json();
-        const nextMode = data.credentialType === LOGIN_MODE.PASSWORD ? LOGIN_MODE.PASSWORD : LOGIN_MODE.PIN;
-        setLoginMode((currentMode) => {
-          if (currentMode !== nextMode) {
-            setCredential("");
-          }
-          return nextMode;
-        });
-      } catch (error) {
-        if (error.name !== "AbortError") {
-          setLoginMode(LOGIN_MODE.PIN);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setIsCheckingLoginMode(false);
-        }
-      }
-    }, 250);
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timeoutId);
-    };
-  }, [employeeId]);
 
   const handleEmployeeIdChange = (event) => {
     setEmployeeId(event.target.value);
     setError("");
   };
 
-  const handleCredentialChange = (event) => {
-    const value = event.target.value;
-    setCredential(isPasswordMode ? value : value.replace(/\D/g, "").slice(0, 6));
+  const handlePasswordChange = (event) => {
+    setPassword(event.target.value);
     setError("");
   };
 
@@ -81,28 +30,24 @@ export default function EmployeeLogin() {
     e.preventDefault();
     if (isSubmitting) return;
 
-    if (!isPasswordMode && !/^\d{6}$/.test(credential)) {
-      setError("Please enter a valid 6 digit PIN.");
-      return;
-    }
-
     setError("");
     setIsSubmitting(true);
 
     try {
       const response = await fetch("/volt/auth/employeelogin", {
         method: "POST",
+        credentials: "include",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           employeeId,
-          password: credential,
+          password,
         }),
       });
 
       if (!response.ok) {
-        let message = `Unable to log in. Please check your employee ID and ${isPasswordMode ? "password" : "PIN"}.`;
+        let message = "Unable to log in. Please check your employee ID and password.";
         if (response.status === 423) {
           message = "Account is locked. Please contact an administrator to reset your password.";
         }
@@ -115,19 +60,20 @@ export default function EmployeeLogin() {
         throw new Error("Missing token");
       }
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("employeeName", data.employeeName ?? "");
-      localStorage.setItem("role", data.role ?? "");
-      localStorage.setItem("employeeId", data.employeeId ?? "");
+      persistAuthSession(data);
       try {
         await fetchCurrentAccess();
       } catch {
         clearAccess();
       }
+      if (data.pinRequired) {
+        navigate("/pin-setup", { replace: true, state: { from: redirectPath } });
+        return;
+      }
       navigate(redirectPath.startsWith("/") ? redirectPath : "/employee-dashboard", { replace: true });
     } catch (error) {
       clearAccess();
-      setError(error.message || `Unable to log in. Please check your employee ID and ${isPasswordMode ? "password" : "PIN"}.`);
+      setError(error.message || "Unable to log in. Please check your employee ID and password.");
     } finally {
       setIsSubmitting(false);
     }
@@ -180,9 +126,8 @@ export default function EmployeeLogin() {
 
             </div>
 
-            <label htmlFor="employee-credential" className="ke-login-label">
-              {credentialLabel}
-              {isCheckingLoginMode && <span className="ml-2 text-xs font-semibold text-gray-500">Checking...</span>}
+            <label htmlFor="employee-password" className="ke-login-label">
+              Password
             </label>
 
             <div className="ke-login-control">
@@ -190,16 +135,13 @@ export default function EmployeeLogin() {
               <Lock className="text-blue-950 mr-3" size={22} />
 
               <input
-                id="employee-credential"
+                id="employee-password"
                 type="password"
-                value={credential}
-                onChange={handleCredentialChange}
-                placeholder={credentialPlaceholder}
+                value={password}
+                onChange={handlePasswordChange}
+                placeholder="Enter Password"
                 className="ke-login-input"
-                autoComplete={isPasswordMode ? "current-password" : "one-time-code"}
-                inputMode={isPasswordMode ? undefined : "numeric"}
-                maxLength={isPasswordMode ? undefined : 6}
-                pattern={isPasswordMode ? undefined : "\\d{6}"}
+                autoComplete="current-password"
                 required
               />
 
@@ -213,6 +155,14 @@ export default function EmployeeLogin() {
             >
               <ShieldCheck size={22} />
               {isSubmitting ? "Logging in..." : "Login"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigate("/pin-login")}
+              className="mt-3 w-full rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 transition hover:bg-blue-50"
+            >
+              Login with PIN
             </button>
 
             {error && (

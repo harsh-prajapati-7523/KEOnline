@@ -1,47 +1,27 @@
 import { useState } from "react";
 import { ArrowLeft, Eye, EyeOff, KeyRound, Lock, ShieldCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { clearAccess } from "../utils/access";
+import { logoutSession } from "../utils/auth";
 
 const emptyForm = {
   currentPassword: "",
   newPassword: "",
   confirmPassword: "",
 };
-const sixDigitPinPattern = /^\d{6}$/;
-
-function clearAuthSession() {
-  localStorage.removeItem("token");
-  localStorage.removeItem("employeeName");
-  localStorage.removeItem("role");
-  localStorage.removeItem("employeeId");
-  clearAccess();
-}
-
-function isSuperAdmin() {
-  return localStorage.getItem("role") === "SUPER_ADMIN";
-}
-
-function credentialName() {
-  return isSuperAdmin() ? "password" : "PIN";
-}
 
 function validate(form) {
   const errors = {};
-  const name = credentialName();
 
-  if (!form.currentPassword) errors.currentPassword = `Current ${name} is required.`;
+  if (!form.currentPassword) errors.currentPassword = "Current password is required.";
   if (!form.newPassword) {
-    errors.newPassword = `New ${name} is required.`;
-  } else if (isSuperAdmin() && form.newPassword.length < 8) {
+    errors.newPassword = "New password is required.";
+  } else if (form.newPassword.length < 8) {
     errors.newPassword = "New password must contain at least 8 characters.";
-  } else if (!isSuperAdmin() && !sixDigitPinPattern.test(form.newPassword)) {
-    errors.newPassword = "New PIN must be exactly 6 digits.";
   }
   if (!form.confirmPassword) {
-    errors.confirmPassword = `Confirm new ${name} is required.`;
+    errors.confirmPassword = "Confirm new password is required.";
   } else if (form.newPassword && form.newPassword !== form.confirmPassword) {
-    errors.confirmPassword = `New ${name} and confirm ${name} must match.`;
+    errors.confirmPassword = "New password and confirm password must match.";
   }
 
   return errors;
@@ -68,8 +48,6 @@ function PasswordField({
   showPassword,
   toggleShowPassword,
   value,
-  inputMode,
-  maxLength,
 }) {
   return (
     <div>
@@ -86,8 +64,6 @@ function PasswordField({
           onChange={onChange}
           placeholder={placeholder}
           autoComplete={autoComplete}
-          inputMode={inputMode}
-          maxLength={maxLength}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${id}-error` : undefined}
           className="min-h-10 min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none placeholder:text-slate-500"
@@ -118,16 +94,10 @@ export default function ChangePassword() {
   const [messageType, setMessageType] = useState("success");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [visibleFields, setVisibleFields] = useState({});
-  const passwordMode = isSuperAdmin();
-  const labelName = passwordMode ? "Password" : "PIN";
-  const lowerLabelName = passwordMode ? "password" : "PIN";
 
   const handleChange = (event) => {
     const { name, value } = event.target;
-    setForm((current) => ({
-      ...current,
-      [name]: passwordMode ? value : value.replace(/\D/g, "").slice(0, 6),
-    }));
+    setForm((current) => ({ ...current, [name]: value }));
     setErrors((current) => ({ ...current, [name]: "" }));
     setMessage("");
   };
@@ -163,23 +133,23 @@ export default function ChangePassword() {
 
       if (!response.ok) {
         if (response.status === 401) {
-          clearAuthSession();
+          await logoutSession();
           navigate("/employee-login", { replace: true });
           return;
         }
-        throw new Error(await readApiError(response, `Unable to change ${lowerLabelName}. Please check the details.`));
+        throw new Error(await readApiError(response, "Unable to change password. Please check the details."));
       }
 
       setMessageType("success");
-      setMessage(`${labelName} changed successfully. Please login again.`);
+      setMessage("Password changed successfully. Please login again.");
       setForm(emptyForm);
-      clearAuthSession();
+      await logoutSession();
       window.setTimeout(() => {
         navigate("/employee-login", { replace: true });
       }, 1200);
     } catch (error) {
       setMessageType("error");
-      setMessage(error.message || `Unable to change ${lowerLabelName}. Please try again.`);
+      setMessage(error.message || "Unable to change password. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -208,7 +178,7 @@ export default function ChangePassword() {
             </div>
             <div className="min-w-0">
               <h1 id="change-password-title" className="break-words text-2xl font-extrabold text-blue-950">
-                Change {labelName}
+                Change Password
               </h1>
             </div>
           </div>
@@ -217,13 +187,11 @@ export default function ChangePassword() {
             <PasswordField
               id="current-password"
               name="currentPassword"
-              label={`Current ${labelName}`}
+              label="Current Password"
               value={form.currentPassword}
               onChange={handleChange}
-              placeholder={`Enter current ${lowerLabelName}`}
+              placeholder="Enter current password"
               autoComplete="current-password"
-              inputMode={passwordMode ? undefined : "numeric"}
-              maxLength={passwordMode ? undefined : 6}
               icon={Lock}
               error={errors.currentPassword}
               showPassword={Boolean(visibleFields.currentPassword)}
@@ -233,13 +201,11 @@ export default function ChangePassword() {
             <PasswordField
               id="new-password"
               name="newPassword"
-              label={`New ${labelName}`}
+              label="New Password"
               value={form.newPassword}
               onChange={handleChange}
-              placeholder={`Enter new ${lowerLabelName}`}
+              placeholder="Enter new password"
               autoComplete="new-password"
-              inputMode={passwordMode ? undefined : "numeric"}
-              maxLength={passwordMode ? undefined : 6}
               icon={ShieldCheck}
               error={errors.newPassword}
               showPassword={Boolean(visibleFields.newPassword)}
@@ -249,13 +215,11 @@ export default function ChangePassword() {
             <PasswordField
               id="confirm-password"
               name="confirmPassword"
-              label={`Confirm New ${labelName}`}
+              label="Confirm New Password"
               value={form.confirmPassword}
               onChange={handleChange}
-              placeholder={`Confirm new ${lowerLabelName}`}
+              placeholder="Confirm new password"
               autoComplete="new-password"
-              inputMode={passwordMode ? undefined : "numeric"}
-              maxLength={passwordMode ? undefined : 6}
               icon={ShieldCheck}
               error={errors.confirmPassword}
               showPassword={Boolean(visibleFields.confirmPassword)}
@@ -278,7 +242,7 @@ export default function ChangePassword() {
                 className="ke-accent-action flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 py-2 text-base font-bold disabled:opacity-70"
               >
                 <KeyRound size={19} aria-hidden="true" />
-                {isSubmitting ? "Changing..." : `Change ${labelName}`}
+                {isSubmitting ? "Changing..." : "Change Password"}
               </button>
             </div>
           </form>

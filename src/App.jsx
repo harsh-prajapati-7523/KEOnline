@@ -4,7 +4,8 @@ import { Download, Home, LayoutDashboard, ListChecks, LogIn, LogOut, PlusCircle,
 import EmployeeLogin from "./pages/EmployeeLogin";
 import KEWaveBackground from "./components/KEWaveBackground";
 import ProtectedRoute from "./components/ProtectedRoute";
-import { clearAccess, hasAnyAccess } from "./utils/access";
+import { hasAnyAccess } from "./utils/access";
+import { clearAuthSession, getTokenExpiryMs, getValidToken } from "./utils/auth";
 
 const HomePage = lazy(() => import("./pages/Home"));
 const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
@@ -85,6 +86,34 @@ function RouteLoadingFallback() {
   );
 }
 
+function AuthExpiryWatcher() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const token = getValidToken();
+    if (!token) {
+      if (location.pathname !== "/" && location.pathname !== "/employee-login") {
+        navigate("/employee-login", { replace: true });
+      }
+      return undefined;
+    }
+
+    const expiryMs = getTokenExpiryMs(token);
+    if (!expiryMs) return undefined;
+
+    const timeoutMs = Math.max(0, expiryMs - Date.now());
+    const timeoutId = window.setTimeout(() => {
+      clearAuthSession();
+      navigate("/employee-login", { replace: true });
+    }, timeoutMs);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [location.pathname, navigate]);
+
+  return null;
+}
+
 function InstallAppPrompt() {
   const location = useLocation();
   const [installPromptEvent, setInstallPromptEvent] = useState(null);
@@ -160,15 +189,11 @@ function Navbar() {
   const active = location.pathname;
   const isEmployeeLogin = active === "/employee-login";
   const isDashboard = active === "/employee-dashboard";
-  const isAuthenticated = Boolean(localStorage.getItem("token"));
+  const isAuthenticated = Boolean(getValidToken());
   const employeeName = localStorage.getItem("employeeName") ?? "";
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("employeeName");
-    localStorage.removeItem("role");
-    localStorage.removeItem("employeeId");
-    clearAccess();
+    clearAuthSession();
     navigate("/employee-login", { replace: true });
   };
 
@@ -239,7 +264,7 @@ function AuthenticatedBottomNav() {
   const navigate = useNavigate();
   const location = useLocation();
   const active = location.pathname;
-  const isAuthenticated = Boolean(localStorage.getItem("token"));
+  const isAuthenticated = Boolean(getValidToken());
 
   if (!isAuthenticated || active === "/employee-login") return null;
 
@@ -247,11 +272,7 @@ function AuthenticatedBottomNav() {
   const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("employeeName");
-    localStorage.removeItem("role");
-    localStorage.removeItem("employeeId");
-    clearAccess();
+    clearAuthSession();
     navigate("/employee-login", { replace: true });
   };
 
@@ -289,7 +310,7 @@ function AuthenticatedBottomNav() {
 
 function AppRoutes() {
   const location = useLocation();
-  const isAuthenticated = Boolean(localStorage.getItem("token"));
+  const isAuthenticated = Boolean(getValidToken());
 
   useEffect(() => {
     if (!isAuthenticated || location.pathname.startsWith("/tickets") || !hasAnyAccess(["VIEW_TICKETS"])) {
@@ -423,6 +444,7 @@ function App() {
       </a>
       <Navbar />
       <AppRoutes />
+      <AuthExpiryWatcher />
       <InstallAppPrompt />
       <AuthenticatedBottomNav />
       

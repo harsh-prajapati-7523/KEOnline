@@ -1,9 +1,11 @@
+import { clearAuthSession, getValidToken } from "./auth";
+
 const ACCESS_STORAGE_KEY = "access";
 
 export async function fetchCurrentAccess() {
-  const token = localStorage.getItem("token");
+  const token = getValidToken();
   if (!token) {
-    clearAccess();
+    clearAuthSession();
     throw new Error("Missing token");
   }
 
@@ -14,7 +16,11 @@ export async function fetchCurrentAccess() {
   });
 
   if (!response.ok) {
-    clearAccess();
+    if (response.status === 401) {
+      clearAuthSession();
+    } else {
+      clearAccess();
+    }
     throw new Error("Access request failed");
   }
 

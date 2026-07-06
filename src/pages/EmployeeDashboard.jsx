@@ -17,6 +17,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import KEPremiumCardBackground from "../components/KEPremiumCardBackground";
 import { clearAccess, fetchCurrentAccess, hasAnyAccess } from "../utils/access";
+import { getValidToken } from "../utils/auth";
 
 const ROLE_LABELS = {
   SUPER_ADMIN: "Super Admin",
@@ -116,7 +117,7 @@ export default function EmployeeDashboard() {
 
   useEffect(() => {
     let isCurrent = true;
-    if (!localStorage.getItem("token")) return undefined;
+    if (!getValidToken()) return undefined;
 
     fetchCurrentAccess()
       .then(() => {

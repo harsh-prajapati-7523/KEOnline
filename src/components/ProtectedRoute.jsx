@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { fetchCurrentAccess, getStoredAccess, hasAccess, hasAnyAccess } from "../utils/access";
+import { getValidToken } from "../utils/auth";
 
 export default function ProtectedRoute({ children, allowedRoles, accessKey, anyAccessKey }) {
   const location = useLocation();
   const [isLoadingAccess, setIsLoadingAccess] = useState(false);
   const [, setAccessRefreshKey] = useState(0);
-  const token = localStorage.getItem("token");
+  const token = getValidToken();
   const role = localStorage.getItem("role");
   const needsAccess = Boolean(accessKey || anyAccessKey);
 

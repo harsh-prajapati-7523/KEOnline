@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { KeyRound, Lock, RotateCcw } from "lucide-react";
+import { useRef, useState } from "react";
+import { Lock, RotateCcw } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess } from "../utils/access";
@@ -9,24 +9,56 @@ function normalizePin(value) {
   return value.replace(/\D/g, "").slice(0, 6);
 }
 
+const MAX_PIN_ATTEMPTS = 5;
+const PIN_RESET_STATUS = 423;
+const PIN_FAILED_ATTEMPTS_KEY = "ke_pin_failed_attempts";
+
+function readFailedPinAttempts() {
+  if (typeof window === "undefined") {
+    return 0;
+  }
+
+  const storedValue = window.sessionStorage.getItem(PIN_FAILED_ATTEMPTS_KEY);
+  const parsedValue = Number.parseInt(storedValue || "0", 10);
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+}
+
+function writeFailedPinAttempts(value) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.setItem(PIN_FAILED_ATTEMPTS_KEY, String(value));
+}
+
+function clearFailedPinAttempts() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(PIN_FAILED_ATTEMPTS_KEY);
+}
+
 export default function PinLogin() {
   const navigate = useNavigate();
   const location = useLocation();
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
+  const [failedAttempts, setFailedAttempts] = useState(readFailedPinAttempts);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResettingPin, setIsResettingPin] = useState(false);
+  const [isPinFocused, setIsPinFocused] = useState(false);
+  const pinInputRef = useRef(null);
   const redirectPath = location.state?.from
     ? typeof location.state.from === "string"
       ? location.state.from
       : `${location.state.from.pathname || ""}${location.state.from.search || ""}${location.state.from.hash || ""}`
     : "/employee-dashboard";
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
+  const unlockWithPin = async (pinValue) => {
     if (isSubmitting) return;
 
-    if (!/^\d{6}$/.test(pin)) {
+    if (!/^\d{6}$/.test(pinValue)) {
       setError("Please enter a valid 6 digit PIN.");
       return;
     }
@@ -40,15 +72,28 @@ export default function PinLogin() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin: pinValue }),
       });
 
+      if (response.status === PIN_RESET_STATUS) {
+        setError("Too many invalid PIN attempts. Resetting PIN...");
+        clearFailedPinAttempts();
+        setFailedAttempts(0);
+        setPin("");
+        await resetPinSession();
+        clearAccess();
+        navigate("/employee-login", { replace: true });
+        return;
+      }
+
       if (!response.ok) {
-        throw new Error("PIN expired or incorrect. Please login with password.");
+        throw new Error("PIN expired or incorrect.");
       }
 
       const data = await response.json();
       persistAuthSession(data);
+      clearFailedPinAttempts();
+      setFailedAttempts(0);
       try {
         await fetchCurrentAccess();
       } catch {
@@ -57,11 +102,49 @@ export default function PinLogin() {
       const safeRedirectPath = redirectPath.startsWith("/") ? redirectPath : "/employee-dashboard";
       navigate(data.pinRequired ? "/pin-setup" : safeRedirectPath, { replace: true });
     } catch (error) {
+      const nextFailedAttempts = failedAttempts + 1;
+      const attemptsRemaining = MAX_PIN_ATTEMPTS - nextFailedAttempts;
       clearAccess();
-      setError(error.message || "PIN expired or incorrect. Please login with password.");
+      setPin("");
+      writeFailedPinAttempts(nextFailedAttempts);
+      setFailedAttempts(nextFailedAttempts);
+
+      if (nextFailedAttempts >= MAX_PIN_ATTEMPTS) {
+        setError("Too many invalid PIN attempts. Resetting PIN...");
+        clearFailedPinAttempts();
+        setFailedAttempts(0);
+        await resetPinSession();
+        clearAccess();
+        navigate("/employee-login", { replace: true });
+        return;
+      }
+
+      setError(
+        attemptsRemaining === 1
+          ? `${error.message || "PIN expired or incorrect."} 1 attempt remaining.`
+          : `${error.message || "PIN expired or incorrect."} ${attemptsRemaining} attempts remaining.`
+      );
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    await unlockWithPin(pin);
+  };
+
+  const handlePinChange = (event) => {
+    const nextPin = normalizePin(event.target.value);
+    setPin(nextPin);
+    setError("");
+    if (nextPin.length === 6) {
+      void unlockWithPin(nextPin);
+    }
+  };
+
+  const focusPinInput = () => {
+    pinInputRef.current?.focus();
   };
 
   const handleResetPin = async () => {
@@ -69,6 +152,8 @@ export default function PinLogin() {
 
     setIsResettingPin(true);
     setError("");
+    clearFailedPinAttempts();
+    setFailedAttempts(0);
     await resetPinSession();
     clearAccess();
     navigate("/employee-login", { replace: true });
@@ -92,17 +177,47 @@ export default function PinLogin() {
               6 Digit PIN
             </label>
 
-            <div className="ke-login-control">
-              <Lock className="mr-3 text-blue-950" size={22} aria-hidden="true" />
-              <input id="employee-pin" type="password" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={pin} onChange={(event) => { setPin(normalizePin(event.target.value)); setError(""); }} placeholder="Enter 6 Digit PIN" className="ke-login-input" required />
+            <div className="ke-pin-entry" onClick={focusPinInput}>
+              <input
+                ref={pinInputRef}
+                id="employee-pin"
+                type="password"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={pin}
+                onChange={handlePinChange}
+                onFocus={() => setIsPinFocused(true)}
+                onBlur={() => setIsPinFocused(false)}
+                className="ke-pin-entry-input"
+                aria-label="6 Digit PIN"
+                required
+              />
+              <div className="ke-pin-box-grid" aria-hidden="true">
+                {Array.from({ length: 6 }).map((_, index) => {
+                  const isFilled = index < pin.length;
+                  const isActive = isPinFocused && index === Math.min(pin.length, 5);
+                  return (
+                    <span key={index} className={`ke-pin-box ${isActive ? "ke-pin-box--active" : ""}`}>
+                      {isFilled ? <span className="ke-pin-dot" /> : isActive ? <span className="ke-pin-caret" /> : null}
+                    </span>
+                  );
+                })}
+              </div>
             </div>
 
-            <button type="submit" disabled={isSubmitting} aria-busy={isSubmitting} className="ke-login-button">
-              <KeyRound size={22} />
-              {isSubmitting ? "Unlocking..." : "Unlock"}
-            </button>
+            <div className="ke-pin-helper">
+              <Lock size={16} aria-hidden="true" />
+              <span>Enter 6-digit PIN</span>
+            </div>
 
-            <button type="button" onClick={handleResetPin} disabled={isResettingPin} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 transition hover:bg-blue-50 disabled:opacity-60">
+            {isSubmitting && (
+              <p role="status" className="mt-4 text-center text-sm font-bold text-blue-950">
+                Unlocking...
+              </p>
+            )}
+
+            <button type="button" onClick={handleResetPin} disabled={isResettingPin || isSubmitting} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 transition hover:bg-blue-50 disabled:opacity-60">
               <RotateCcw size={17} aria-hidden="true" />
               {isResettingPin ? "Resetting..." : "Reset PIN"}
             </button>

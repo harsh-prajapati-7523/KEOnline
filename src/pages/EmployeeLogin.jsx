@@ -35,7 +35,11 @@ export default function EmployeeLogin() {
       });
 
       if (!response.ok) {
-        throw new Error("Invalid credentials");
+        let message = "Unable to log in. Please check your employee ID and password.";
+        if (response.status === 423) {
+          message = "Account is locked. Please contact an administrator to reset your password.";
+        }
+        throw new Error(message);
       }
 
       const data = await response.json();
@@ -54,9 +58,9 @@ export default function EmployeeLogin() {
         clearAccess();
       }
       navigate(redirectPath.startsWith("/") ? redirectPath : "/employee-dashboard", { replace: true });
-    } catch {
+    } catch (error) {
       clearAccess();
-      setError("Unable to log in. Please check your employee ID and password.");
+      setError(error.message || "Unable to log in. Please check your employee ID and password.");
     } finally {
       setIsSubmitting(false);
     }

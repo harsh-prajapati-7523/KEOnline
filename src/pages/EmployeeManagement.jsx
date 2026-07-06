@@ -264,7 +264,7 @@ export default function EmployeeManagement() {
       if (!response.ok) throw new Error(await readApiError(response, "Unable to reset password."));
       closeAction();
       setMessageType("success");
-      setMessage("Employee password reset successfully.");
+      setMessage("Employee password reset successfully. Account unlocked.");
       await loadEmployees();
     } catch (error) {
       setActionError(error.message || "Unable to reset password.");
@@ -361,14 +361,22 @@ export default function EmployeeManagement() {
                     <h3 className="text-lg font-extrabold text-blue-950">{employee.name || "Unnamed employee"}</h3>
                     <p className="mt-1 text-sm font-semibold text-gray-500">{employee.employeeId || "Not available"}</p>
                   </div>
-                  <span className={`rounded-full px-3 py-1 text-xs font-bold ${employee.active ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"}`}>
-                    {employee.active ? "Active" : "Inactive"}
-                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${employee.active ? "bg-green-100 text-green-800" : "bg-gray-200 text-gray-700"}`}>
+                      {employee.active ? "Active" : "Inactive"}
+                    </span>
+                    {employee.accountLocked && (
+                      <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-800">
+                        Locked
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 <dl className="mt-4 grid grid-cols-1 gap-3 text-sm min-[390px]:grid-cols-2">
                   <div><dt className="font-bold text-gray-500">Role</dt><dd className="mt-1 text-gray-800">{formatEmployeeRole(employee)}</dd></div>
                   <div><dt className="font-bold text-gray-500">Created Date</dt><dd className="mt-1 text-gray-800">{formatDate(employee.createdAt)}</dd></div>
+                  <div><dt className="font-bold text-gray-500">Failed Login Attempts</dt><dd className="mt-1 text-gray-800">{employee.failedLoginAttempts ?? 0}</dd></div>
                 </dl>
 
                 <div className="mt-4 grid grid-cols-1 gap-2 min-[390px]:grid-cols-3">

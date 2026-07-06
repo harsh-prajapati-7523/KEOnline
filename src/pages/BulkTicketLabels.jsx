@@ -1,20 +1,14 @@
-import { useMemo, useState } from "react";
-import { ArrowLeft, Download, Eye, Printer, TriangleAlert } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Download, Eye, Printer, RotateCcw, Save, TriangleAlert, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 
-const NAVY = "#0B2A6E";
-const GOLD = "#F4B000";
+const A4_WIDTH_MM = 210;
+const A4_HEIGHT_MM = 297;
 const LABEL_LIMIT = 1000;
-const LABEL_WIDTH_MM = 65;
-const LABEL_HEIGHT_MM = 33;
-const PAGE_MARGIN_X_MM = 5;
-const PAGE_MARGIN_Y_MM = 12;
-const LABEL_COLS = 3;
-const LABEL_ROWS = 8;
-const LABELS_PER_PAGE = LABEL_COLS * LABEL_ROWS;
 const LOGO_PATH = "/ke-logo-transparent.png";
+const STORAGE_KEY = "ke_bulk_label_design_settings";
 
 const initialForm = {
   startNumber: "1",
@@ -24,8 +18,50 @@ const initialForm = {
   baseUrl: "https://kumar-electricals.com/ticket/",
 };
 
+const defaultDesignSettings = {
+  labelWidthMm: "65",
+  labelHeightMm: "33",
+  columns: "3",
+  rows: "8",
+  horizontalGapMm: "2",
+  verticalGapMm: "2",
+  pageMarginMm: "5",
+  businessLine1: "KUMAR ELECTRONICS",
+  businessLine2: "& ELECTRICALS",
+  subtitle: "Service Ticket",
+  qrCaption: "Scan to Track",
+  navyColor: "#0B2A6E",
+  goldColor: "#F4B000",
+  borderWidthMm: "0.45",
+  borderRadiusMm: "3",
+  ticketFontSizeMm: "11.6",
+  businessFontSizeMm: "4.6",
+  subtitleFontSizeMm: "5.3",
+  qrCaptionFontSizeMm: "4.1",
+  logoSizeMm: "12.2",
+  qrSizeMm: "11.8",
+  dividerXPercent: "35",
+  ticketXPercent: "56",
+  ticketYPercent: "43",
+  qrXPercent: "78",
+  qrYPercent: "15",
+  subtitleYPercent: "75",
+};
+
+const designFields = Object.keys(defaultDesignSettings);
+
 function normalizePrefix(value) {
   return String(value || "").trim().replace(/-+$/g, "").toUpperCase();
+}
+
+function numberValue(value, fallback = 0) {
+  if (value === "" || value === null || typeof value === "undefined") return fallback;
+  const next = Number(value);
+  return Number.isFinite(next) ? next : fallback;
+}
+
+function settingNumber(settings, key) {
+  return numberValue(settings[key], numberValue(defaultDesignSettings[key]));
 }
 
 function buildTicketNumber(prefix, number, digits) {
@@ -36,13 +72,45 @@ function buildTrackingUrl(baseUrl, ticketNumber) {
   return `${String(baseUrl || "").trim().replace(/\/?$/, "/")}${encodeURIComponent(ticketNumber)}`;
 }
 
-function validateForm(form) {
+function getLayout(settings) {
+  const labelWidth = settingNumber(settings, "labelWidthMm");
+  const labelHeight = settingNumber(settings, "labelHeightMm");
+  const columns = settingNumber(settings, "columns");
+  const rows = settingNumber(settings, "rows");
+  const horizontalGap = settingNumber(settings, "horizontalGapMm");
+  const verticalGap = settingNumber(settings, "verticalGapMm");
+  const pageMargin = settingNumber(settings, "pageMarginMm");
+  const usedWidth = columns * labelWidth + Math.max(0, columns - 1) * horizontalGap + pageMargin * 2;
+  const usedHeight = rows * labelHeight + Math.max(0, rows - 1) * verticalGap + pageMargin * 2;
+
+  return {
+    labelWidth,
+    labelHeight,
+    columns,
+    rows,
+    horizontalGap,
+    verticalGap,
+    pageMargin,
+    labelsPerPage: columns * rows,
+    pageCountFor: (count) => columns > 0 && rows > 0 ? Math.ceil(count / (columns * rows)) : 0,
+    usedWidth,
+    usedHeight,
+    fitsA4: usedWidth <= A4_WIDTH_MM && usedHeight <= A4_HEIGHT_MM,
+  };
+}
+
+function validatePositive(errors, settings, key, label, min = 0.1) {
+  if (settingNumber(settings, key) < min) errors[key] = `${label} must be ${min} or higher.`;
+}
+
+function validateForm(form, settings) {
   const errors = {};
   const start = Number(form.startNumber);
   const end = Number(form.endNumber);
   const digits = Number(form.digits);
   const prefix = normalizePrefix(form.prefix);
   const baseUrl = String(form.baseUrl || "").trim();
+  const layout = getLayout(settings);
 
   if (!form.startNumber) errors.startNumber = "Start number is required.";
   if (!form.endNumber) errors.endNumber = "End number is required.";
@@ -55,6 +123,28 @@ function validateForm(form) {
   if (!prefix) errors.prefix = "Prefix is required.";
   if (!Number.isInteger(digits) || digits < 3 || digits > 6) errors.digits = "Digits must be between 3 and 6.";
   if (!baseUrl) errors.baseUrl = "Base tracking URL is required.";
+
+  validatePositive(errors, settings, "labelWidthMm", "Label width", 20);
+  validatePositive(errors, settings, "labelHeightMm", "Label height", 15);
+  validatePositive(errors, settings, "columns", "Columns", 1);
+  validatePositive(errors, settings, "rows", "Rows", 1);
+  validatePositive(errors, settings, "logoSizeMm", "Logo size", 4);
+  validatePositive(errors, settings, "qrSizeMm", "QR size", 6);
+  validatePositive(errors, settings, "ticketFontSizeMm", "Ticket font size", 1);
+  validatePositive(errors, settings, "businessFontSizeMm", "Business font size", 1);
+  validatePositive(errors, settings, "subtitleFontSizeMm", "Subtitle font size", 1);
+  validatePositive(errors, settings, "qrCaptionFontSizeMm", "QR caption font size", 1);
+
+  if (!Number.isInteger(layout.columns)) errors.columns = "Columns must be a whole number.";
+  if (!Number.isInteger(layout.rows)) errors.rows = "Rows must be a whole number.";
+  if (!layout.fitsA4) errors.layout = "Selected label layout does not fit on A4. Reduce label size, rows, columns, or gaps.";
+  if (layout.labelsPerPage < 1) errors.layout = "Rows and columns must create at least one label per page.";
+  if (settingNumber(settings, "qrSizeMm") > layout.labelWidth * 0.35 || settingNumber(settings, "qrSizeMm") > layout.labelHeight * 0.75) {
+    errors.qrSizeMm = "QR size must fit inside the label.";
+  }
+  if (settingNumber(settings, "logoSizeMm") > layout.labelWidth * 0.35 || settingNumber(settings, "logoSizeMm") > layout.labelHeight * 0.75) {
+    errors.logoSizeMm = "Logo size must fit inside the label.";
+  }
 
   return errors;
 }
@@ -76,79 +166,146 @@ async function makeQrDataUrl(url, width = 256) {
     errorCorrectionLevel: "M",
     margin: 2,
     width,
-    color: {
-      dark: "#000000",
-      light: "#FFFFFF",
-    },
+    color: { dark: "#000000", light: "#FFFFFF" },
   });
 }
 
-function drawLightning(doc, x, y, scale = 1) {
-  doc.setFillColor(GOLD);
+function drawLightning(doc, x, y, scale, goldColor) {
+  doc.setFillColor(goldColor);
   doc.triangle(x + 1.6 * scale, y, x, y + 4.2 * scale, x + 2.3 * scale, y + 4.2 * scale, "F");
   doc.triangle(x + 2.3 * scale, y + 3 * scale, x + 0.7 * scale, y + 7.5 * scale, x + 4.1 * scale, y + 3 * scale, "F");
 }
 
-function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl) {
-  doc.setDrawColor(GOLD);
-  doc.setLineWidth(0.45);
-  doc.roundedRect(x, y, LABEL_WIDTH_MM, LABEL_HEIGHT_MM, 3, 3, "S");
+function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
+  const layout = getLayout(settings);
+  const labelWidth = layout.labelWidth;
+  const labelHeight = layout.labelHeight;
+  const navy = settings.navyColor;
+  const gold = settings.goldColor;
+  const dividerX = labelWidth * settingNumber(settings, "dividerXPercent") / 100;
+  const ticketX = labelWidth * settingNumber(settings, "ticketXPercent") / 100;
+  const ticketY = labelHeight * settingNumber(settings, "ticketYPercent") / 100;
+  const qrX = labelWidth * settingNumber(settings, "qrXPercent") / 100;
+  const qrY = labelHeight * settingNumber(settings, "qrYPercent") / 100;
+  const subtitleY = labelHeight * settingNumber(settings, "subtitleYPercent") / 100;
+  const logoSize = settingNumber(settings, "logoSizeMm");
+  const qrSize = settingNumber(settings, "qrSizeMm");
+  const brandCenterX = dividerX / 2;
+  const logoX = Math.max(1, brandCenterX - logoSize / 2);
+  const logoY = Math.max(1, labelHeight * 0.12);
 
-  doc.addImage(logoDataUrl, "PNG", x + 5.3, y + 4.2, 12.2, 12.2);
-  doc.setTextColor(NAVY);
+  doc.setDrawColor(gold);
+  doc.setLineWidth(settingNumber(settings, "borderWidthMm"));
+  doc.roundedRect(x, y, labelWidth, labelHeight, settingNumber(settings, "borderRadiusMm"), settingNumber(settings, "borderRadiusMm"), "S");
+
+  doc.addImage(logoDataUrl, "PNG", x + logoX, y + logoY, logoSize, logoSize);
+  doc.setTextColor(navy);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(4.6);
-  doc.text("KUMAR ELECTRONICS", x + 11.4, y + 21.7, { align: "center" });
-  doc.text("& ELECTRICALS", x + 11.4, y + 25.4, { align: "center" });
+  doc.setFontSize(settingNumber(settings, "businessFontSizeMm"));
+  doc.text(settings.businessLine1, x + brandCenterX, y + logoY + logoSize + 5.3, { align: "center" });
+  doc.text(settings.businessLine2, x + brandCenterX, y + logoY + logoSize + 9, { align: "center" });
 
-  doc.setDrawColor(NAVY);
+  doc.setDrawColor(navy);
   doc.setLineWidth(0.35);
-  doc.line(x + 22.6, y + 5.7, x + 22.6, y + 27.3);
+  doc.line(x + dividerX, y + labelHeight * 0.17, x + dividerX, y + labelHeight * 0.83);
 
-  doc.setFontSize(11.6);
-  doc.text(label.ticketNumber, x + 36.6, y + 14.1, { align: "center" });
+  doc.setTextColor(navy);
+  doc.setFontSize(settingNumber(settings, "ticketFontSizeMm"));
+  doc.text(label.ticketNumber, x + ticketX, y + ticketY, { align: "center" });
 
-  doc.setDrawColor(GOLD);
+  doc.setDrawColor(gold);
   doc.setLineWidth(0.45);
-  doc.line(x + 27.2, y + 18.8, x + 34.5, y + 18.8);
-  drawLightning(doc, x + 35.4, y + 15.8, 0.78);
-  doc.line(x + 41.1, y + 18.8, x + 47.7, y + 18.8);
+  const accentY = y + Math.min(labelHeight - 8, ticketY + 4.7);
+  const accentLeft = x + dividerX + 4.5;
+  const accentRight = x + qrX - 2.5;
+  const lightningX = x + (dividerX + qrX) / 2 - 1.6;
+  doc.line(accentLeft, accentY, Math.max(accentLeft, lightningX - 2), accentY);
+  drawLightning(doc, lightningX, accentY - 3, 0.78, gold);
+  doc.line(lightningX + 5.5, accentY, accentRight, accentY);
 
-  doc.setTextColor(NAVY);
-  doc.setFontSize(5.3);
-  doc.text("Service Ticket", x + 36.6, y + 24.7, { align: "center" });
+  doc.setTextColor(navy);
+  doc.setFontSize(settingNumber(settings, "subtitleFontSizeMm"));
+  doc.text(settings.subtitle, x + ticketX, y + subtitleY, { align: "center" });
 
-  doc.setDrawColor(NAVY);
+  doc.setDrawColor(navy);
   doc.setLineWidth(0.35);
-  doc.roundedRect(x + 50.2, y + 4.1, 13.2, 13.2, 1, 1, "S");
-  doc.addImage(qrDataUrl, "PNG", x + 50.9, y + 4.8, 11.8, 11.8);
-  doc.setFontSize(4.1);
-  doc.text("Scan to Track", x + 56.8, y + 21.2, { align: "center" });
+  doc.roundedRect(x + qrX, y + qrY, qrSize + 1.4, qrSize + 1.4, 1, 1, "S");
+  doc.addImage(qrDataUrl, "PNG", x + qrX + 0.7, y + qrY + 0.7, qrSize, qrSize);
+  doc.setTextColor(navy);
+  doc.setFontSize(settingNumber(settings, "qrCaptionFontSizeMm"));
+  doc.text(settings.qrCaption, x + qrX + qrSize / 2 + 0.7, y + qrY + qrSize + 5, { align: "center" });
 }
 
-function LabelPreview({ label }) {
+function DesignNumberInput({ label, name, value, onChange, error, min, max, step = "1", type = "number" }) {
   return (
-    <div className="bulk-label-preview-label">
-      <div className="bulk-label-preview-brand">
-        <img src={LOGO_PATH} alt="" aria-hidden="true" />
-        <p>KUMAR ELECTRONICS<br />&amp; ELECTRICALS</p>
+    <label className="bulk-label-control">
+      <span>{label}</span>
+      <input name={name} type={type} min={min} max={max} step={step} value={value} onChange={onChange} />
+      {error && <small>{error}</small>}
+    </label>
+  );
+}
+
+function SliderControl({ label, name, value, onChange, min, max, step = "1", suffix = "" }) {
+  return (
+    <label className="bulk-label-slider">
+      <span>{label}</span>
+      <input name={name} type="range" min={min} max={max} step={step} value={value} onChange={onChange} />
+      <output>{value}{suffix}</output>
+    </label>
+  );
+}
+
+function LabelPreview({ label, settings, qrDataUrl }) {
+  const layout = getLayout(settings);
+  const labelWidth = layout.labelWidth;
+  const labelHeight = layout.labelHeight;
+  const dividerX = settingNumber(settings, "dividerXPercent");
+  const ticketX = settingNumber(settings, "ticketXPercent");
+  const ticketY = settingNumber(settings, "ticketYPercent");
+  const qrX = settingNumber(settings, "qrXPercent");
+  const qrY = settingNumber(settings, "qrYPercent");
+  const subtitleY = settingNumber(settings, "subtitleYPercent");
+  const logoSizePct = settingNumber(settings, "logoSizeMm") / labelWidth * 100;
+  const qrSizePct = settingNumber(settings, "qrSizeMm") / labelWidth * 100;
+
+  return (
+    <div
+      className="bulk-label-live-label"
+      style={{
+        aspectRatio: `${labelWidth} / ${labelHeight}`,
+        borderColor: settings.goldColor,
+        borderRadius: `${settingNumber(settings, "borderRadiusMm") * 3}px`,
+        borderWidth: `${Math.max(1, settingNumber(settings, "borderWidthMm") * 4)}px`,
+        color: settings.navyColor,
+      }}
+    >
+      <div className="bulk-label-live-brand" style={{ left: `${dividerX / 2}%`, top: "13%", width: `${Math.max(10, dividerX - 3)}%`, transform: "translateX(-50%)" }}>
+        <img src={LOGO_PATH} alt="" aria-hidden="true" style={{ width: `${logoSizePct}%` }} />
+        <p style={{ fontSize: `${settingNumber(settings, "businessFontSizeMm") * 2.6}px` }}>{settings.businessLine1}<br />{settings.businessLine2}</p>
       </div>
-      <div className="bulk-label-preview-divider" aria-hidden="true" />
-      <div className="bulk-label-preview-ticket">
-        <strong>{label.ticketNumber}</strong>
-        <div className="bulk-label-preview-accent" aria-hidden="true">
-          <span />
-          <svg viewBox="0 0 16 28" focusable="false" aria-hidden="true">
-            <polygon points="9,0 1,15 8,15 5,28 15,11 9,11" />
-          </svg>
-          <span />
-        </div>
-        <p>Service Ticket</p>
+      <div className="bulk-label-live-divider" style={{ left: `${dividerX}%`, background: settings.navyColor }} aria-hidden="true" />
+      <strong
+        className="bulk-label-live-ticket"
+        style={{
+          left: `${ticketX}%`,
+          top: `${ticketY}%`,
+          color: settings.navyColor,
+          fontSize: `${settingNumber(settings, "ticketFontSizeMm") * 3.2}px`,
+        }}
+      >
+        {label.ticketNumber}
+      </strong>
+      <div className="bulk-label-live-accent" style={{ left: `${(dividerX + qrX) / 2}%`, top: `${Math.min(82, ticketY + 15)}%`, color: settings.goldColor }} aria-hidden="true">
+        <span style={{ background: settings.goldColor }} />
+        <svg viewBox="0 0 16 28" focusable="false" aria-hidden="true"><polygon points="9,0 1,15 8,15 5,28 15,11 9,11" /></svg>
+        <span style={{ background: settings.goldColor }} />
       </div>
-      <div className="bulk-label-preview-qr">
-        {label.qrDataUrl ? <img src={label.qrDataUrl} alt="" aria-hidden="true" /> : <div />}
-        <p>Scan to Track</p>
+      <p className="bulk-label-live-subtitle" style={{ left: `${ticketX}%`, top: `${subtitleY}%`, fontSize: `${settingNumber(settings, "subtitleFontSizeMm") * 2.8}px` }}>{settings.subtitle}</p>
+      <div className="bulk-label-live-qr" style={{ left: `${qrX}%`, top: `${qrY}%`, width: `${qrSizePct}%`, borderColor: settings.navyColor }}>
+        {qrDataUrl ? <img src={qrDataUrl} alt="" aria-hidden="true" /> : <div />}
       </div>
+      <p className="bulk-label-live-qr-caption" style={{ left: `${qrX + qrSizePct / 2}%`, top: `${qrY + (settingNumber(settings, "qrSizeMm") / labelHeight * 100) + 6}%`, fontSize: `${settingNumber(settings, "qrCaptionFontSizeMm") * 2.5}px` }}>{settings.qrCaption}</p>
     </div>
   );
 }
@@ -156,7 +313,9 @@ function LabelPreview({ label }) {
 export default function BulkTicketLabels() {
   const navigate = useNavigate();
   const [form, setForm] = useState(initialForm);
+  const [design, setDesign] = useState(defaultDesignSettings);
   const [errors, setErrors] = useState({});
+  const [sampleQrDataUrl, setSampleQrDataUrl] = useState("");
   const [previewLabels, setPreviewLabels] = useState([]);
   const [message, setMessage] = useState("");
   const [isPreviewing, setIsPreviewing] = useState(false);
@@ -168,7 +327,24 @@ export default function BulkTicketLabels() {
     return Number.isInteger(start) && Number.isInteger(end) && end >= start ? end - start + 1 : 0;
   }, [form.endNumber, form.startNumber]);
 
-  const pageCount = labelCount > 0 ? Math.ceil(labelCount / LABELS_PER_PAGE) : 0;
+  const layout = useMemo(() => getLayout(design), [design]);
+  const pageCount = labelCount > 0 ? layout.pageCountFor(labelCount) : 0;
+  const sampleTicketNumber = buildTicketNumber(form.prefix, Number(form.startNumber) || 1, Number(form.digits) || 3);
+  const sampleUrl = buildTrackingUrl(form.baseUrl, sampleTicketNumber);
+
+  useEffect(() => {
+    let isCurrent = true;
+    makeQrDataUrl(sampleUrl, 180)
+      .then((dataUrl) => {
+        if (isCurrent) setSampleQrDataUrl(dataUrl);
+      })
+      .catch(() => {
+        if (isCurrent) setSampleQrDataUrl("");
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [sampleUrl]);
 
   const updateField = (event) => {
     const { name, value } = event.target;
@@ -177,8 +353,15 @@ export default function BulkTicketLabels() {
     setMessage("");
   };
 
+  const updateDesign = (event) => {
+    const { name, value } = event.target;
+    setDesign((current) => ({ ...current, [name]: value }));
+    setErrors((current) => ({ ...current, [name]: "" }));
+    setMessage("");
+  };
+
   const getLabels = () => {
-    const nextErrors = validateForm(form);
+    const nextErrors = validateForm(form, design);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return null;
 
@@ -188,10 +371,7 @@ export default function BulkTicketLabels() {
 
     return Array.from({ length: end - start + 1 }, (_, index) => {
       const ticketNumber = buildTicketNumber(form.prefix, start + index, digits);
-      return {
-        ticketNumber,
-        url: buildTrackingUrl(form.baseUrl, ticketNumber),
-      };
+      return { ticketNumber, url: buildTrackingUrl(form.baseUrl, ticketNumber) };
     });
   };
 
@@ -202,7 +382,7 @@ export default function BulkTicketLabels() {
     setIsPreviewing(true);
     setMessage("");
     try {
-      const visibleLabels = await Promise.all(labels.slice(0, LABELS_PER_PAGE).map(async (label) => ({
+      const visibleLabels = await Promise.all(labels.slice(0, layout.labelsPerPage).map(async (label) => ({
         ...label,
         qrDataUrl: await makeQrDataUrl(label.url, 160),
       })));
@@ -225,26 +405,50 @@ export default function BulkTicketLabels() {
     try {
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
       const logoDataUrl = await imageToDataUrl(LOGO_PATH);
-      const colGap = (210 - PAGE_MARGIN_X_MM * 2 - LABEL_COLS * LABEL_WIDTH_MM) / (LABEL_COLS - 1);
-      const rowGap = (297 - PAGE_MARGIN_Y_MM * 2 - LABEL_ROWS * LABEL_HEIGHT_MM) / (LABEL_ROWS - 1);
 
       for (let index = 0; index < labels.length; index += 1) {
-        if (index > 0 && index % LABELS_PER_PAGE === 0) doc.addPage();
-        const pageIndex = index % LABELS_PER_PAGE;
-        const col = pageIndex % LABEL_COLS;
-        const row = Math.floor(pageIndex / LABEL_COLS);
-        const x = PAGE_MARGIN_X_MM + col * (LABEL_WIDTH_MM + colGap);
-        const y = PAGE_MARGIN_Y_MM + row * (LABEL_HEIGHT_MM + rowGap);
+        if (index > 0 && index % layout.labelsPerPage === 0) doc.addPage();
+        const pageIndex = index % layout.labelsPerPage;
+        const col = pageIndex % layout.columns;
+        const row = Math.floor(pageIndex / layout.columns);
+        const x = layout.pageMargin + col * (layout.labelWidth + layout.horizontalGap);
+        const y = layout.pageMargin + row * (layout.labelHeight + layout.verticalGap);
         const qrDataUrl = await makeQrDataUrl(labels[index].url);
-        drawPdfLabel(doc, labels[index], x, y, logoDataUrl, qrDataUrl);
+        drawPdfLabel(doc, labels[index], x, y, logoDataUrl, qrDataUrl, design);
       }
 
       doc.save(`bulk-ticket-labels-${labels[0].ticketNumber}-to-${labels[labels.length - 1].ticketNumber}.pdf`);
-      setMessage(`PDF generated for ${labels.length} labels across ${Math.ceil(labels.length / LABELS_PER_PAGE)} A4 page${labels.length <= LABELS_PER_PAGE ? "" : "s"}.`);
+      setMessage(`PDF generated for ${labels.length} labels across ${layout.pageCountFor(labels.length)} A4 page${labels.length <= layout.labelsPerPage ? "" : "s"}.`);
     } catch {
       setMessage("Unable to generate PDF. Please try again.");
     } finally {
       setIsDownloading(false);
+    }
+  };
+
+  const resetDesign = () => {
+    setDesign(defaultDesignSettings);
+    setPreviewLabels([]);
+    setMessage("Default design restored.");
+  };
+
+  const saveDesign = () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(design));
+    setMessage("Label design settings saved locally.");
+  };
+
+  const loadDesign = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+      const nextDesign = designFields.reduce((next, key) => ({
+        ...next,
+        [key]: saved[key] ?? defaultDesignSettings[key],
+      }), {});
+      setDesign(nextDesign);
+      setPreviewLabels([]);
+      setMessage("Saved label design settings loaded.");
+    } catch {
+      setMessage("Unable to load saved label design settings.");
     }
   };
 
@@ -259,55 +463,102 @@ export default function BulkTicketLabels() {
           <div>
             <p className="text-sm font-extrabold uppercase tracking-wider text-amber-700">Print Tools</p>
             <h1 className="mt-1 text-3xl font-extrabold text-blue-950">Bulk Ticket Labels</h1>
-            <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-600">Generate scannable QR sticker labels for ticket tracking links.</p>
+            <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-600">Customize scannable QR sticker labels before generating an A4 PDF.</p>
           </div>
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-900">
-            A4, 3 columns x 8 rows, 24 labels per page
+            {layout.labelsPerPage || 0} labels per page, {labelCount || 0} labels = {pageCount || 0} page{pageCount === 1 ? "" : "s"}
           </div>
         </header>
 
-        <section className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,24rem)_1fr]">
+        <section className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,30rem)_1fr]">
           <div className="space-y-4">
-            <form className="rounded-lg border border-blue-100 bg-white p-4 shadow-sm" onSubmit={(event) => event.preventDefault()}>
-              <div className="grid gap-4">
-                <label className="block text-sm font-bold text-slate-700">
-                  Start Ticket Number
-                  <input name="startNumber" type="number" min="1" value={form.startNumber} onChange={updateField} className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 font-semibold text-blue-950" />
-                  {errors.startNumber && <span className="mt-1 block text-xs font-bold text-red-700">{errors.startNumber}</span>}
-                </label>
-                <label className="block text-sm font-bold text-slate-700">
-                  End Ticket Number
-                  <input name="endNumber" type="number" min="1" value={form.endNumber} onChange={updateField} className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 font-semibold text-blue-950" />
-                  {errors.endNumber && <span className="mt-1 block text-xs font-bold text-red-700">{errors.endNumber}</span>}
-                </label>
+            <form className="space-y-4" onSubmit={(event) => event.preventDefault()}>
+              <section className="bulk-label-settings-section">
+                <h2>Ticket Range</h2>
                 <div className="grid grid-cols-2 gap-3">
-                  <label className="block text-sm font-bold text-slate-700">
-                    Prefix
-                    <input name="prefix" value={form.prefix} onChange={updateField} className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 font-semibold text-blue-950" />
-                    {errors.prefix && <span className="mt-1 block text-xs font-bold text-red-700">{errors.prefix}</span>}
-                  </label>
-                  <label className="block text-sm font-bold text-slate-700">
-                    Digits
-                    <input name="digits" type="number" min="3" max="6" value={form.digits} onChange={updateField} className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 font-semibold text-blue-950" />
-                    {errors.digits && <span className="mt-1 block text-xs font-bold text-red-700">{errors.digits}</span>}
-                  </label>
+                  <DesignNumberInput label="Start Ticket Number" name="startNumber" value={form.startNumber} onChange={updateField} error={errors.startNumber} min="1" />
+                  <DesignNumberInput label="End Ticket Number" name="endNumber" value={form.endNumber} onChange={updateField} error={errors.endNumber} min="1" />
+                  <DesignNumberInput label="Prefix" name="prefix" value={form.prefix} onChange={updateField} error={errors.prefix} type="text" />
+                  <DesignNumberInput label="Digits" name="digits" value={form.digits} onChange={updateField} error={errors.digits} min="3" max="6" />
                 </div>
-                <label className="block text-sm font-bold text-slate-700">
-                  Base Tracking URL
-                  <input name="baseUrl" type="url" value={form.baseUrl} onChange={updateField} className="mt-1 h-11 w-full rounded-lg border border-slate-300 px-3 font-semibold text-blue-950" />
-                  {errors.baseUrl && <span className="mt-1 block text-xs font-bold text-red-700">{errors.baseUrl}</span>}
-                </label>
-              </div>
+                <DesignNumberInput label="Base Tracking URL" name="baseUrl" value={form.baseUrl} onChange={updateField} error={errors.baseUrl} type="url" />
+              </section>
 
-              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
-                <button type="button" onClick={generatePreview} disabled={isPreviewing || isDownloading} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blue-950 px-4 py-2 text-sm font-extrabold text-blue-950 hover:bg-blue-50 disabled:opacity-60">
-                  <Eye size={17} aria-hidden="true" /> {isPreviewing ? "Generating..." : "Generate Preview"}
-                </button>
-                <button type="button" onClick={downloadPdf} disabled={isDownloading || isPreviewing} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-950 px-4 py-2 text-sm font-extrabold text-white hover:bg-blue-900 disabled:opacity-60">
-                  <Download size={17} aria-hidden="true" /> {isDownloading ? "Preparing..." : "Download PDF"}
-                </button>
-              </div>
+              <section className="bulk-label-settings-section">
+                <h2>Label Size / A4 Layout</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <DesignNumberInput label="Label Width in mm" name="labelWidthMm" value={design.labelWidthMm} onChange={updateDesign} error={errors.labelWidthMm} min="20" step="0.5" />
+                  <DesignNumberInput label="Label Height in mm" name="labelHeightMm" value={design.labelHeightMm} onChange={updateDesign} error={errors.labelHeightMm} min="15" step="0.5" />
+                  <DesignNumberInput label="Columns per A4 page" name="columns" value={design.columns} onChange={updateDesign} error={errors.columns} min="1" max="6" />
+                  <DesignNumberInput label="Rows per A4 page" name="rows" value={design.rows} onChange={updateDesign} error={errors.rows} min="1" max="12" />
+                  <DesignNumberInput label="Horizontal gap in mm" name="horizontalGapMm" value={design.horizontalGapMm} onChange={updateDesign} min="0" step="0.5" />
+                  <DesignNumberInput label="Vertical gap in mm" name="verticalGapMm" value={design.verticalGapMm} onChange={updateDesign} min="0" step="0.5" />
+                  <DesignNumberInput label="Page margin in mm" name="pageMarginMm" value={design.pageMarginMm} onChange={updateDesign} min="0" step="0.5" />
+                </div>
+                {errors.layout && <p className="bulk-label-error">{errors.layout}</p>}
+                <p className={`bulk-label-fit ${layout.fitsA4 ? "bulk-label-fit-ok" : "bulk-label-fit-bad"}`}>
+                  Uses {layout.usedWidth.toFixed(1)}mm x {layout.usedHeight.toFixed(1)}mm of A4 {A4_WIDTH_MM}mm x {A4_HEIGHT_MM}mm.
+                </p>
+              </section>
+
+              <section className="bulk-label-settings-section">
+                <h2>Label Text</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <DesignNumberInput label="Business Name Line 1" name="businessLine1" value={design.businessLine1} onChange={updateDesign} type="text" />
+                  <DesignNumberInput label="Business Name Line 2" name="businessLine2" value={design.businessLine2} onChange={updateDesign} type="text" />
+                  <DesignNumberInput label="Subtitle / Label Type" name="subtitle" value={design.subtitle} onChange={updateDesign} type="text" />
+                  <DesignNumberInput label="QR Caption" name="qrCaption" value={design.qrCaption} onChange={updateDesign} type="text" />
+                </div>
+              </section>
+
+              <section className="bulk-label-settings-section">
+                <h2>Style</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <DesignNumberInput label="Navy Color" name="navyColor" value={design.navyColor} onChange={updateDesign} type="color" />
+                  <DesignNumberInput label="Gold Color" name="goldColor" value={design.goldColor} onChange={updateDesign} type="color" />
+                  <DesignNumberInput label="Border Width" name="borderWidthMm" value={design.borderWidthMm} onChange={updateDesign} min="0.1" step="0.05" />
+                  <DesignNumberInput label="Border Radius" name="borderRadiusMm" value={design.borderRadiusMm} onChange={updateDesign} min="0" step="0.5" />
+                  <DesignNumberInput label="Ticket Font Size" name="ticketFontSizeMm" value={design.ticketFontSizeMm} onChange={updateDesign} error={errors.ticketFontSizeMm} min="1" step="0.2" />
+                  <DesignNumberInput label="Business Font Size" name="businessFontSizeMm" value={design.businessFontSizeMm} onChange={updateDesign} error={errors.businessFontSizeMm} min="1" step="0.2" />
+                  <DesignNumberInput label="Subtitle Font Size" name="subtitleFontSizeMm" value={design.subtitleFontSizeMm} onChange={updateDesign} error={errors.subtitleFontSizeMm} min="1" step="0.2" />
+                  <DesignNumberInput label="QR Caption Font Size" name="qrCaptionFontSizeMm" value={design.qrCaptionFontSizeMm} onChange={updateDesign} error={errors.qrCaptionFontSizeMm} min="1" step="0.2" />
+                </div>
+              </section>
+
+              <section className="bulk-label-settings-section">
+                <h2>Element Size / Position</h2>
+                <div className="grid gap-3">
+                  <SliderControl label="Logo Size" name="logoSizeMm" value={design.logoSizeMm} onChange={updateDesign} min="4" max="24" step="0.2" suffix="mm" />
+                  {errors.logoSizeMm && <p className="bulk-label-error">{errors.logoSizeMm}</p>}
+                  <SliderControl label="QR Size" name="qrSizeMm" value={design.qrSizeMm} onChange={updateDesign} min="6" max="22" step="0.2" suffix="mm" />
+                  {errors.qrSizeMm && <p className="bulk-label-error">{errors.qrSizeMm}</p>}
+                  <SliderControl label="Vertical Divider X Position" name="dividerXPercent" value={design.dividerXPercent} onChange={updateDesign} min="25" max="45" suffix="%" />
+                  <SliderControl label="Move Ticket Number Left/Right" name="ticketXPercent" value={design.ticketXPercent} onChange={updateDesign} min="38" max="74" suffix="%" />
+                  <SliderControl label="Move Ticket Number Up/Down" name="ticketYPercent" value={design.ticketYPercent} onChange={updateDesign} min="25" max="62" suffix="%" />
+                  <SliderControl label="Move QR Left/Right" name="qrXPercent" value={design.qrXPercent} onChange={updateDesign} min="60" max="88" suffix="%" />
+                  <SliderControl label="Move QR Up/Down" name="qrYPercent" value={design.qrYPercent} onChange={updateDesign} min="5" max="48" suffix="%" />
+                  <SliderControl label="Subtitle Y Position" name="subtitleYPercent" value={design.subtitleYPercent} onChange={updateDesign} min="55" max="88" suffix="%" />
+                </div>
+              </section>
             </form>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button type="button" onClick={generatePreview} disabled={isPreviewing || isDownloading} className="bulk-label-secondary-button">
+                <Eye size={17} aria-hidden="true" /> {isPreviewing ? "Generating..." : "Generate Preview"}
+              </button>
+              <button type="button" onClick={downloadPdf} disabled={isDownloading || isPreviewing} className="bulk-label-primary-button">
+                <Download size={17} aria-hidden="true" /> {isDownloading ? "Preparing..." : "Download PDF"}
+              </button>
+              <button type="button" onClick={resetDesign} className="bulk-label-secondary-button">
+                <RotateCcw size={17} aria-hidden="true" /> Reset to Default Design
+              </button>
+              <button type="button" onClick={saveDesign} className="bulk-label-secondary-button">
+                <Save size={17} aria-hidden="true" /> Save Settings Locally
+              </button>
+              <button type="button" onClick={loadDesign} className="bulk-label-secondary-button sm:col-span-2">
+                <Upload size={17} aria-hidden="true" /> Load Saved Settings
+              </button>
+            </div>
 
             <aside className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950">
               <div className="flex items-start gap-3">
@@ -315,38 +566,42 @@ export default function BulkTicketLabels() {
                 <p className="text-sm font-bold">Print using A4 paper and 100% / Actual Size. Do not use Fit to Page.</p>
               </div>
             </aside>
+          </div>
 
-            <section className="rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
+          <section className="min-w-0 rounded-lg border border-blue-100 bg-white p-4 shadow-sm" aria-label="Label preview">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-extrabold text-blue-950">Live Label Preview</h2>
+                <p className="text-sm font-semibold text-slate-600">Updates as you edit settings. QR encodes {sampleUrl}</p>
+              </div>
+              <span className="inline-flex w-fit items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-950">
+                <Printer size={15} aria-hidden="true" /> {layout.labelsPerPage || 0} per A4 page
+              </span>
+            </div>
+
+            {message && <p className={`mt-4 rounded-lg px-4 py-3 text-sm font-bold ${message.startsWith("Unable") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{message}</p>}
+
+            <div className="bulk-label-live-preview-wrap">
+              <LabelPreview label={{ ticketNumber: sampleTicketNumber }} settings={design} qrDataUrl={sampleQrDataUrl} />
+            </div>
+
+            <section className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
               <h2 className="text-sm font-extrabold text-blue-950">Generation Summary</h2>
-              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+              <dl className="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                 <div><dt className="font-bold text-slate-500">Labels</dt><dd className="font-extrabold text-blue-950">{labelCount || "Not ready"}</dd></div>
                 <div><dt className="font-bold text-slate-500">Pages</dt><dd className="font-extrabold text-blue-950">{pageCount || "Not ready"}</dd></div>
                 <div><dt className="font-bold text-slate-500">First</dt><dd className="font-extrabold text-blue-950">{labelCount ? buildTicketNumber(form.prefix, Number(form.startNumber), Number(form.digits)) : "Not ready"}</dd></div>
                 <div><dt className="font-bold text-slate-500">Last</dt><dd className="font-extrabold text-blue-950">{labelCount ? buildTicketNumber(form.prefix, Number(form.endNumber), Number(form.digits)) : "Not ready"}</dd></div>
               </dl>
             </section>
-          </div>
-
-          <section className="min-w-0 rounded-lg border border-blue-100 bg-white p-4 shadow-sm" aria-label="Label preview">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="text-lg font-extrabold text-blue-950">Preview</h2>
-                <p className="text-sm font-semibold text-slate-600">First page preview with real generated QR codes.</p>
-              </div>
-              <span className="inline-flex w-fit items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-xs font-extrabold text-blue-950">
-                <Printer size={15} aria-hidden="true" /> {LABELS_PER_PAGE} per A4 page
-              </span>
-            </div>
-
-            {message && <p className={`mt-4 rounded-lg px-4 py-3 text-sm font-bold ${message.startsWith("Unable") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{message}</p>}
 
             <div className="bulk-label-preview-sheet mt-4">
               {previewLabels.length > 0 ? (
-                previewLabels.map((label) => <LabelPreview key={label.ticketNumber} label={label} />)
+                previewLabels.map((label) => <LabelPreview key={label.ticketNumber} label={label} settings={design} qrDataUrl={label.qrDataUrl} />)
               ) : (
                 <div className="bulk-label-empty-state">
                   <p className="text-base font-extrabold text-blue-950">Generate a preview to see the first A4 page.</p>
-                  <p className="mt-1 text-sm font-semibold text-slate-600">The PDF will include the full validated range.</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-600">The PDF will include the full validated range and current design settings.</p>
                 </div>
               )}
             </div>

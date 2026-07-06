@@ -36,6 +36,11 @@ export function clearAuthSession() {
   AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
 }
 
+export function clearAccessSession() {
+  localStorage.removeItem("token");
+  localStorage.removeItem("access");
+}
+
 export function persistAuthSession(data = {}) {
   const token = data.accessToken || data.token;
   if (!token) {

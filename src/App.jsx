@@ -7,7 +7,7 @@ import PinSetup from "./pages/PinSetup";
 import KEWaveBackground from "./components/KEWaveBackground";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { hasAnyAccess } from "./utils/access";
-import { clearAuthSession, getTokenExpiryMs, getValidToken, isPinLoginAvailable, logoutSession, onAuthExpired } from "./utils/auth";
+import { clearAccessSession, clearAuthSession, getTokenExpiryMs, getValidToken, isPinLoginAvailable, logoutSession, onAuthExpired } from "./utils/auth";
 
 const HomePage = lazy(() => import("./pages/Home"));
 const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
@@ -132,6 +132,41 @@ function AuthExpiryWatcher() {
 
     return () => window.clearTimeout(timeoutId);
   }, [location.pathname, navigate]);
+
+  return null;
+}
+
+function InactivityWatcher() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const authPaths = ["/employee-login", "/pin-login", "/pin-setup"];
+    if (!getValidToken() || authPaths.includes(location.pathname)) return undefined;
+
+    let timeoutId;
+    const lockSession = () => {
+      clearAccessSession();
+      navigate("/pin-login", { replace: true, state: { from: location } });
+    };
+    const resetTimer = () => {
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(lockSession, 5 * 60 * 1000);
+    };
+    const activityEvents = ["pointerdown", "keydown", "touchstart", "mousemove", "scroll"];
+
+    activityEvents.forEach((eventName) => {
+      window.addEventListener(eventName, resetTimer, { passive: true });
+    });
+    resetTimer();
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      activityEvents.forEach((eventName) => {
+        window.removeEventListener(eventName, resetTimer);
+      });
+    };
+  }, [location, navigate]);
 
   return null;
 }
@@ -473,6 +508,7 @@ function App() {
       <Navbar />
       <AppRoutes />
       <AuthExpiryWatcher />
+      <InactivityWatcher />
       <InstallAppPrompt />
       <AuthenticatedBottomNav />
       

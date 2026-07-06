@@ -6,6 +6,7 @@ import {
   ListPlus,
   ListChecks,
   PlusCircle,
+  Printer,
   Search,
   Settings2,
   ShieldCheck,
@@ -109,8 +110,9 @@ export default function EmployeeDashboard() {
   const canManageTicketFields = hasAnyAccess(["VIEW_TICKET_FIELD_MANAGEMENT", "MANAGE_TICKET_FIELDS"]);
   const canManageCategoryFieldConfiguration = hasAnyAccess(["VIEW_CATEGORY_FIELD_CONFIGURATION", "MANAGE_CATEGORY_FIELD_CONFIGS"]);
   const canManageDropdownSources = hasAnyAccess(["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]);
+  const canGenerateBulkLabels = role === "SUPER_ADMIN";
   const hasAdminActions = canManageEmployees || canManageRoles || canManageRoleAccess || canManageWorkflow
-    || canManageTicketCategories || canManageTicketFields || canManageCategoryFieldConfiguration || canManageDropdownSources;
+    || canManageTicketCategories || canManageTicketFields || canManageCategoryFieldConfiguration || canManageDropdownSources || canGenerateBulkLabels;
 
   useEffect(() => {
     let isCurrent = true;
@@ -229,6 +231,11 @@ export default function EmployeeDashboard() {
                 {canManageDropdownSources && (
                   <DashboardAction icon={ListPlus} tone="pink" onClick={() => navigate("/admin/dropdown-sources")}>
                     Dropdown Sources
+                  </DashboardAction>
+                )}
+                {canGenerateBulkLabels && (
+                  <DashboardAction icon={Printer} tone="teal" onClick={() => navigate("/admin/bulk-labels")}>
+                    Bulk Ticket Labels
                   </DashboardAction>
                 )}
               </div>

@@ -17,6 +17,7 @@ const TicketCategoryManagement = lazy(() => import("./pages/TicketCategoryManage
 const TicketCategoryFieldManagement = lazy(() => import("./pages/TicketCategoryFieldManagement"));
 const TicketFieldManagement = lazy(() => import("./pages/TicketFieldManagement"));
 const DropdownSourceManagement = lazy(() => import("./pages/DropdownSourceManagement"));
+const BulkTicketLabels = lazy(() => import("./pages/BulkTicketLabels"));
 const Settings = lazy(() => import("./pages/Settings"));
 const ChangePassword = lazy(() => import("./pages/ChangePassword"));
 const CreateTicket = lazy(() => import("./pages/CreateTicket"));
@@ -370,6 +371,11 @@ function AppRoutes() {
           <Route path="/admin/dropdown-sources" element={
             <ProtectedRoute anyAccessKey={["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]}>
               <DropdownSourceManagement />
+            </ProtectedRoute>
+          }/>
+          <Route path="/admin/bulk-labels" element={
+            <ProtectedRoute allowedRoles={["SUPER_ADMIN"]}>
+              <BulkTicketLabels />
             </ProtectedRoute>
           }/>
           <Route path="/tickets/new" element={

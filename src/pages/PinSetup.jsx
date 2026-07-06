@@ -2,7 +2,7 @@ import { useState } from "react";
 import { KeyRound, Lock, ShieldCheck } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import KEPremiumCardBackground from "../components/KEPremiumCardBackground";
-import { getValidToken } from "../utils/auth";
+import { clearAuthSession, getValidToken } from "../utils/auth";
 
 const emptyForm = {
   pin: "",
@@ -63,7 +63,8 @@ export default function PinSetup() {
         throw new Error("Unable to create PIN. Please login again.");
       }
 
-      navigate(redirectPath, { replace: true });
+      clearAuthSession();
+      navigate("/pin-login", { replace: true, state: { from: redirectPath } });
     } catch (error) {
       setError(error.message || "Unable to create PIN. Please login again.");
     } finally {

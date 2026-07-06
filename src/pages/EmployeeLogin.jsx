@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { User, Lock, ShieldCheck } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
-import { clearAccess, fetchCurrentAccess } from "../utils/access";
-import { getValidToken, isPinLoginAvailable, persistAuthSession } from "../utils/auth";
+import { clearAuthSession, getValidToken, isPinLoginAvailable, persistAuthSession } from "../utils/auth";
 
 export default function EmployeeLogin() {
   const navigate = useNavigate();
@@ -75,19 +74,15 @@ export default function EmployeeLogin() {
         throw new Error("Missing token");
       }
 
-      persistAuthSession(data);
-      try {
-        await fetchCurrentAccess();
-      } catch {
-        clearAccess();
-      }
       if (data.pinRequired) {
+        persistAuthSession(data);
         navigate("/pin-setup", { replace: true, state: { from: redirectPath } });
         return;
       }
-      navigate(redirectPath.startsWith("/") ? redirectPath : "/employee-dashboard", { replace: true });
+      clearAuthSession();
+      navigate("/pin-login", { replace: true, state: { from: redirectPath } });
     } catch (error) {
-      clearAccess();
+      clearAuthSession();
       setError(error.message || "Unable to log in. Please check your employee ID and password.");
     } finally {
       setIsSubmitting(false);

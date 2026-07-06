@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { KeyRound, Lock, RotateCcw } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess } from "../utils/access";
 import { persistAuthSession, resetPinSession } from "../utils/auth";
@@ -11,10 +11,16 @@ function normalizePin(value) {
 
 export default function PinLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResettingPin, setIsResettingPin] = useState(false);
+  const redirectPath = location.state?.from
+    ? typeof location.state.from === "string"
+      ? location.state.from
+      : `${location.state.from.pathname || ""}${location.state.from.search || ""}${location.state.from.hash || ""}`
+    : "/employee-dashboard";
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -48,7 +54,8 @@ export default function PinLogin() {
       } catch {
         clearAccess();
       }
-      navigate(data.pinRequired ? "/pin-setup" : "/employee-dashboard", { replace: true });
+      const safeRedirectPath = redirectPath.startsWith("/") ? redirectPath : "/employee-dashboard";
+      navigate(data.pinRequired ? "/pin-setup" : safeRedirectPath, { replace: true });
     } catch (error) {
       clearAccess();
       setError(error.message || "PIN expired or incorrect. Please login with password.");

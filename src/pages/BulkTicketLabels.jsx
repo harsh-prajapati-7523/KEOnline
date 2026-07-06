@@ -19,38 +19,38 @@ const initialForm = {
 };
 
 const defaultDesignSettings = {
-  labelWidthMm: "65",
-  labelHeightMm: "33",
-  columns: "3",
-  rows: "8",
-  horizontalGapMm: "2",
-  verticalGapMm: "2",
-  pageMarginMm: "5",
+  labelWidthMm: "95",
+  labelHeightMm: "34",
+  columns: "2",
+  rows: "7",
+  horizontalGapMm: "4",
+  verticalGapMm: "4",
+  pageMarginMm: "8",
   businessLine1: "KUMAR ELECTRONICS",
   businessLine2: "& ELECTRICALS",
   subtitle: "Service Ticket",
   qrCaption: "Scan to Track",
-  navyColor: "#0B2A6E",
+  navyColor: "#1C264A",
   goldColor: "#F4B000",
-  borderWidthMm: "0.45",
-  borderRadiusMm: "3",
-  ticketFontSizeMm: "11.6",
-  businessFontSizeMm: "4.6",
-  subtitleFontSizeMm: "5.3",
-  qrCaptionFontSizeMm: "4.1",
-  logoSizeMm: "12.2",
-  qrSizeMm: "11.8",
-  brandXPercent: "17.5",
-  brandYPercent: "13",
-  dividerXPercent: "35",
+  borderWidthMm: "0.6",
+  borderRadiusMm: "4.2",
+  ticketFontSizeMm: "23.5",
+  businessFontSizeMm: "5.4",
+  subtitleFontSizeMm: "6.5",
+  qrCaptionFontSizeMm: "5.4",
+  logoSizeMm: "23",
+  qrSizeMm: "18.8",
+  brandXPercent: "15",
+  brandYPercent: "7",
+  dividerXPercent: "30",
   ticketXPercent: "56",
-  ticketYPercent: "43",
-  qrXPercent: "78",
-  qrYPercent: "15",
+  ticketYPercent: "42",
+  qrXPercent: "79",
+  qrYPercent: "14",
   subtitleXPercent: "56",
   subtitleYPercent: "75",
-  qrCaptionXPercent: "87",
-  qrCaptionYPercent: "70",
+  qrCaptionXPercent: "89.5",
+  qrCaptionYPercent: "76",
 };
 
 const designFields = Object.keys(defaultDesignSettings);
@@ -252,6 +252,10 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
 
   doc.setTextColor(navy);
   doc.setFontSize(settingNumber(settings, "subtitleFontSizeMm"));
+  doc.setDrawColor(navy);
+  doc.setLineWidth(0.45);
+  doc.line(x + subtitleX - 14, y + subtitleY - 1.4, x + subtitleX - 9.4, y + subtitleY - 1.4);
+  doc.line(x + subtitleX + 9.4, y + subtitleY - 1.4, x + subtitleX + 14, y + subtitleY - 1.4);
   doc.text(settings.subtitle, x + subtitleX, y + subtitleY, { align: "center" });
 
   doc.setDrawColor(navy);
@@ -299,7 +303,8 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
   const subtitleY = settingNumber(settings, "subtitleYPercent");
   const qrCaptionX = settingNumber(settings, "qrCaptionXPercent");
   const qrCaptionY = settingNumber(settings, "qrCaptionYPercent");
-  const logoSizePct = settingNumber(settings, "logoSizeMm") / labelWidth * 100;
+  const brandWidthPct = Math.max(10, dividerX - 3);
+  const logoSizePct = clamp((settingNumber(settings, "logoSizeMm") / labelWidth * 100) / (brandWidthPct / 100), 20, 120);
   const qrSizePct = settingNumber(settings, "qrSizeMm") / labelWidth * 100;
   const canEdit = editable && typeof onDesignChange === "function";
 
@@ -374,7 +379,7 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
   };
 
   const elementClass = (name, baseClass) => `${baseClass} ${editable ? "bulk-label-editable-element" : ""} ${selectedElement === name ? "bulk-label-element-selected" : ""}`.trim();
-  const handleClass = editable ? "bulk-label-resize-handle" : "hidden";
+  const handleClass = (name) => editable && selectedElement === name ? "bulk-label-resize-handle" : "hidden";
 
   return (
     <div
@@ -391,11 +396,11 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
       <div
         className={elementClass("brand", "bulk-label-live-brand")}
         onPointerDown={(event) => startDrag(event, "brand", ["brandXPercent", "brandYPercent"])}
-        style={{ left: `${brandX}%`, top: `${brandY}%`, width: `${Math.max(10, dividerX - 3)}%`, transform: "translateX(-50%)" }}
+        style={{ left: `${brandX}%`, top: `${brandY}%`, width: `${brandWidthPct}%`, transform: "translateX(-50%)" }}
       >
         <img src={LOGO_PATH} alt="" aria-hidden="true" style={{ width: `${logoSizePct}%` }} />
         <p style={{ fontSize: `${settingNumber(settings, "businessFontSizeMm") * 2.6}px` }}>{settings.businessLine1}<br />{settings.businessLine2}</p>
-        <button type="button" className={handleClass} aria-label="Resize logo" onPointerDown={(event) => startResize(event, "brand", "logoSizeMm", 4, 24)} />
+        <button type="button" className={handleClass("brand")} aria-label="Resize logo" onPointerDown={(event) => startResize(event, "brand", "logoSizeMm", 4, 24)} />
       </div>
       <div
         className={elementClass("divider", "bulk-label-live-divider")}
@@ -414,7 +419,7 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
         }}
       >
         {label.ticketNumber}
-        <button type="button" className={handleClass} aria-label="Resize ticket number" onPointerDown={(event) => startResize(event, "ticket", "ticketFontSizeMm", 4, 24, "font")} />
+        <button type="button" className={handleClass("ticket")} aria-label="Resize ticket number" onPointerDown={(event) => startResize(event, "ticket", "ticketFontSizeMm", 4, 24, "font")} />
       </strong>
       <div className="bulk-label-live-accent" style={{ left: `${(dividerX + qrX) / 2}%`, top: `${Math.min(82, ticketY + 15)}%`, color: settings.goldColor }} aria-hidden="true">
         <span style={{ background: settings.goldColor }} />
@@ -427,7 +432,7 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
         style={{ left: `${subtitleX}%`, top: `${subtitleY}%`, fontSize: `${settingNumber(settings, "subtitleFontSizeMm") * 2.8}px` }}
       >
         {settings.subtitle}
-        <button type="button" className={handleClass} aria-label="Resize subtitle" onPointerDown={(event) => startResize(event, "subtitle", "subtitleFontSizeMm", 2, 12, "font")} />
+        <button type="button" className={handleClass("subtitle")} aria-label="Resize subtitle" onPointerDown={(event) => startResize(event, "subtitle", "subtitleFontSizeMm", 2, 12, "font")} />
       </span>
       <div
         className={elementClass("qr", "bulk-label-live-qr")}
@@ -435,7 +440,7 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
         style={{ left: `${qrX}%`, top: `${qrY}%`, width: `${qrSizePct}%`, borderColor: settings.navyColor }}
       >
         {qrDataUrl ? <img src={qrDataUrl} alt="" aria-hidden="true" /> : <div />}
-        <button type="button" className={handleClass} aria-label="Resize QR code" onPointerDown={(event) => startResize(event, "qr", "qrSizeMm", 6, 22)} />
+        <button type="button" className={handleClass("qr")} aria-label="Resize QR code" onPointerDown={(event) => startResize(event, "qr", "qrSizeMm", 6, 22)} />
       </div>
       <span
         className={elementClass("qrCaption", "bulk-label-live-qr-caption")}
@@ -443,7 +448,7 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
         style={{ left: `${qrCaptionX}%`, top: `${qrCaptionY}%`, fontSize: `${settingNumber(settings, "qrCaptionFontSizeMm") * 2.5}px` }}
       >
         {settings.qrCaption}
-        <button type="button" className={handleClass} aria-label="Resize QR caption" onPointerDown={(event) => startResize(event, "qrCaption", "qrCaptionFontSizeMm", 2, 10, "font")} />
+        <button type="button" className={handleClass("qrCaption")} aria-label="Resize QR caption" onPointerDown={(event) => startResize(event, "qrCaption", "qrCaptionFontSizeMm", 2, 10, "font")} />
       </span>
     </div>
   );
@@ -457,7 +462,7 @@ export default function BulkTicketLabels() {
   const [sampleQrDataUrl, setSampleQrDataUrl] = useState("");
   const [previewLabels, setPreviewLabels] = useState([]);
   const [message, setMessage] = useState("");
-  const [selectedElement, setSelectedElement] = useState("ticket");
+  const [selectedElement, setSelectedElement] = useState("");
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 

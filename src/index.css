@@ -50,7 +50,7 @@ body {
 }
 
 .bulk-label-page {
-  --label-navy: #0b2a6e;
+  --label-navy: #1c264a;
   --label-gold: #f4b000;
 }
 
@@ -255,10 +255,23 @@ body {
 }
 
 .bulk-label-live-subtitle {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.55rem;
   position: absolute;
   text-align: center;
   transform: translate(-50%, -50%);
   white-space: nowrap;
+}
+
+.bulk-label-live-subtitle::before,
+.bulk-label-live-subtitle::after {
+  background: currentColor;
+  border-radius: 999px;
+  content: "";
+  display: inline-block;
+  height: 3px;
+  width: 34px;
 }
 
 .bulk-label-live-qr {

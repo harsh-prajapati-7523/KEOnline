@@ -248,12 +248,6 @@ body {
   height: 3px;
 }
 
-.bulk-label-live-accent svg {
-  fill: currentColor;
-  height: 0.63rem;
-  width: 0.315rem;
-}
-
 .bulk-label-live-subtitle {
   align-items: center;
   display: inline-flex;

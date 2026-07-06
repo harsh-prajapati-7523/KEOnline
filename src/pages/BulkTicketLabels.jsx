@@ -197,18 +197,6 @@ async function makeQrDataUrl(url, width = 256) {
   });
 }
 
-function drawLightning(doc, x, y, scale, goldColor) {
-  doc.setFillColor(goldColor);
-  doc.lines(
-    [[-7, 17], [6, 0], [-3, 15], [13, -20], [-7, 0], [3, -12]],
-    x + 7 * scale,
-    y,
-    [scale, scale],
-    "F",
-    true
-  );
-}
-
 function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
   const layout = getLayout(settings);
   const labelWidth = layout.labelWidth;
@@ -256,10 +244,7 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
   const accentY = y + labelHeight * 0.66;
   const accentLeft = x + dividerX + 5.8;
   const accentRight = x + qrX - 3.4;
-  const lightningX = x + labelWidth * 0.535 - 2.2;
-  doc.line(accentLeft, accentY, Math.max(accentLeft, lightningX - 1.6), accentY);
-  drawLightning(doc, lightningX, accentY - 1.2, 0.078, gold);
-  doc.line(lightningX + 1.4, accentY, accentRight, accentY);
+  doc.line(accentLeft, accentY, accentRight, accentY);
 
   doc.setTextColor(navy);
   doc.setFontSize(settingNumber(settings, "subtitleFontSizeMm") * PDF_SUBTITLE_SCALE);
@@ -435,7 +420,6 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
       </strong>
       <div className="bulk-label-live-accent" style={{ left: `${(dividerX + qrX) / 2}%`, top: `${Math.min(84, ticketY + 27)}%`, color: settings.goldColor }} aria-hidden="true">
         <span style={{ background: settings.goldColor }} />
-        <svg viewBox="0 0 16 32" focusable="false" aria-hidden="true"><polygon points="7,0 0,17 6,17 3,32 16,12 9,12 12,0" /></svg>
         <span style={{ background: settings.goldColor }} />
       </div>
       <span

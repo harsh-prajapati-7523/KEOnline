@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { KeyRound, Lock, ShieldCheck } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import KEPremiumCardBackground from "../components/KEPremiumCardBackground";
+import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAuthSession, getValidToken } from "../utils/auth";
 
 const emptyForm = {
@@ -13,12 +13,76 @@ function normalizePin(value) {
   return value.replace(/\D/g, "").slice(0, 6);
 }
 
+function PinBoxInput({
+  id,
+  name,
+  value,
+  label,
+  helper,
+  icon: Icon,
+  isFocused,
+  onBlur,
+  onChange,
+  onFocus,
+  inputRef,
+}) {
+  const focusInput = () => {
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div>
+      <label htmlFor={id} className="ke-login-label">
+        {label}
+      </label>
+
+      <div className="ke-pin-entry" onClick={focusInput}>
+        <input
+          ref={inputRef}
+          id={id}
+          name={name}
+          type="password"
+          inputMode="numeric"
+          autoComplete="one-time-code"
+          maxLength={6}
+          value={value}
+          onChange={onChange}
+          onFocus={onFocus}
+          onBlur={onBlur}
+          className="ke-pin-entry-input"
+          aria-label={label}
+          required
+        />
+        <div className="ke-pin-box-grid" aria-hidden="true">
+          {Array.from({ length: 6 }).map((_, index) => {
+            const isFilled = index < value.length;
+            const isActive = isFocused && index === Math.min(value.length, 5);
+            return (
+              <span key={index} className={`ke-pin-box ${isActive ? "ke-pin-box--active" : ""}`}>
+                {isFilled ? <span className="ke-pin-dot" /> : isActive ? <span className="ke-pin-caret" /> : null}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="ke-pin-helper">
+        <Icon size={16} aria-hidden="true" />
+        <span>{helper}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function PinSetup() {
   const navigate = useNavigate();
   const location = useLocation();
   const [form, setForm] = useState(emptyForm);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [focusedField, setFocusedField] = useState("");
+  const pinInputRef = useRef(null);
+  const confirmPinInputRef = useRef(null);
   const redirectPath = location.state?.from && String(location.state.from).startsWith("/")
     ? location.state.from
     : "/employee-dashboard";
@@ -73,50 +137,61 @@ export default function PinSetup() {
   };
 
   return (
-    <main id="main-content" className="ke-page-main dashboard-page lg:px-8">
-      <div className="dashboard-mobile-container max-w-xl">
-        <header className="dashboard-welcome-card">
-          <KEPremiumCardBackground className="dashboard-welcome-premium-bg">
-            <div className="dashboard-welcome-content">
-              <div className="dashboard-user-avatar" aria-hidden="true">
-                <KeyRound />
-              </div>
-              <div className="dashboard-user-info">
-                <h1 className="dashboard-welcome-title">Create 6 Digit PIN</h1>
-                <p className="dashboard-welcome-helper">Use this PIN for quick secure login on this device.</p>
-              </div>
+    <main id="main-content" className="app-screen ke-login-page ke-login-page--premium">
+      <div className="ke-login-shell">
+        <KEWaveBackground className="login-premium-header">
+          <header className="login-header-content flex flex-col items-center">
+            <img src="/ke-logo-256w.png" alt="" aria-hidden="true" className="ke-login-logo" />
+            <p className="ke-login-brand">Kumar Electronics and Electricals</p>
+            <h1 className="ke-login-title">Create PIN</h1>
+            <p className="ke-login-subtitle">Secure Staff Access</p>
+          </header>
+        </KEWaveBackground>
+
+        <div className="ke-login-card ke-login-form-area">
+          <form onSubmit={handleSubmit} className="ke-login-form">
+            <PinBoxInput
+              id="pin"
+              name="pin"
+              value={form.pin}
+              label="6 Digit PIN"
+              helper="Enter 6-digit PIN"
+              icon={Lock}
+              inputRef={pinInputRef}
+              isFocused={focusedField === "pin"}
+              onChange={handleChange}
+              onFocus={() => setFocusedField("pin")}
+              onBlur={() => setFocusedField("")}
+            />
+
+            <div className="mt-4">
+              <PinBoxInput
+                id="confirm-pin"
+                name="confirmPin"
+                value={form.confirmPin}
+                label="Confirm PIN"
+                helper="Confirm 6-digit PIN"
+                icon={ShieldCheck}
+                inputRef={confirmPinInputRef}
+                isFocused={focusedField === "confirmPin"}
+                onChange={handleChange}
+                onFocus={() => setFocusedField("confirmPin")}
+                onBlur={() => setFocusedField("")}
+              />
             </div>
-          </KEPremiumCardBackground>
-        </header>
 
-        <form onSubmit={handleSubmit} className="mt-4 rounded-2xl border border-blue-100 bg-white p-5 shadow-sm sm:p-6">
-          <label htmlFor="pin" className="ke-form-label">
-            PIN
-          </label>
-          <div className="mb-4 flex min-h-12 w-full items-center rounded-xl border border-blue-100 bg-white px-3 py-1.5 focus-within:border-blue-950">
-            <Lock className="mr-3 shrink-0 text-blue-950" size={20} aria-hidden="true" />
-            <input id="pin" name="pin" type="password" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={form.pin} onChange={handleChange} className="min-h-10 min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none" required />
-          </div>
+            <button type="submit" disabled={isSubmitting} className="ke-login-button mt-5">
+              <KeyRound size={22} aria-hidden="true" />
+              {isSubmitting ? "Creating..." : "Create PIN"}
+            </button>
 
-          <label htmlFor="confirm-pin" className="ke-form-label">
-            Confirm PIN
-          </label>
-          <div className="flex min-h-12 w-full items-center rounded-xl border border-blue-100 bg-white px-3 py-1.5 focus-within:border-blue-950">
-            <ShieldCheck className="mr-3 shrink-0 text-blue-950" size={20} aria-hidden="true" />
-            <input id="confirm-pin" name="confirmPin" type="password" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={form.confirmPin} onChange={handleChange} className="min-h-10 min-w-0 flex-1 bg-transparent text-base font-semibold text-slate-900 outline-none" required />
-          </div>
-
-          <button type="submit" disabled={isSubmitting} className="ke-accent-action mt-5 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-base font-bold disabled:opacity-70">
-            <KeyRound size={19} aria-hidden="true" />
-            {isSubmitting ? "Creating..." : "Create PIN"}
-          </button>
-
-          {error && (
-            <p role="alert" className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-              {error}
-            </p>
-          )}
-        </form>
+            {error && (
+              <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-700">
+                {error}
+              </p>
+            )}
+          </form>
+        </div>
       </div>
     </main>
   );

@@ -3,6 +3,7 @@ import { ArrowLeft, KeyRound, PlusCircle, RefreshCw, ShieldCheck, UserRoundCog, 
 import { useNavigate } from "react-router-dom";
 
 const employeeIdPattern = /^[a-zA-Z0-9_]{3,30}$/;
+const sixDigitPinPattern = /^\d{6}$/;
 const emptyCreateForm = {
   name: "",
   employeeId: "",
@@ -58,8 +59,28 @@ function formatEmployeeRole(employee) {
   return employee.roleKey ?? employee.role ?? "Not available";
 }
 
-function validateCreate(form) {
+function isSuperAdminRoleKey(roleKey) {
+  return roleKey === "SUPER_ADMIN";
+}
+
+function selectedRole(roles, roleId) {
+  return roles.find((role) => String(role.id) === String(roleId));
+}
+
+function credentialLabelForRoleKey(roleKey) {
+  return isSuperAdminRoleKey(roleKey) ? "Temporary password" : "6 digit PIN";
+}
+
+function validateCredentialForRole(value, roleKey) {
+  if (isSuperAdminRoleKey(roleKey)) {
+    return value.length >= 8 ? "" : "Temporary password must contain at least 8 characters.";
+  }
+  return sixDigitPinPattern.test(value) ? "" : "PIN must be exactly 6 digits.";
+}
+
+function validateCreate(form, roles) {
   const errors = {};
+  const role = selectedRole(roles, form.roleId);
   if (!form.name.trim()) errors.name = "Employee name is required.";
   if (!form.employeeId.trim()) {
     errors.employeeId = "Employee ID is required.";
@@ -67,7 +88,10 @@ function validateCreate(form) {
     errors.employeeId = "Use 3 to 30 letters, digits, or underscores.";
   }
   if (!form.roleId) errors.roleId = "Role is required.";
-  if (form.password.length < 8) errors.password = "Temporary password must contain at least 8 characters.";
+  if (form.roleId) {
+    const credentialError = validateCredentialForRole(form.password, role?.roleKey);
+    if (credentialError) errors.password = credentialError;
+  }
   return errors;
 }
 
@@ -90,6 +114,8 @@ export default function EmployeeManagement() {
   const [passwordValue, setPasswordValue] = useState("");
   const [actionError, setActionError] = useState("");
   const [processingKey, setProcessingKey] = useState("");
+  const createRole = selectedRole(roles, createForm.roleId);
+  const createCredentialLabel = credentialLabelForRoleKey(createRole?.roleKey);
 
   const loadEmployees = useCallback(async () => {
     setIsLoading(true);
@@ -136,14 +162,24 @@ export default function EmployeeManagement() {
 
   const handleCreateChange = (event) => {
     const { checked, name, type, value } = event.target;
-    setCreateForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
+    setCreateForm((current) => {
+      const nextValue = type === "checkbox" ? checked : value;
+      if (name !== "password") {
+        return { ...current, [name]: nextValue };
+      }
+      const role = selectedRole(roles, current.roleId);
+      return {
+        ...current,
+        [name]: isSuperAdminRoleKey(role?.roleKey) ? value : value.replace(/\D/g, "").slice(0, 6),
+      };
+    });
     setCreateErrors((current) => ({ ...current, [name]: "" }));
     setMessage("");
   };
 
   const handleCreate = async (event) => {
     event.preventDefault();
-    const errors = validateCreate(createForm);
+    const errors = validateCreate(createForm, roles);
     if (Object.keys(errors).length > 0) {
       setCreateErrors(errors);
       return;
@@ -247,8 +283,9 @@ export default function EmployeeManagement() {
   };
 
   const resetPassword = async (employee) => {
-    if (passwordValue.length < 8) {
-      setActionError("Temporary password must contain at least 8 characters.");
+    const credentialError = validateCredentialForRole(passwordValue, employee.roleKey ?? employee.role);
+    if (credentialError) {
+      setActionError(credentialError);
       return;
     }
 
@@ -264,7 +301,7 @@ export default function EmployeeManagement() {
       if (!response.ok) throw new Error(await readApiError(response, "Unable to reset password."));
       closeAction();
       setMessageType("success");
-      setMessage("Employee password reset successfully. Account unlocked.");
+      setMessage("Employee credential reset successfully. Account unlocked.");
       await loadEmployees();
     } catch (error) {
       setActionError(error.message || "Unable to reset password.");
@@ -315,8 +352,8 @@ export default function EmployeeManagement() {
               <FieldError message={createErrors.roleId} />
             </label>
             <label className="font-semibold text-gray-700">
-              Temporary Password
-              <input name="password" type="password" value={createForm.password} onChange={handleCreateChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+              {createCredentialLabel}
+              <input name="password" type="password" inputMode={isSuperAdminRoleKey(createRole?.roleKey) ? undefined : "numeric"} maxLength={isSuperAdminRoleKey(createRole?.roleKey) ? undefined : 6} value={createForm.password} onChange={handleCreateChange} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
               <FieldError message={createErrors.password} />
             </label>
             <label className="flex items-center gap-3 font-semibold text-gray-700 sm:col-span-2">
@@ -387,7 +424,7 @@ export default function EmployeeManagement() {
                     <UserRoundCog size={15} aria-hidden="true" /> Change Role
                   </button>
                   <button type="button" onClick={() => toggleAction(employee, "password")} className="flex items-center justify-center gap-1 rounded-xl border border-blue-950 px-3 py-2 text-sm font-bold text-blue-950 hover:bg-blue-50">
-                    <KeyRound size={15} aria-hidden="true" /> Reset Password
+                    <KeyRound size={15} aria-hidden="true" /> Reset Credential
                   </button>
                 </div>
 
@@ -409,11 +446,11 @@ export default function EmployeeManagement() {
                 {openAction?.id === employee.id && openAction.type === "password" && (
                   <div className="mt-4 border-t border-blue-100 pt-4">
                     <label className="text-sm font-semibold text-gray-700">
-                      Temporary Password
-                      <input type="password" value={passwordValue} onChange={(event) => setPasswordValue(event.target.value)} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
+                      {credentialLabelForRoleKey(employee.roleKey ?? employee.role)}
+                      <input type="password" inputMode={isSuperAdminRoleKey(employee.roleKey ?? employee.role) ? undefined : "numeric"} maxLength={isSuperAdminRoleKey(employee.roleKey ?? employee.role) ? undefined : 6} value={passwordValue} onChange={(event) => setPasswordValue(isSuperAdminRoleKey(employee.roleKey ?? employee.role) ? event.target.value : event.target.value.replace(/\D/g, "").slice(0, 6))} className="mt-2 w-full rounded-xl border border-gray-300 px-4 py-3 outline-none focus:border-blue-950" />
                     </label>
                     <button type="button" onClick={() => resetPassword(employee)} disabled={processingKey === `password-${employee.id}`} className="mt-3 rounded-xl bg-blue-950 px-4 py-2 text-sm font-bold text-white hover:bg-blue-900 disabled:opacity-60">
-                      {processingKey === `password-${employee.id}` ? "Saving..." : "Save Password"}
+                      {processingKey === `password-${employee.id}` ? "Saving..." : "Save Credential"}
                     </button>
                   </div>
                 )}

@@ -121,6 +121,19 @@ export async function logoutSession() {
   }
 }
 
+export async function resetPinSession() {
+  try {
+    await fetch("/volt/auth/pin/reset", {
+      method: "POST",
+      credentials: "include",
+    });
+  } catch {
+    // Local cleanup still needs to happen if the network is unavailable.
+  } finally {
+    clearAuthSession();
+  }
+}
+
 function isVoltRequest(input) {
   const url = typeof input === "string" ? input : input?.url;
   if (!url) return false;

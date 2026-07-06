@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { ArrowLeft, KeyRound, Lock } from "lucide-react";
+import { KeyRound, Lock, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess } from "../utils/access";
-import { persistAuthSession } from "../utils/auth";
+import { persistAuthSession, resetPinSession } from "../utils/auth";
 
 function normalizePin(value) {
   return value.replace(/\D/g, "").slice(0, 6);
@@ -14,6 +14,7 @@ export default function PinLogin() {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResettingPin, setIsResettingPin] = useState(false);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -56,6 +57,16 @@ export default function PinLogin() {
     }
   };
 
+  const handleResetPin = async () => {
+    if (isResettingPin) return;
+
+    setIsResettingPin(true);
+    setError("");
+    await resetPinSession();
+    clearAccess();
+    navigate("/employee-login", { replace: true });
+  };
+
   return (
     <main id="main-content" className="app-screen ke-login-page ke-login-page--premium">
       <div className="ke-login-shell">
@@ -84,9 +95,9 @@ export default function PinLogin() {
               {isSubmitting ? "Unlocking..." : "Unlock"}
             </button>
 
-            <button type="button" onClick={() => navigate("/employee-login")} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 transition hover:bg-blue-50">
-              <ArrowLeft size={17} aria-hidden="true" />
-              Password Login
+            <button type="button" onClick={handleResetPin} disabled={isResettingPin} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 transition hover:bg-blue-50 disabled:opacity-60">
+              <RotateCcw size={17} aria-hidden="true" />
+              {isResettingPin ? "Resetting..." : "Reset PIN"}
             </button>
 
             {error && (

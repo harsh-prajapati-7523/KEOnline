@@ -9,6 +9,9 @@ const A4_HEIGHT_MM = 297;
 const LABEL_LIMIT = 1000;
 const LOGO_PATH = "/ke-logo-transparent.png";
 const STORAGE_KEY = "ke_bulk_label_design_settings";
+const PDF_TICKET_SCALE = 1.28;
+const PDF_SUBTITLE_SCALE = 1.15;
+const PDF_CAPTION_SCALE = 1.05;
 
 const initialForm = {
   startNumber: "1",
@@ -228,16 +231,17 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
   doc.addImage(logoDataUrl, "PNG", x + logoX, y + logoY, logoSize, logoSize);
   doc.setTextColor(navy);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(settingNumber(settings, "businessFontSizeMm"));
-  doc.text(settings.businessLine1, x + brandX, y + logoY + logoSize + 5.3, { align: "center" });
-  doc.text(settings.businessLine2, x + brandX, y + logoY + logoSize + 9, { align: "center" });
+  const businessFontSize = settingNumber(settings, "businessFontSizeMm");
+  doc.setFontSize(businessFontSize);
+  doc.text(settings.businessLine1, x + brandX, y + labelHeight * 0.78, { align: "center" });
+  doc.text(settings.businessLine2, x + brandX, y + labelHeight * 0.86, { align: "center" });
 
   doc.setDrawColor(navy);
   doc.setLineWidth(0.35);
   doc.line(x + dividerX, y + labelHeight * 0.17, x + dividerX, y + labelHeight * 0.83);
 
   doc.setTextColor(navy);
-  doc.setFontSize(settingNumber(settings, "ticketFontSizeMm"));
+  doc.setFontSize(settingNumber(settings, "ticketFontSizeMm") * PDF_TICKET_SCALE);
   doc.text(label.ticketNumber, x + ticketX, y + ticketY, { align: "center" });
 
   doc.setDrawColor(gold);
@@ -251,7 +255,7 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
   doc.line(lightningX + 5.5, accentY, accentRight, accentY);
 
   doc.setTextColor(navy);
-  doc.setFontSize(settingNumber(settings, "subtitleFontSizeMm"));
+  doc.setFontSize(settingNumber(settings, "subtitleFontSizeMm") * PDF_SUBTITLE_SCALE);
   doc.setDrawColor(navy);
   doc.setLineWidth(0.45);
   doc.line(x + subtitleX - 14, y + subtitleY - 1.4, x + subtitleX - 9.4, y + subtitleY - 1.4);
@@ -263,8 +267,8 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
   doc.roundedRect(x + qrX, y + qrY, qrSize + 1.4, qrSize + 1.4, 1, 1, "S");
   doc.addImage(qrDataUrl, "PNG", x + qrX + 0.7, y + qrY + 0.7, qrSize, qrSize);
   doc.setTextColor(navy);
-  doc.setFontSize(settingNumber(settings, "qrCaptionFontSizeMm"));
-  doc.text(settings.qrCaption, x + qrCaptionX, y + qrCaptionY, { align: "center" });
+  doc.setFontSize(settingNumber(settings, "qrCaptionFontSizeMm") * PDF_CAPTION_SCALE);
+  doc.text(settings.qrCaption, x + qrCaptionX, y + qrCaptionY + 2, { align: "center" });
 }
 
 function DesignNumberInput({ label, name, value, onChange, error, min, max, step = "1", type = "number" }) {

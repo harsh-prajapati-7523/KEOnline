@@ -2179,6 +2179,35 @@ textarea {
   flex: 0 0 auto;
 }
 
+.ke-pin-reset-row {
+  align-items: center;
+  color: #101b4d;
+  display: flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 0.35rem;
+  justify-content: center;
+  margin-top: 18px;
+  text-align: center;
+}
+
+.ke-pin-reset-link {
+  color: #101b4d;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color 160ms ease, opacity 160ms ease;
+}
+
+.ke-pin-reset-link:hover {
+  color: #0f63d8;
+}
+
+.ke-pin-reset-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 @keyframes ke-pin-caret-blink {
   50% {
     opacity: 0;

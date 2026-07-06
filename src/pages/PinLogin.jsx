@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Lock, RotateCcw } from "lucide-react";
+import { Lock } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess } from "../utils/access";
@@ -217,10 +217,12 @@ export default function PinLogin() {
               </p>
             )}
 
-            <button type="button" onClick={handleResetPin} disabled={isResettingPin || isSubmitting} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-blue-950 px-4 py-3 text-sm font-bold text-blue-950 transition hover:bg-blue-50 disabled:opacity-60">
-              <RotateCcw size={17} aria-hidden="true" />
-              {isResettingPin ? "Resetting..." : "Reset PIN"}
-            </button>
+            <p className="ke-pin-reset-row">
+              <span>Forgot PIN?</span>
+              <button type="button" onClick={handleResetPin} disabled={isResettingPin || isSubmitting} className="ke-pin-reset-link">
+                {isResettingPin ? "Resetting..." : "Reset PIN"}
+              </button>
+            </p>
 
             {error && (
               <p role="alert" className="mt-4 rounded-xl bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-700">

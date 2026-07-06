@@ -4,6 +4,23 @@ import { useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAuthSession, getValidToken, isPinLoginAvailable, persistAuthSession } from "../utils/auth";
 
+function SessionCheckScreen() {
+  return (
+    <main id="main-content" className="app-screen ke-login-page ke-login-page--premium">
+      <div className="ke-login-shell">
+        <KEWaveBackground className="login-premium-header">
+          <header className="login-header-content flex flex-col items-center">
+            <img src="/ke-logo-256w.png" alt="" aria-hidden="true" className="ke-login-logo" />
+            <p className="ke-login-brand">Kumar Electronics and Electricals</p>
+            <h1 className="ke-login-title">Secure Staff Access</h1>
+            <p className="ke-login-subtitle">Checking session...</p>
+          </header>
+        </KEWaveBackground>
+      </div>
+    </main>
+  );
+}
+
 export default function EmployeeLogin() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -14,21 +31,35 @@ export default function EmployeeLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingPinLogin, setIsCheckingPinLogin] = useState(() => !getValidToken());
 
   useEffect(() => {
     let isCurrent = true;
-    if (getValidToken()) return undefined;
+    if (getValidToken()) {
+      setIsCheckingPinLogin(false);
+      return undefined;
+    }
 
+    setIsCheckingPinLogin(true);
     isPinLoginAvailable().then((available) => {
-      if (isCurrent && available) {
+      if (!isCurrent) return;
+
+      if (available) {
         navigate("/pin-login", { replace: true, state: location.state });
+        return;
       }
+
+      setIsCheckingPinLogin(false);
     });
 
     return () => {
       isCurrent = false;
     };
   }, [location.state, navigate]);
+
+  if (isCheckingPinLogin) {
+    return <SessionCheckScreen />;
+  }
 
   const handleEmployeeIdChange = (event) => {
     setEmployeeId(event.target.value);

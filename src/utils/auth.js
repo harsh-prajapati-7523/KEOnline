@@ -1,4 +1,7 @@
 const AUTH_STORAGE_KEYS = ["token", "employeeName", "role", "employeeId", "access"];
+const AUTH_EXPIRED_EVENT = "ke:auth-expired";
+
+let fetchInterceptorInstalled = false;
 
 function decodeBase64Url(value) {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
@@ -42,4 +45,40 @@ export function getValidToken() {
   }
 
   return token;
+}
+
+export function notifyAuthExpired() {
+  clearAuthSession();
+  window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+}
+
+export function onAuthExpired(callback) {
+  window.addEventListener(AUTH_EXPIRED_EVENT, callback);
+  return () => window.removeEventListener(AUTH_EXPIRED_EVENT, callback);
+}
+
+function isVoltRequest(input) {
+  const url = typeof input === "string" ? input : input?.url;
+  if (!url) return false;
+
+  try {
+    return new URL(url, window.location.origin).pathname.startsWith("/volt/");
+  } catch {
+    return false;
+  }
+}
+
+export function installAuthFetchInterceptor() {
+  if (fetchInterceptorInstalled) return;
+
+  fetchInterceptorInstalled = true;
+  const originalFetch = window.fetch.bind(window);
+
+  window.fetch = async (input, init) => {
+    const response = await originalFetch(input, init);
+    if (response.status === 401 && isVoltRequest(input)) {
+      notifyAuthExpired();
+    }
+    return response;
+  };
 }

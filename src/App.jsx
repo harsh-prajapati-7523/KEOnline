@@ -5,7 +5,7 @@ import EmployeeLogin from "./pages/EmployeeLogin";
 import KEWaveBackground from "./components/KEWaveBackground";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { hasAnyAccess } from "./utils/access";
-import { clearAuthSession, getTokenExpiryMs, getValidToken } from "./utils/auth";
+import { clearAuthSession, getTokenExpiryMs, getValidToken, onAuthExpired } from "./utils/auth";
 
 const HomePage = lazy(() => import("./pages/Home"));
 const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
@@ -89,6 +89,16 @@ function RouteLoadingFallback() {
 function AuthExpiryWatcher() {
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    const unsubscribe = onAuthExpired(() => {
+      if (location.pathname !== "/employee-login") {
+        navigate("/employee-login", { replace: true });
+      }
+    });
+
+    return unsubscribe;
+  }, [location.pathname, navigate]);
 
   useEffect(() => {
     const token = getValidToken();

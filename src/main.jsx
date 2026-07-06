@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import { installAuthFetchInterceptor } from './utils/auth'
 
 function scheduleServiceWorkerRegistration() {
   if (!('serviceWorker' in navigator)) return
@@ -37,6 +38,8 @@ function scheduleServiceWorkerRegistration() {
 
   window.addEventListener('load', registerWhenIdle, { once: true })
 }
+
+installAuthFetchInterceptor()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

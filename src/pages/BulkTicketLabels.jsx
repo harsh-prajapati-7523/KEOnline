@@ -9,7 +9,7 @@ const A4_HEIGHT_MM = 297;
 const LABEL_LIMIT = 1000;
 const LOGO_PATH = "/ke-logo-transparent.png";
 const STORAGE_KEY = "ke_bulk_label_design_settings";
-const PDF_TICKET_SCALE = 1.15;
+const PDF_TICKET_SCALE = 1.27;
 const PDF_BUSINESS_SCALE = 1.35;
 const PDF_SUBTITLE_SCALE = 1.15;
 const PDF_CAPTION_SCALE = 1.25;
@@ -249,25 +249,26 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
 
   doc.setTextColor(navy);
   doc.setFontSize(settingNumber(settings, "ticketFontSizeMm") * PDF_TICKET_SCALE);
-  doc.text(label.ticketNumber, x + ticketX, y + ticketY, { align: "center" });
+  doc.text(label.ticketNumber, x + ticketX, y + ticketY + 1.2, { align: "center" });
 
   doc.setDrawColor(gold);
   doc.setLineWidth(0.45);
-  const accentY = y + Math.min(labelHeight - 7, ticketY + 10.2);
-  const accentLeft = x + dividerX + 4.5;
-  const accentRight = x + qrX - 2.5;
-  const lightningX = x + (dividerX + qrX) / 2 - 2.7;
-  doc.line(accentLeft, accentY, Math.max(accentLeft, lightningX - 2), accentY);
-  drawLightning(doc, lightningX, accentY - 3.3, 0.22, gold);
-  doc.line(lightningX + 4.2, accentY, accentRight, accentY);
+  const accentY = y + labelHeight * 0.66;
+  const accentLeft = x + dividerX + 5.8;
+  const accentRight = x + qrX - 3.4;
+  const lightningX = x + labelWidth * 0.535 - 2.2;
+  doc.line(accentLeft, accentY, Math.max(accentLeft, lightningX - 1.6), accentY);
+  drawLightning(doc, lightningX, accentY - 1.2, 0.078, gold);
+  doc.line(lightningX + 1.4, accentY, accentRight, accentY);
 
   doc.setTextColor(navy);
   doc.setFontSize(settingNumber(settings, "subtitleFontSizeMm") * PDF_SUBTITLE_SCALE);
   doc.setDrawColor(navy);
   doc.setLineWidth(0.45);
-  doc.line(x + subtitleX - 14, y + subtitleY - 1.4, x + subtitleX - 9.4, y + subtitleY - 1.4);
-  doc.line(x + subtitleX + 9.4, y + subtitleY - 1.4, x + subtitleX + 14, y + subtitleY - 1.4);
-  doc.text(settings.subtitle, x + subtitleX, y + subtitleY, { align: "center" });
+  const subtitleBaselineY = y + labelHeight * 0.795;
+  doc.line(x + subtitleX - 13.2, subtitleBaselineY - 1.7, x + subtitleX - 9.2, subtitleBaselineY - 1.7);
+  doc.line(x + subtitleX + 9.2, subtitleBaselineY - 1.7, x + subtitleX + 13.2, subtitleBaselineY - 1.7);
+  doc.text(settings.subtitle, x + subtitleX, subtitleBaselineY, { align: "center" });
 
   doc.setDrawColor(navy);
   doc.setLineWidth(0.35);

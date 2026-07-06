@@ -9,9 +9,10 @@ const A4_HEIGHT_MM = 297;
 const LABEL_LIMIT = 1000;
 const LOGO_PATH = "/ke-logo-transparent.png";
 const STORAGE_KEY = "ke_bulk_label_design_settings";
-const PDF_TICKET_SCALE = 1.28;
+const PDF_TICKET_SCALE = 1.15;
+const PDF_BUSINESS_SCALE = 1.35;
 const PDF_SUBTITLE_SCALE = 1.15;
-const PDF_CAPTION_SCALE = 1.05;
+const PDF_CAPTION_SCALE = 1.25;
 
 const initialForm = {
   startNumber: "1",
@@ -22,38 +23,38 @@ const initialForm = {
 };
 
 const defaultDesignSettings = {
-  labelWidthMm: "95",
-  labelHeightMm: "34",
+  labelWidthMm: "97",
+  labelHeightMm: "38.1",
   columns: "2",
   rows: "7",
-  horizontalGapMm: "4",
-  verticalGapMm: "4",
-  pageMarginMm: "8",
+  horizontalGapMm: "5",
+  verticalGapMm: "3",
+  pageMarginMm: "5",
   businessLine1: "KUMAR ELECTRONICS",
   businessLine2: "& ELECTRICALS",
   subtitle: "Service Ticket",
   qrCaption: "Scan to Track",
   navyColor: "#1C264A",
   goldColor: "#F4B000",
-  borderWidthMm: "0.6",
-  borderRadiusMm: "4.2",
-  ticketFontSizeMm: "23.5",
-  businessFontSizeMm: "5.4",
-  subtitleFontSizeMm: "6.5",
-  qrCaptionFontSizeMm: "5.4",
-  logoSizeMm: "23",
-  qrSizeMm: "18.8",
+  borderWidthMm: "0.55",
+  borderRadiusMm: "4.6",
+  ticketFontSizeMm: "27",
+  businessFontSizeMm: "5",
+  subtitleFontSizeMm: "6.2",
+  qrCaptionFontSizeMm: "5.1",
+  logoSizeMm: "19",
+  qrSizeMm: "19",
   brandXPercent: "15",
-  brandYPercent: "7",
-  dividerXPercent: "30",
-  ticketXPercent: "56",
-  ticketYPercent: "42",
-  qrXPercent: "79",
-  qrYPercent: "14",
-  subtitleXPercent: "56",
-  subtitleYPercent: "75",
-  qrCaptionXPercent: "89.5",
-  qrCaptionYPercent: "76",
+  brandYPercent: "13",
+  dividerXPercent: "30.4",
+  ticketXPercent: "55",
+  ticketYPercent: "39.5",
+  qrXPercent: "76.5",
+  qrYPercent: "17",
+  subtitleXPercent: "55",
+  subtitleYPercent: "78",
+  qrCaptionXPercent: "86.8",
+  qrCaptionYPercent: "80.5",
 };
 
 const designFields = Object.keys(defaultDesignSettings);
@@ -198,8 +199,14 @@ async function makeQrDataUrl(url, width = 256) {
 
 function drawLightning(doc, x, y, scale, goldColor) {
   doc.setFillColor(goldColor);
-  doc.triangle(x + 1.6 * scale, y, x, y + 4.2 * scale, x + 2.3 * scale, y + 4.2 * scale, "F");
-  doc.triangle(x + 2.3 * scale, y + 3 * scale, x + 0.7 * scale, y + 7.5 * scale, x + 4.1 * scale, y + 3 * scale, "F");
+  doc.lines(
+    [[-7, 17], [6, 0], [-3, 15], [13, -20], [-7, 0], [3, -12]],
+    x + 7 * scale,
+    y,
+    [scale, scale],
+    "F",
+    true
+  );
 }
 
 function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
@@ -232,9 +239,9 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
   doc.setTextColor(navy);
   doc.setFont("helvetica", "bold");
   const businessFontSize = settingNumber(settings, "businessFontSizeMm");
-  doc.setFontSize(businessFontSize);
-  doc.text(settings.businessLine1, x + brandX, y + labelHeight * 0.78, { align: "center" });
-  doc.text(settings.businessLine2, x + brandX, y + labelHeight * 0.86, { align: "center" });
+  doc.setFontSize(businessFontSize * PDF_BUSINESS_SCALE);
+  doc.text(settings.businessLine1, x + brandX, y + labelHeight * 0.73, { align: "center" });
+  doc.text(settings.businessLine2, x + brandX, y + labelHeight * 0.82, { align: "center" });
 
   doc.setDrawColor(navy);
   doc.setLineWidth(0.35);
@@ -246,13 +253,13 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
 
   doc.setDrawColor(gold);
   doc.setLineWidth(0.45);
-  const accentY = y + Math.min(labelHeight - 8, ticketY + 4.7);
+  const accentY = y + Math.min(labelHeight - 7, ticketY + 10.2);
   const accentLeft = x + dividerX + 4.5;
   const accentRight = x + qrX - 2.5;
-  const lightningX = x + (dividerX + qrX) / 2 - 1.6;
+  const lightningX = x + (dividerX + qrX) / 2 - 2.7;
   doc.line(accentLeft, accentY, Math.max(accentLeft, lightningX - 2), accentY);
-  drawLightning(doc, lightningX, accentY - 3, 0.78, gold);
-  doc.line(lightningX + 5.5, accentY, accentRight, accentY);
+  drawLightning(doc, lightningX, accentY - 3.3, 0.22, gold);
+  doc.line(lightningX + 4.2, accentY, accentRight, accentY);
 
   doc.setTextColor(navy);
   doc.setFontSize(settingNumber(settings, "subtitleFontSizeMm") * PDF_SUBTITLE_SCALE);
@@ -392,7 +399,7 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
       style={{
         aspectRatio: `${labelWidth} / ${labelHeight}`,
         borderColor: settings.goldColor,
-        borderRadius: `${settingNumber(settings, "borderRadiusMm") * 3}px`,
+        borderRadius: `${settingNumber(settings, "borderRadiusMm") / labelHeight * 100}%`,
         borderWidth: `${Math.max(1, settingNumber(settings, "borderWidthMm") * 4)}px`,
         color: settings.navyColor,
       }}
@@ -423,11 +430,11 @@ function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedEl
         }}
       >
         {label.ticketNumber}
-        <button type="button" className={handleClass("ticket")} aria-label="Resize ticket number" onPointerDown={(event) => startResize(event, "ticket", "ticketFontSizeMm", 4, 24, "font")} />
+        <button type="button" className={handleClass("ticket")} aria-label="Resize ticket number" onPointerDown={(event) => startResize(event, "ticket", "ticketFontSizeMm", 4, 36, "font")} />
       </strong>
-      <div className="bulk-label-live-accent" style={{ left: `${(dividerX + qrX) / 2}%`, top: `${Math.min(82, ticketY + 15)}%`, color: settings.goldColor }} aria-hidden="true">
+      <div className="bulk-label-live-accent" style={{ left: `${(dividerX + qrX) / 2}%`, top: `${Math.min(84, ticketY + 27)}%`, color: settings.goldColor }} aria-hidden="true">
         <span style={{ background: settings.goldColor }} />
-        <svg viewBox="0 0 16 28" focusable="false" aria-hidden="true"><polygon points="9,0 1,15 8,15 5,28 15,11 9,11" /></svg>
+        <svg viewBox="0 0 16 32" focusable="false" aria-hidden="true"><polygon points="7,0 0,17 6,17 3,32 16,12 9,12 12,0" /></svg>
         <span style={{ background: settings.goldColor }} />
       </div>
       <span

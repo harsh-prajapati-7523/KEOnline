@@ -239,7 +239,7 @@ body {
   gap: 0.45rem;
   position: absolute;
   transform: translate(-50%, -50%);
-  width: 34%;
+  width: 38%;
 }
 
 .bulk-label-live-accent span {
@@ -250,8 +250,8 @@ body {
 
 .bulk-label-live-accent svg {
   fill: currentColor;
-  height: 1.5rem;
-  width: 0.9rem;
+  height: 2.1rem;
+  width: 1.05rem;
 }
 
 .bulk-label-live-subtitle {

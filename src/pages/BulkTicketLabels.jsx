@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Download, Eye, Printer, RotateCcw, Save, TriangleAlert, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
@@ -40,12 +40,17 @@ const defaultDesignSettings = {
   qrCaptionFontSizeMm: "4.1",
   logoSizeMm: "12.2",
   qrSizeMm: "11.8",
+  brandXPercent: "17.5",
+  brandYPercent: "13",
   dividerXPercent: "35",
   ticketXPercent: "56",
   ticketYPercent: "43",
   qrXPercent: "78",
   qrYPercent: "15",
+  subtitleXPercent: "56",
   subtitleYPercent: "75",
+  qrCaptionXPercent: "87",
+  qrCaptionYPercent: "70",
 };
 
 const designFields = Object.keys(defaultDesignSettings);
@@ -62,6 +67,14 @@ function numberValue(value, fallback = 0) {
 
 function settingNumber(settings, key) {
   return numberValue(settings[key], numberValue(defaultDesignSettings[key]));
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function roundedString(value, decimals = 1) {
+  return String(Number(value).toFixed(decimals)).replace(/\.0$/, "");
 }
 
 function buildTicketNumber(prefix, number, digits) {
@@ -145,6 +158,16 @@ function validateForm(form, settings) {
   if (settingNumber(settings, "logoSizeMm") > layout.labelWidth * 0.35 || settingNumber(settings, "logoSizeMm") > layout.labelHeight * 0.75) {
     errors.logoSizeMm = "Logo size must fit inside the label.";
   }
+  const qrRightMm = layout.labelWidth * settingNumber(settings, "qrXPercent") / 100 + settingNumber(settings, "qrSizeMm");
+  const qrBottomMm = layout.labelHeight * settingNumber(settings, "qrYPercent") / 100 + settingNumber(settings, "qrSizeMm");
+  if (qrRightMm > layout.labelWidth || qrBottomMm > layout.labelHeight) {
+    errors.qrSizeMm = "Move or resize QR so it stays inside the label.";
+  }
+  const logoHalfMm = settingNumber(settings, "logoSizeMm") / 2;
+  const logoCenterMm = layout.labelWidth * settingNumber(settings, "brandXPercent") / 100;
+  if (logoCenterMm - logoHalfMm < 0 || logoCenterMm + logoHalfMm > layout.labelWidth) {
+    errors.logoSizeMm = "Move or resize logo so it stays inside the label.";
+  }
 
   return errors;
 }
@@ -183,16 +206,20 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
   const navy = settings.navyColor;
   const gold = settings.goldColor;
   const dividerX = labelWidth * settingNumber(settings, "dividerXPercent") / 100;
+  const brandX = labelWidth * settingNumber(settings, "brandXPercent") / 100;
+  const brandY = labelHeight * settingNumber(settings, "brandYPercent") / 100;
   const ticketX = labelWidth * settingNumber(settings, "ticketXPercent") / 100;
   const ticketY = labelHeight * settingNumber(settings, "ticketYPercent") / 100;
   const qrX = labelWidth * settingNumber(settings, "qrXPercent") / 100;
   const qrY = labelHeight * settingNumber(settings, "qrYPercent") / 100;
+  const subtitleX = labelWidth * settingNumber(settings, "subtitleXPercent") / 100;
   const subtitleY = labelHeight * settingNumber(settings, "subtitleYPercent") / 100;
+  const qrCaptionX = labelWidth * settingNumber(settings, "qrCaptionXPercent") / 100;
+  const qrCaptionY = labelHeight * settingNumber(settings, "qrCaptionYPercent") / 100;
   const logoSize = settingNumber(settings, "logoSizeMm");
   const qrSize = settingNumber(settings, "qrSizeMm");
-  const brandCenterX = dividerX / 2;
-  const logoX = Math.max(1, brandCenterX - logoSize / 2);
-  const logoY = Math.max(1, labelHeight * 0.12);
+  const logoX = Math.max(1, brandX - logoSize / 2);
+  const logoY = Math.max(1, brandY);
 
   doc.setDrawColor(gold);
   doc.setLineWidth(settingNumber(settings, "borderWidthMm"));
@@ -202,8 +229,8 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
   doc.setTextColor(navy);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(settingNumber(settings, "businessFontSizeMm"));
-  doc.text(settings.businessLine1, x + brandCenterX, y + logoY + logoSize + 5.3, { align: "center" });
-  doc.text(settings.businessLine2, x + brandCenterX, y + logoY + logoSize + 9, { align: "center" });
+  doc.text(settings.businessLine1, x + brandX, y + logoY + logoSize + 5.3, { align: "center" });
+  doc.text(settings.businessLine2, x + brandX, y + logoY + logoSize + 9, { align: "center" });
 
   doc.setDrawColor(navy);
   doc.setLineWidth(0.35);
@@ -225,7 +252,7 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
 
   doc.setTextColor(navy);
   doc.setFontSize(settingNumber(settings, "subtitleFontSizeMm"));
-  doc.text(settings.subtitle, x + ticketX, y + subtitleY, { align: "center" });
+  doc.text(settings.subtitle, x + subtitleX, y + subtitleY, { align: "center" });
 
   doc.setDrawColor(navy);
   doc.setLineWidth(0.35);
@@ -233,7 +260,7 @@ function drawPdfLabel(doc, label, x, y, logoDataUrl, qrDataUrl, settings) {
   doc.addImage(qrDataUrl, "PNG", x + qrX + 0.7, y + qrY + 0.7, qrSize, qrSize);
   doc.setTextColor(navy);
   doc.setFontSize(settingNumber(settings, "qrCaptionFontSizeMm"));
-  doc.text(settings.qrCaption, x + qrX + qrSize / 2 + 0.7, y + qrY + qrSize + 5, { align: "center" });
+  doc.text(settings.qrCaption, x + qrCaptionX, y + qrCaptionY, { align: "center" });
 }
 
 function DesignNumberInput({ label, name, value, onChange, error, min, max, step = "1", type = "number" }) {
@@ -256,21 +283,102 @@ function SliderControl({ label, name, value, onChange, min, max, step = "1", suf
   );
 }
 
-function LabelPreview({ label, settings, qrDataUrl }) {
+function LabelPreview({ label, settings, qrDataUrl, editable = false, selectedElement = "", onSelect, onDesignChange }) {
+  const labelRef = useRef(null);
   const layout = getLayout(settings);
   const labelWidth = layout.labelWidth;
   const labelHeight = layout.labelHeight;
+  const brandX = settingNumber(settings, "brandXPercent");
+  const brandY = settingNumber(settings, "brandYPercent");
   const dividerX = settingNumber(settings, "dividerXPercent");
   const ticketX = settingNumber(settings, "ticketXPercent");
   const ticketY = settingNumber(settings, "ticketYPercent");
   const qrX = settingNumber(settings, "qrXPercent");
   const qrY = settingNumber(settings, "qrYPercent");
+  const subtitleX = settingNumber(settings, "subtitleXPercent");
   const subtitleY = settingNumber(settings, "subtitleYPercent");
+  const qrCaptionX = settingNumber(settings, "qrCaptionXPercent");
+  const qrCaptionY = settingNumber(settings, "qrCaptionYPercent");
   const logoSizePct = settingNumber(settings, "logoSizeMm") / labelWidth * 100;
   const qrSizePct = settingNumber(settings, "qrSizeMm") / labelWidth * 100;
+  const canEdit = editable && typeof onDesignChange === "function";
+
+  const updateSetting = (key, value) => {
+    onDesignChange?.((current) => ({ ...current, [key]: roundedString(value) }));
+  };
+
+  const startDrag = (event, elementName, keys) => {
+    if (!canEdit) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect?.(elementName);
+    const rect = labelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const initial = keys.reduce((next, key) => ({ ...next, [key]: settingNumber(settings, key) }), {});
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+
+    const handleMove = (moveEvent) => {
+      const deltaXPercent = (moveEvent.clientX - startX) / rect.width * 100;
+      const deltaYPercent = (moveEvent.clientY - startY) / rect.height * 100;
+      onDesignChange((current) => {
+        const next = { ...current };
+        keys.forEach((key) => {
+          const isY = key.toLowerCase().includes("y");
+          const min = key === "dividerXPercent" ? 20 : 2;
+          const max = key === "dividerXPercent" ? 55 : 94;
+          next[key] = roundedString(clamp(initial[key] + (isY ? deltaYPercent : deltaXPercent), min, max));
+        });
+        return next;
+      });
+    };
+
+    const stopDrag = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", stopDrag);
+      window.removeEventListener("pointercancel", stopDrag);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", stopDrag, { once: true });
+    window.addEventListener("pointercancel", stopDrag, { once: true });
+  };
+
+  const startResize = (event, elementName, key, min, max, unit = "mm") => {
+    if (!canEdit) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onSelect?.(elementName);
+    const rect = labelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const startX = event.clientX;
+    const startValue = settingNumber(settings, key);
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+
+    const handleMove = (moveEvent) => {
+      const deltaPx = moveEvent.clientX - startX;
+      const delta = unit === "mm" ? deltaPx / rect.width * labelWidth : deltaPx / 10;
+      updateSetting(key, clamp(startValue + delta, min, max));
+    };
+
+    const stopResize = () => {
+      window.removeEventListener("pointermove", handleMove);
+      window.removeEventListener("pointerup", stopResize);
+      window.removeEventListener("pointercancel", stopResize);
+    };
+
+    window.addEventListener("pointermove", handleMove);
+    window.addEventListener("pointerup", stopResize, { once: true });
+    window.addEventListener("pointercancel", stopResize, { once: true });
+  };
+
+  const elementClass = (name, baseClass) => `${baseClass} ${editable ? "bulk-label-editable-element" : ""} ${selectedElement === name ? "bulk-label-element-selected" : ""}`.trim();
+  const handleClass = editable ? "bulk-label-resize-handle" : "hidden";
 
   return (
     <div
+      ref={labelRef}
       className="bulk-label-live-label"
       style={{
         aspectRatio: `${labelWidth} / ${labelHeight}`,
@@ -280,13 +388,24 @@ function LabelPreview({ label, settings, qrDataUrl }) {
         color: settings.navyColor,
       }}
     >
-      <div className="bulk-label-live-brand" style={{ left: `${dividerX / 2}%`, top: "13%", width: `${Math.max(10, dividerX - 3)}%`, transform: "translateX(-50%)" }}>
+      <div
+        className={elementClass("brand", "bulk-label-live-brand")}
+        onPointerDown={(event) => startDrag(event, "brand", ["brandXPercent", "brandYPercent"])}
+        style={{ left: `${brandX}%`, top: `${brandY}%`, width: `${Math.max(10, dividerX - 3)}%`, transform: "translateX(-50%)" }}
+      >
         <img src={LOGO_PATH} alt="" aria-hidden="true" style={{ width: `${logoSizePct}%` }} />
         <p style={{ fontSize: `${settingNumber(settings, "businessFontSizeMm") * 2.6}px` }}>{settings.businessLine1}<br />{settings.businessLine2}</p>
+        <button type="button" className={handleClass} aria-label="Resize logo" onPointerDown={(event) => startResize(event, "brand", "logoSizeMm", 4, 24)} />
       </div>
-      <div className="bulk-label-live-divider" style={{ left: `${dividerX}%`, background: settings.navyColor }} aria-hidden="true" />
+      <div
+        className={elementClass("divider", "bulk-label-live-divider")}
+        style={{ left: `${dividerX}%`, background: settings.navyColor }}
+        onPointerDown={(event) => startDrag(event, "divider", ["dividerXPercent"])}
+        aria-hidden="true"
+      />
       <strong
-        className="bulk-label-live-ticket"
+        className={elementClass("ticket", "bulk-label-live-ticket")}
+        onPointerDown={(event) => startDrag(event, "ticket", ["ticketXPercent", "ticketYPercent"])}
         style={{
           left: `${ticketX}%`,
           top: `${ticketY}%`,
@@ -295,17 +414,37 @@ function LabelPreview({ label, settings, qrDataUrl }) {
         }}
       >
         {label.ticketNumber}
+        <button type="button" className={handleClass} aria-label="Resize ticket number" onPointerDown={(event) => startResize(event, "ticket", "ticketFontSizeMm", 4, 24, "font")} />
       </strong>
       <div className="bulk-label-live-accent" style={{ left: `${(dividerX + qrX) / 2}%`, top: `${Math.min(82, ticketY + 15)}%`, color: settings.goldColor }} aria-hidden="true">
         <span style={{ background: settings.goldColor }} />
         <svg viewBox="0 0 16 28" focusable="false" aria-hidden="true"><polygon points="9,0 1,15 8,15 5,28 15,11 9,11" /></svg>
         <span style={{ background: settings.goldColor }} />
       </div>
-      <p className="bulk-label-live-subtitle" style={{ left: `${ticketX}%`, top: `${subtitleY}%`, fontSize: `${settingNumber(settings, "subtitleFontSizeMm") * 2.8}px` }}>{settings.subtitle}</p>
-      <div className="bulk-label-live-qr" style={{ left: `${qrX}%`, top: `${qrY}%`, width: `${qrSizePct}%`, borderColor: settings.navyColor }}>
+      <span
+        className={elementClass("subtitle", "bulk-label-live-subtitle")}
+        onPointerDown={(event) => startDrag(event, "subtitle", ["subtitleXPercent", "subtitleYPercent"])}
+        style={{ left: `${subtitleX}%`, top: `${subtitleY}%`, fontSize: `${settingNumber(settings, "subtitleFontSizeMm") * 2.8}px` }}
+      >
+        {settings.subtitle}
+        <button type="button" className={handleClass} aria-label="Resize subtitle" onPointerDown={(event) => startResize(event, "subtitle", "subtitleFontSizeMm", 2, 12, "font")} />
+      </span>
+      <div
+        className={elementClass("qr", "bulk-label-live-qr")}
+        onPointerDown={(event) => startDrag(event, "qr", ["qrXPercent", "qrYPercent"])}
+        style={{ left: `${qrX}%`, top: `${qrY}%`, width: `${qrSizePct}%`, borderColor: settings.navyColor }}
+      >
         {qrDataUrl ? <img src={qrDataUrl} alt="" aria-hidden="true" /> : <div />}
+        <button type="button" className={handleClass} aria-label="Resize QR code" onPointerDown={(event) => startResize(event, "qr", "qrSizeMm", 6, 22)} />
       </div>
-      <p className="bulk-label-live-qr-caption" style={{ left: `${qrX + qrSizePct / 2}%`, top: `${qrY + (settingNumber(settings, "qrSizeMm") / labelHeight * 100) + 6}%`, fontSize: `${settingNumber(settings, "qrCaptionFontSizeMm") * 2.5}px` }}>{settings.qrCaption}</p>
+      <span
+        className={elementClass("qrCaption", "bulk-label-live-qr-caption")}
+        onPointerDown={(event) => startDrag(event, "qrCaption", ["qrCaptionXPercent", "qrCaptionYPercent"])}
+        style={{ left: `${qrCaptionX}%`, top: `${qrCaptionY}%`, fontSize: `${settingNumber(settings, "qrCaptionFontSizeMm") * 2.5}px` }}
+      >
+        {settings.qrCaption}
+        <button type="button" className={handleClass} aria-label="Resize QR caption" onPointerDown={(event) => startResize(event, "qrCaption", "qrCaptionFontSizeMm", 2, 10, "font")} />
+      </span>
     </div>
   );
 }
@@ -318,6 +457,7 @@ export default function BulkTicketLabels() {
   const [sampleQrDataUrl, setSampleQrDataUrl] = useState("");
   const [previewLabels, setPreviewLabels] = useState([]);
   const [message, setMessage] = useState("");
+  const [selectedElement, setSelectedElement] = useState("ticket");
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -532,12 +672,17 @@ export default function BulkTicketLabels() {
                   {errors.logoSizeMm && <p className="bulk-label-error">{errors.logoSizeMm}</p>}
                   <SliderControl label="QR Size" name="qrSizeMm" value={design.qrSizeMm} onChange={updateDesign} min="6" max="22" step="0.2" suffix="mm" />
                   {errors.qrSizeMm && <p className="bulk-label-error">{errors.qrSizeMm}</p>}
+                  <SliderControl label="Move Logo/Business Left/Right" name="brandXPercent" value={design.brandXPercent} onChange={updateDesign} min="8" max="32" suffix="%" />
+                  <SliderControl label="Move Logo/Business Up/Down" name="brandYPercent" value={design.brandYPercent} onChange={updateDesign} min="4" max="35" suffix="%" />
                   <SliderControl label="Vertical Divider X Position" name="dividerXPercent" value={design.dividerXPercent} onChange={updateDesign} min="25" max="45" suffix="%" />
                   <SliderControl label="Move Ticket Number Left/Right" name="ticketXPercent" value={design.ticketXPercent} onChange={updateDesign} min="38" max="74" suffix="%" />
                   <SliderControl label="Move Ticket Number Up/Down" name="ticketYPercent" value={design.ticketYPercent} onChange={updateDesign} min="25" max="62" suffix="%" />
                   <SliderControl label="Move QR Left/Right" name="qrXPercent" value={design.qrXPercent} onChange={updateDesign} min="60" max="88" suffix="%" />
                   <SliderControl label="Move QR Up/Down" name="qrYPercent" value={design.qrYPercent} onChange={updateDesign} min="5" max="48" suffix="%" />
+                  <SliderControl label="Subtitle X Position" name="subtitleXPercent" value={design.subtitleXPercent} onChange={updateDesign} min="38" max="74" suffix="%" />
                   <SliderControl label="Subtitle Y Position" name="subtitleYPercent" value={design.subtitleYPercent} onChange={updateDesign} min="55" max="88" suffix="%" />
+                  <SliderControl label="QR Caption X Position" name="qrCaptionXPercent" value={design.qrCaptionXPercent} onChange={updateDesign} min="58" max="96" suffix="%" />
+                  <SliderControl label="QR Caption Y Position" name="qrCaptionYPercent" value={design.qrCaptionYPercent} onChange={updateDesign} min="35" max="92" suffix="%" />
                 </div>
               </section>
             </form>
@@ -582,8 +727,17 @@ export default function BulkTicketLabels() {
             {message && <p className={`mt-4 rounded-lg px-4 py-3 text-sm font-bold ${message.startsWith("Unable") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>{message}</p>}
 
             <div className="bulk-label-live-preview-wrap">
-              <LabelPreview label={{ ticketNumber: sampleTicketNumber }} settings={design} qrDataUrl={sampleQrDataUrl} />
+              <LabelPreview
+                label={{ ticketNumber: sampleTicketNumber }}
+                settings={design}
+                qrDataUrl={sampleQrDataUrl}
+                editable
+                selectedElement={selectedElement}
+                onSelect={setSelectedElement}
+                onDesignChange={setDesign}
+              />
             </div>
+            <p className="mt-2 text-xs font-bold text-slate-500">Drag label elements to move them. Use the small square handle on a selected element to resize it.</p>
 
             <section className="mt-5 rounded-lg border border-blue-100 bg-blue-50 p-4">
               <h2 className="text-sm font-extrabold text-blue-950">Generation Summary</h2>

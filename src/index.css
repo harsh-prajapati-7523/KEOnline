@@ -282,6 +282,54 @@ body {
   white-space: nowrap;
 }
 
+.bulk-label-editable-element {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.bulk-label-editable-element:active {
+  cursor: grabbing;
+}
+
+.bulk-label-element-selected {
+  outline: 2px dashed #38bdf8;
+  outline-offset: 4px;
+  z-index: 5;
+}
+
+.bulk-label-live-divider.bulk-label-element-selected {
+  outline-offset: 6px;
+}
+
+.bulk-label-resize-handle {
+  background: #ffffff;
+  border: 2px solid #0b2a6e;
+  border-radius: 4px;
+  bottom: -12px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.18);
+  cursor: nwse-resize;
+  height: 14px;
+  padding: 0;
+  position: absolute;
+  right: -12px;
+  touch-action: none;
+  width: 14px;
+  z-index: 8;
+}
+
+.bulk-label-live-ticket .bulk-label-resize-handle,
+.bulk-label-live-subtitle .bulk-label-resize-handle,
+.bulk-label-live-qr-caption .bulk-label-resize-handle {
+  bottom: -16px;
+  right: -18px;
+}
+
+.bulk-label-live-qr .bulk-label-resize-handle {
+  bottom: -10px;
+  right: -10px;
+}
+
 .bulk-label-preview-sheet {
   align-content: start;
   background: #f8fafc;

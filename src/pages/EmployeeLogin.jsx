@@ -1,11 +1,15 @@
 import { useState } from "react";
 import { User, Lock, ShieldCheck } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess } from "../utils/access";
 
 export default function EmployeeLogin() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectPath = location.state?.from
+    ? `${location.state.from.pathname || ""}${location.state.from.search || ""}${location.state.from.hash || ""}`
+    : "/employee-dashboard";
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -49,7 +53,7 @@ export default function EmployeeLogin() {
       } catch {
         clearAccess();
       }
-      navigate("/employee-dashboard", { replace: true });
+      navigate(redirectPath.startsWith("/") ? redirectPath : "/employee-dashboard", { replace: true });
     } catch {
       clearAccess();
       setError("Unable to log in. Please check your employee ID and password.");

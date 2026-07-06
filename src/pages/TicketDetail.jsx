@@ -279,7 +279,9 @@ function TicketDetailSkeleton() {
 export default function TicketDetail() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { ticketId } = useParams();
+  const { ticketId, ticketNumber } = useParams();
+  const ticketLookupKey = ticketNumber || ticketId;
+  const isTicketNumberLookup = Boolean(ticketNumber);
   const backTarget = location.state?.from === "myTickets"
     ? "/tickets/my"
     : location.state?.from === "openTicket"
@@ -331,19 +333,22 @@ export default function TicketDetail() {
   const [assignForm, setAssignForm] = useState({ employeeId: "", note: "" });
   const [assignError, setAssignError] = useState("");
   const [pendingDeleteChargeId, setPendingDeleteChargeId] = useState(null);
-  const availableActionsTicketIdRef = useRef(ticketId);
-  const customerHistoryTicketIdRef = useRef(ticketId);
-  const ticketDetailTicketIdRef = useRef(ticketId);
-  const workflowHistoryTicketIdRef = useRef(ticketId);
+  const availableActionsTicketIdRef = useRef(ticketLookupKey);
+  const customerHistoryTicketIdRef = useRef(ticketLookupKey);
+  const ticketDetailTicketIdRef = useRef(ticketLookupKey);
+  const workflowHistoryTicketIdRef = useRef(ticketLookupKey);
   const currentRole = localStorage.getItem("role") ?? "";
   const currentEmployeeId = localStorage.getItem("employeeId") ?? "";
 
   const loadTicket = async () => {
-    const requestedTicketId = ticketId;
+    const requestedTicketKey = ticketLookupKey;
     setIsLoading(true);
     setError("");
     try {
-      const response = await fetch(`/volt/tickets/${ticketId}`, {
+      const endpoint = isTicketNumberLookup
+        ? `/volt/tickets/by-number/${encodeURIComponent(ticketNumber)}`
+        : `/volt/tickets/${ticketId}`;
+      const response = await fetch(endpoint, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -352,20 +357,25 @@ export default function TicketDetail() {
       if (!response.ok) throw new Error("Ticket details failed");
 
       const data = await response.json();
-      if (String(ticketDetailTicketIdRef.current) !== String(requestedTicketId)) return;
-      if (!data || String(data.id) !== String(ticketId)) {
+      if (String(ticketDetailTicketIdRef.current) !== String(requestedTicketKey)) return;
+      if (!data || (!isTicketNumberLookup && String(data.id) !== String(ticketId))) {
         setTicket(null);
         setError("Ticket not found.");
         return;
       }
 
+      if (isTicketNumberLookup) {
+        navigate(`/tickets/${data.id}${location.search}`, { replace: true, state: location.state });
+        return;
+      }
+
       setTicket(data);
     } catch {
-      if (String(ticketDetailTicketIdRef.current) !== String(requestedTicketId)) return;
+      if (String(ticketDetailTicketIdRef.current) !== String(requestedTicketKey)) return;
       setTicket(null);
       setError("Unable to load ticket details. Please try again.");
     } finally {
-      if (String(ticketDetailTicketIdRef.current) === String(requestedTicketId)) {
+      if (String(ticketDetailTicketIdRef.current) === String(requestedTicketKey)) {
         setIsLoading(false);
       }
     }
@@ -473,7 +483,7 @@ export default function TicketDetail() {
 
   useEffect(() => {
     availableActionsTicketIdRef.current = ticketId;
-    ticketDetailTicketIdRef.current = ticketId;
+    ticketDetailTicketIdRef.current = ticketLookupKey;
     workflowHistoryTicketIdRef.current = ticketId;
     setWorkflowHistory([]);
     setWorkflowHistoryPage(0);
@@ -496,7 +506,7 @@ export default function TicketDetail() {
     loadTicket();
     loadAvailableActions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ticketId]);
+  }, [ticketId, ticketLookupKey]);
 
   useEffect(() => {
     if (!chargeActionMessage || chargeActionMessage.startsWith("Unable")) return undefined;

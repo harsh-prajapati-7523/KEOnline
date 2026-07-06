@@ -68,7 +68,7 @@ if (window.location.pathname === "/tickets" || window.location.pathname === "/ti
   preloadTicketList();
 }
 
-if (/^\/tickets\/\d+/.test(window.location.pathname)) {
+if (/^\/tickets\/\d+/.test(window.location.pathname) || /^\/ticket\/[^/]+/.test(window.location.pathname)) {
   preloadTicketDetail();
 }
 
@@ -394,6 +394,11 @@ function AppRoutes() {
           }/>
           <Route path="/tickets" element={<Navigate to="/tickets/find" replace />} />
           <Route path="/tickets/:ticketId" element={
+            <ProtectedRoute accessKey="VIEW_TICKETS">
+              <TicketDetail />
+            </ProtectedRoute>
+          }/>
+          <Route path="/ticket/:ticketNumber" element={
             <ProtectedRoute accessKey="VIEW_TICKETS">
               <TicketDetail />
             </ProtectedRoute>

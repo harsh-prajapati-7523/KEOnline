@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { fetchCurrentAccess, getStoredAccess, hasAccess, hasAnyAccess } from "../utils/access";
 
 export default function ProtectedRoute({ children, allowedRoles, accessKey, anyAccessKey }) {
+  const location = useLocation();
   const [isLoadingAccess, setIsLoadingAccess] = useState(false);
   const [, setAccessRefreshKey] = useState(0);
   const token = localStorage.getItem("token");
@@ -28,7 +29,7 @@ export default function ProtectedRoute({ children, allowedRoles, accessKey, anyA
   }, [needsAccess, role, token]);
 
   if (!token) {
-    return <Navigate to="/employee-login" replace />;
+    return <Navigate to="/employee-login" replace state={{ from: location }} />;
   }
 
   if (allowedRoles && !allowedRoles.includes(role)) {

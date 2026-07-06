@@ -10,9 +10,19 @@ function scheduleServiceWorkerRegistration() {
   const register = async () => {
     try {
       const { registerSW } = await import('virtual:pwa-register')
+      let refreshing = false
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (refreshing) return
+        refreshing = true
+        window.location.reload()
+      })
+
       let updateSW = () => {}
       updateSW = registerSW({
         immediate: true,
+        onRegisteredSW(_swUrl, registration) {
+          registration?.update()
+        },
         onNeedRefresh() {
           updateSW(true)
         },

@@ -57,8 +57,8 @@ export default defineConfig({
       },
       workbox: {
         cleanupOutdatedCaches: true,
-        globPatterns: ['**/*.{js,css,html,png,svg,ico,webmanifest}'],
-        navigateFallbackDenylist: [/^\/volt\//],
+        globPatterns: ['**/*.{js,css,png,svg,ico}'],
+        navigateFallback: null,
       },
     }),
   ],

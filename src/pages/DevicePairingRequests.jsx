@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, CheckCircle2, RefreshCw, Save, Smartphone, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Camera, CheckCircle2, QrCode, RefreshCw, Save, Smartphone, Trash2, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 function authHeaders(includeContentType = false) {
@@ -20,7 +20,7 @@ async function readApiError(response, fallback) {
 
 function parsePairingToken(value) {
   const token = value.trim();
-  if (!token) throw new Error("Paste or scan a pairing token first.");
+  if (!token) throw new Error("Scan the technician QR first.");
   const parsed = JSON.parse(token);
   return {
     requestId: parsed.requestId,
@@ -32,13 +32,19 @@ function parsePairingToken(value) {
 
 export default function DevicePairingRequests() {
   const navigate = useNavigate();
+  const videoRef = useRef(null);
+  const scanLoopRef = useRef(null);
+  const cameraStreamRef = useRef(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [trustedDevices, setTrustedDevices] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [pairingToken, setPairingToken] = useState("");
+  const [scannedRequestId, setScannedRequestId] = useState("");
   const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scannerError, setScannerError] = useState("");
   const [revokingDeviceId, setRevokingDeviceId] = useState(null);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
@@ -78,6 +84,91 @@ export default function DevicePairingRequests() {
     loadData();
   }, [loadData]);
 
+  const stopScanner = useCallback((updateState = true) => {
+    if (scanLoopRef.current) {
+      window.clearTimeout(scanLoopRef.current);
+      scanLoopRef.current = null;
+    }
+    if (cameraStreamRef.current) {
+      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    if (updateState) setIsScanning(false);
+  }, []);
+
+  const acceptScannedValue = (rawValue) => {
+    try {
+      const parsedToken = parsePairingToken(rawValue);
+      setPairingToken(rawValue);
+      setScannedRequestId(parsedToken.requestId || "");
+      setScannerError("");
+      stopScanner();
+    } catch {
+      setScannerError("Scanned QR is not a valid pairing token.");
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      stopScanner(false);
+    };
+  }, [stopScanner]);
+
+  const startScanner = async () => {
+    setScannerError("");
+    setPairingToken("");
+    setScannedRequestId("");
+
+    if (!("BarcodeDetector" in window)) {
+      setScannerError("QR scanning is not supported in this browser.");
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setScannerError("Camera access is not available in this browser.");
+      return;
+    }
+
+    try {
+      const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+        },
+        audio: false,
+      });
+      cameraStreamRef.current = stream;
+      setIsScanning(true);
+
+      const video = videoRef.current;
+      if (!video) throw new Error("Scanner unavailable");
+      video.srcObject = stream;
+      await video.play();
+
+      const scan = async () => {
+        if (!videoRef.current || !cameraStreamRef.current) return;
+        try {
+          const codes = await detector.detect(videoRef.current);
+          const rawValue = codes?.[0]?.rawValue;
+          if (rawValue) {
+            acceptScannedValue(rawValue);
+            return;
+          }
+        } catch {
+          setScannerError("Unable to read QR from camera.");
+        }
+        scanLoopRef.current = window.setTimeout(scan, 450);
+      };
+
+      scan();
+    } catch (error) {
+      stopScanner();
+      setScannerError(error.message || "Unable to start camera scanner.");
+    }
+  };
+
   const approve = async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -97,6 +188,7 @@ export default function DevicePairingRequests() {
       setMessageType("success");
       setMessage("Device pairing approved.");
       setPairingToken("");
+      setScannedRequestId("");
       setSelectedEmployeeId("");
       await loadData();
     } catch (error) {
@@ -159,16 +251,61 @@ export default function DevicePairingRequests() {
         <section className="mt-5 rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
           <h2 className="text-xl font-extrabold text-blue-950">Approve Device</h2>
           <div className="mt-4 grid gap-4">
-            <label className="font-semibold text-gray-700">
-              Pairing QR Token
-              <textarea
-                value={pairingToken}
-                onChange={(event) => setPairingToken(event.target.value)}
-                rows={4}
-                className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 font-mono text-sm outline-none focus:border-blue-950"
-                placeholder='{"requestId":"...","nonce":"...","expiresAt":"...","signature":"..."}'
-              />
-            </label>
+            <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-800">Technician QR</p>
+                  <p className="mt-1 break-words text-sm font-semibold text-gray-600">
+                    {scannedRequestId ? `Scanned request ${scannedRequestId}` : "Scan the technician QR to load the pairing request."}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {!isScanning && (
+                    <button
+                      type="button"
+                      onClick={startScanner}
+                      disabled={isSaving}
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-2 text-sm font-bold text-white transition hover:bg-blue-900 disabled:opacity-60"
+                    >
+                      <Camera size={18} aria-hidden="true" />
+                      Scan QR
+                    </button>
+                  )}
+                  {isScanning && (
+                    <button
+                      type="button"
+                      onClick={stopScanner}
+                      className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-50"
+                    >
+                      <X size={18} aria-hidden="true" />
+                      Stop
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-slate-900">
+                {isScanning ? (
+                  <video
+                    ref={videoRef}
+                    className="h-72 w-full object-cover"
+                    muted
+                    playsInline
+                  />
+                ) : (
+                  <div className="flex h-48 items-center justify-center text-blue-100">
+                    <QrCode size={46} aria-hidden="true" />
+                  </div>
+                )}
+              </div>
+
+              {scannerError && (
+                <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{scannerError}</p>
+              )}
+              {pairingToken && !scannerError && (
+                <p className="mt-3 rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">QR scanned successfully.</p>
+              )}
+            </div>
 
             <label className="font-semibold text-gray-700">
               Employee
@@ -190,7 +327,7 @@ export default function DevicePairingRequests() {
             <button
               type="button"
               onClick={approve}
-              disabled={isSaving || isLoading}
+              disabled={isSaving || isLoading || !pairingToken}
               className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-blue-950 px-5 py-3 font-bold text-white transition hover:bg-blue-900 disabled:opacity-60"
             >
               {isSaving ? <RefreshCw size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}

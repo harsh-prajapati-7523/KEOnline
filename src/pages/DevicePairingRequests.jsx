@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Camera, CheckCircle2, QrCode, RefreshCw, Save, Smartphone, Trash2, X } from "lucide-react";
+import QrScanner from "qr-scanner";
 import { useNavigate } from "react-router-dom";
 
 function authHeaders(includeContentType = false) {
@@ -33,8 +34,7 @@ function parsePairingToken(value) {
 export default function DevicePairingRequests() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
-  const scanLoopRef = useRef(null);
-  const cameraStreamRef = useRef(null);
+  const scannerRef = useRef(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [trustedDevices, setTrustedDevices] = useState([]);
   const [employees, setEmployees] = useState([]);
@@ -85,14 +85,9 @@ export default function DevicePairingRequests() {
   }, [loadData]);
 
   const stopScanner = useCallback((updateState = true) => {
-    if (scanLoopRef.current) {
-      window.clearTimeout(scanLoopRef.current);
-      scanLoopRef.current = null;
-    }
-    if (cameraStreamRef.current) {
-      cameraStreamRef.current.getTracks().forEach((track) => track.stop());
-      cameraStreamRef.current = null;
-    }
+    scannerRef.current?.stop();
+    scannerRef.current?.destroy();
+    scannerRef.current = null;
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -122,47 +117,27 @@ export default function DevicePairingRequests() {
     setPairingToken("");
     setScannedRequestId("");
 
-    if (!("BarcodeDetector" in window)) {
-      setScannerError("QR scanning is not supported in this browser.");
-      return;
-    }
     if (!navigator.mediaDevices?.getUserMedia) {
       setScannerError("Camera access is not available in this browser.");
       return;
     }
 
     try {
-      const detector = new window.BarcodeDetector({ formats: ["qr_code"] });
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: "environment" },
-        },
-        audio: false,
-      });
-      cameraStreamRef.current = stream;
-      setIsScanning(true);
-
       const video = videoRef.current;
       if (!video) throw new Error("Scanner unavailable");
-      video.srcObject = stream;
-      await video.play();
-
-      const scan = async () => {
-        if (!videoRef.current || !cameraStreamRef.current) return;
-        try {
-          const codes = await detector.detect(videoRef.current);
-          const rawValue = codes?.[0]?.rawValue;
-          if (rawValue) {
-            acceptScannedValue(rawValue);
-            return;
-          }
-        } catch {
-          setScannerError("Unable to read QR from camera.");
+      setIsScanning(true);
+      const scanner = new QrScanner(
+        video,
+        (result) => acceptScannedValue(typeof result === "string" ? result : result?.data || ""),
+        {
+          preferredCamera: "environment",
+          returnDetailedScanResult: true,
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
         }
-        scanLoopRef.current = window.setTimeout(scan, 450);
-      };
-
-      scan();
+      );
+      scannerRef.current = scanner;
+      await scanner.start();
     } catch (error) {
       stopScanner();
       setScannerError(error.message || "Unable to start camera scanner.");
@@ -284,16 +259,15 @@ export default function DevicePairingRequests() {
                 </div>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-slate-900">
-                {isScanning ? (
-                  <video
-                    ref={videoRef}
-                    className="h-72 w-full object-cover"
-                    muted
-                    playsInline
-                  />
-                ) : (
-                  <div className="flex h-48 items-center justify-center text-blue-100">
+              <div className="relative mt-4 overflow-hidden rounded-xl border border-gray-200 bg-slate-900">
+                <video
+                  ref={videoRef}
+                  className="h-72 w-full object-cover"
+                  muted
+                  playsInline
+                />
+                {!isScanning && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-slate-900 text-blue-100">
                     <QrCode size={46} aria-hidden="true" />
                   </div>
                 )}

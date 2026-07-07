@@ -21,12 +21,16 @@ function SessionCheckScreen() {
   );
 }
 
+function getRedirectPath(from) {
+  if (!from) return "/employee-dashboard";
+  if (typeof from === "string") return from;
+  return `${from.pathname || ""}${from.search || ""}${from.hash || ""}` || "/employee-dashboard";
+}
+
 export default function EmployeeLogin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const redirectPath = location.state?.from
-    ? `${location.state.from.pathname || ""}${location.state.from.search || ""}${location.state.from.hash || ""}`
-    : "/employee-dashboard";
+  const redirectPath = getRedirectPath(location.state?.from);
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Navigate, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { Download, Home, LayoutDashboard, ListChecks, Lock, LogIn, PlusCircle, X } from "lucide-react";
 import EmployeeLogin from "./pages/EmployeeLogin";
@@ -91,16 +91,17 @@ function RouteLoadingFallback() {
 function AuthExpiryWatcher() {
   const navigate = useNavigate();
   const location = useLocation();
+  const currentRedirectState = useMemo(() => ({ from: location }), [location]);
 
   useEffect(() => {
     const unsubscribe = onAuthExpired(async () => {
       if (location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
-        navigate(await isPinLoginAvailable() ? "/pin-login" : "/employee-login", { replace: true });
+        navigate(await isPinLoginAvailable() ? "/pin-login" : "/employee-login", { replace: true, state: currentRedirectState });
       }
     });
 
     return unsubscribe;
-  }, [location.pathname, navigate]);
+  }, [currentRedirectState, location.pathname, navigate]);
 
   useEffect(() => {
     const token = getValidToken();
@@ -109,7 +110,7 @@ function AuthExpiryWatcher() {
         let isCurrent = true;
         isPinLoginAvailable().then((available) => {
           if (isCurrent) {
-            navigate(available ? "/pin-login" : "/employee-login", { replace: true });
+            navigate(available ? "/pin-login" : "/employee-login", { replace: true, state: currentRedirectState });
           }
         });
         return () => {
@@ -126,12 +127,12 @@ function AuthExpiryWatcher() {
     const timeoutId = window.setTimeout(async () => {
       clearAuthSession();
       if (location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
-        navigate(await isPinLoginAvailable() ? "/pin-login" : "/employee-login", { replace: true });
+        navigate(await isPinLoginAvailable() ? "/pin-login" : "/employee-login", { replace: true, state: currentRedirectState });
       }
     }, timeoutMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [location.pathname, navigate]);
+  }, [currentRedirectState, location.pathname, navigate]);
 
   return null;
 }

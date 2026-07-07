@@ -78,6 +78,11 @@ const accessLabels = {
 
 const hiddenSystemAccessKeys = new Set(["UPDATE_WARRANTY"]);
 
+const authenticationModeOptions = [
+  { value: "PASSWORD_PIN", label: "Password + PIN" },
+  { value: "DEVICE_PAIRING_PIN", label: "Device Pairing + PIN" },
+];
+
 function authHeaders(includeContentType = false) {
   return {
     ...(includeContentType ? { "Content-Type": "application/json" } : {}),
@@ -199,6 +204,8 @@ export default function RoleAccessManagement() {
   const [customRules, setCustomRules] = useState([]);
   const [originalCustomRules, setOriginalCustomRules] = useState({});
   const [editableCustomRules, setEditableCustomRules] = useState({});
+  const [originalAuthenticationMode, setOriginalAuthenticationMode] = useState("PASSWORD_PIN");
+  const [editableAuthenticationMode, setEditableAuthenticationMode] = useState("PASSWORD_PIN");
   const [isLoadingRoles, setIsLoadingRoles] = useState(true);
   const [isLoadingAccess, setIsLoadingAccess] = useState(false);
   const [isLoadingCustomAccess, setIsLoadingCustomAccess] = useState(false);
@@ -225,6 +232,7 @@ export default function RoleAccessManagement() {
     () => !sameRuleMap(originalCustomRules, editableCustomRules),
     [originalCustomRules, editableCustomRules]
   );
+  const hasAuthenticationModeChanges = originalAuthenticationMode !== editableAuthenticationMode;
 
   const loadRoles = useCallback(async () => {
     setIsLoadingRoles(true);
@@ -276,6 +284,8 @@ export default function RoleAccessManagement() {
       setCustomRules([]);
       setOriginalCustomRules({});
       setEditableCustomRules({});
+      setOriginalAuthenticationMode("PASSWORD_PIN");
+      setEditableAuthenticationMode("PASSWORD_PIN");
       setCustomAccessError("");
       return;
     }
@@ -298,9 +308,12 @@ export default function RoleAccessManagement() {
       const dynamicData = await dynamicResponse.json();
       const mergedRules = mergeCustomRules(catalogData, dynamicData.rules);
       const mergedRuleMap = normalizeRules(mergedRules);
+      const authenticationMode = dynamicData.authenticationMode || selectedRole?.authenticationMode || "PASSWORD_PIN";
       setCustomRules(mergedRules);
       setOriginalCustomRules(mergedRuleMap);
       setEditableCustomRules(mergedRuleMap);
+      setOriginalAuthenticationMode(authenticationMode);
+      setEditableAuthenticationMode(authenticationMode);
     } catch (error) {
       setCustomRules([]);
       setOriginalCustomRules({});
@@ -309,7 +322,7 @@ export default function RoleAccessManagement() {
     } finally {
       setIsLoadingCustomAccess(false);
     }
-  }, []);
+  }, [selectedRole?.authenticationMode]);
 
   useEffect(() => {
     loadRoles();
@@ -326,6 +339,12 @@ export default function RoleAccessManagement() {
     setCustomMessage("");
     setAccessError("");
     setCustomAccessError("");
+  };
+
+  const handleAuthenticationModeChange = (event) => {
+    if (protectedRole) return;
+    setEditableAuthenticationMode(event.target.value);
+    setCustomMessage("");
   };
 
   const toggleRule = (accessKey) => {
@@ -394,6 +413,7 @@ export default function RoleAccessManagement() {
     setCustomMessage("");
     try {
       const payload = {
+        authenticationMode: editableAuthenticationMode,
         rules: customRules
           .filter((rule) => rule.active)
           .map((rule) => ({
@@ -413,6 +433,48 @@ export default function RoleAccessManagement() {
     } catch (error) {
       setCustomMessageType("error");
       setCustomMessage(error.message || "Unable to save custom permissions. Please try again.");
+    } finally {
+      setIsSavingCustom(false);
+    }
+  };
+
+  const saveAuthenticationMode = async () => {
+    if (!selectedRoleId) {
+      setCustomMessageType("error");
+      setCustomMessage("Select a role to manage authentication mode.");
+      return;
+    }
+    if (protectedRole) {
+      setCustomMessageType("error");
+      setCustomMessage("SUPER_ADMIN authentication mode is protected.");
+      return;
+    }
+
+    setIsSavingCustom(true);
+    setCustomMessage("");
+    try {
+      const payload = {
+        authenticationMode: editableAuthenticationMode,
+        rules: customRules
+          .filter((rule) => rule.active)
+          .map((rule) => ({
+            accessKey: rule.accessKey,
+            allowed: Boolean(editableCustomRules[rule.accessKey]),
+          })),
+      };
+      const response = await fetch(`/volt/role-access/${selectedRoleId}/dynamic`, {
+        method: "PATCH",
+        headers: authHeaders(true),
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) throw new Error(await readApiError(response, "Unable to save authentication mode. Please try again."));
+      setCustomMessageType("success");
+      setCustomMessage("Authentication mode updated successfully.");
+      await loadRoles();
+      await loadCustomPermissions(selectedRoleId);
+    } catch (error) {
+      setCustomMessageType("error");
+      setCustomMessage(error.message || "Unable to save authentication mode. Please try again.");
     } finally {
       setIsSavingCustom(false);
     }
@@ -478,6 +540,58 @@ export default function RoleAccessManagement() {
           {roleError && <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{roleError}</p>}
           {!isLoadingRoles && !roleError && roles.length === 0 && (
             <p className="mt-3 rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">No roles are available.</p>
+          )}
+        </section>
+
+        <section className="mt-5 rounded-2xl border border-blue-100 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-xl font-extrabold text-blue-950">Authentication Mode</h2>
+              <p className="mt-1 text-sm text-gray-500">
+                {selectedRole ? formatRoleLabel(selectedRole) : "Select a role to configure login."}
+              </p>
+            </div>
+            {roleAccess && (
+              <span className={`inline-flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-bold ${protectedRole ? "bg-yellow-100 text-yellow-800" : "bg-green-50 text-green-700"}`}>
+                {protectedRole && <LockKeyhole size={14} aria-hidden="true" />}
+                {protectedRole ? "SUPER_ADMIN forced to Password + PIN" : "Configurable"}
+              </span>
+            )}
+          </div>
+
+          {!selectedRoleId && (
+            <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">Select a role to configure authentication mode.</p>
+          )}
+          {selectedRoleId && (
+            <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto] md:items-end">
+              <label className="font-semibold text-gray-700">
+                Authentication Mode
+                <select
+                  value={protectedRole ? "PASSWORD_PIN" : editableAuthenticationMode}
+                  onChange={handleAuthenticationModeChange}
+                  disabled={protectedRole || isLoadingCustomAccess || isSavingCustom}
+                  className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 outline-none focus:border-blue-950 disabled:opacity-60"
+                >
+                  {authenticationModeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                onClick={saveAuthenticationMode}
+                disabled={protectedRole || !hasAuthenticationModeChanges || isSavingCustom || isLoadingCustomAccess}
+                className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-blue-950 px-5 py-3 font-bold text-white transition hover:bg-blue-900 disabled:opacity-60"
+              >
+                {isSavingCustom ? <RefreshCw size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
+                {isSavingCustom ? "Saving..." : "Save Mode"}
+              </button>
+            </div>
+          )}
+          {protectedRole && selectedRoleId && (
+            <p className="mt-4 rounded-xl bg-yellow-50 px-4 py-3 text-sm font-semibold text-yellow-800">
+              SUPER_ADMIN always uses Employee ID, password, and PIN.
+            </p>
           )}
         </section>
 

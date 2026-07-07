@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowLeft, ChevronRight, KeyRound, LogOut, Settings2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, KeyRound, LogOut, Settings2, Smartphone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { logoutSession } from "../utils/auth";
 
@@ -78,6 +78,13 @@ export default function Settings() {
               value="Open"
               tone="blue"
               onClick={() => navigate("/change-password")}
+            />
+            <SettingsRow
+              icon={Smartphone}
+              label="Device Pairing Requests"
+              value="Open"
+              tone="blue"
+              onClick={() => navigate("/settings/device-pairing")}
             />
           </section>
 

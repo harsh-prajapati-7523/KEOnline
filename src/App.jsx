@@ -22,6 +22,7 @@ const TicketFieldManagement = lazy(() => import("./pages/TicketFieldManagement")
 const DropdownSourceManagement = lazy(() => import("./pages/DropdownSourceManagement"));
 const BulkTicketLabels = lazy(() => import("./pages/BulkTicketLabels"));
 const Settings = lazy(() => import("./pages/Settings"));
+const DevicePairingRequests = lazy(() => import("./pages/DevicePairingRequests"));
 const ChangePassword = lazy(() => import("./pages/ChangePassword"));
 const CreateTicket = lazy(() => import("./pages/CreateTicket"));
 const MyTickets = lazy(() => import("./pages/MyTickets"));
@@ -411,6 +412,11 @@ function AppRoutes() {
           <Route path="/settings" element={
             <ProtectedRoute>
               <Settings />
+            </ProtectedRoute>
+          }/>
+          <Route path="/settings/device-pairing" element={
+            <ProtectedRoute anyAccessKey={["MANAGE_EMPLOYEES", "MANAGE_ROLES"]}>
+              <DevicePairingRequests />
             </ProtectedRoute>
           }/>
           <Route path="/admin/employees" element={

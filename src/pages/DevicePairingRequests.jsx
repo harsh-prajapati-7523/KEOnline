@@ -23,12 +23,16 @@ function parsePairingToken(value) {
   const token = value.trim();
   if (!token) throw new Error("Scan the technician QR first.");
   const parsed = JSON.parse(token);
-  return {
-    requestId: parsed.requestId,
-    nonce: parsed.nonce,
-    expiresAt: parsed.expiresAt,
-    signature: parsed.signature,
+  const pairingToken = {
+    requestId: String(parsed.requestId || "").trim(),
+    nonce: String(parsed.nonce || "").trim(),
+    expiresAt: String(parsed.expiresAt || "").trim(),
+    signature: String(parsed.signature || "").trim(),
   };
+  if (!pairingToken.requestId || !pairingToken.nonce || !pairingToken.expiresAt || !pairingToken.signature) {
+    throw new Error("Scanned QR is not a valid pairing token.");
+  }
+  return pairingToken;
 }
 
 export default function DevicePairingRequests() {

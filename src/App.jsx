@@ -245,7 +245,7 @@ function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const active = location.pathname;
-  const isAuthPage = active === "/employee-login" || active === "/pin-login" || active === "/pin-setup";
+  const isAuthPage = active === "/" || active === "/employee-login" || active === "/pin-login" || active === "/pin-setup";
   const isDashboard = active === "/employee-dashboard";
   const isAuthenticated = Boolean(getValidToken());
   const employeeName = localStorage.getItem("employeeName") ?? "";
@@ -324,7 +324,7 @@ function AuthenticatedBottomNav() {
   const active = location.pathname;
   const isAuthenticated = Boolean(getValidToken());
 
-  if (!isAuthenticated || active === "/employee-login" || active === "/pin-login" || active === "/pin-setup") return null;
+  if (!isAuthenticated || active === "/" || active === "/employee-login" || active === "/pin-login" || active === "/pin-setup") return null;
 
   const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
   const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
@@ -366,6 +366,30 @@ function AuthenticatedBottomNav() {
   );
 }
 
+function RootSessionRoute() {
+  const [redirectPath, setRedirectPath] = useState(() => (getValidToken() ? "/pin-login" : ""));
+
+  useEffect(() => {
+    let isCurrent = true;
+    if (redirectPath) return undefined;
+
+    isPinLoginAvailable().then((available) => {
+      if (!isCurrent) return;
+      setRedirectPath(available ? "/pin-login" : "/employee-login");
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [redirectPath]);
+
+  if (redirectPath) {
+    return <Navigate to={redirectPath} replace />;
+  }
+
+  return <RouteLoadingFallback />;
+}
+
 function AppRoutes() {
   const location = useLocation();
   const isAuthenticated = Boolean(getValidToken());
@@ -390,7 +414,7 @@ function AppRoutes() {
     <div className={isAuthenticated ? "ke-content-with-bottom-nav sm:pb-0" : ""}>
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
-          <Route path="/" element={<EmployeeLogin />} />
+          <Route path="/" element={<RootSessionRoute />} />
           <Route path="/employee-login" element={<EmployeeLogin />} />
           <Route path="/pin-login" element={<PinLogin />} />
           <Route path="/pin-setup" element={

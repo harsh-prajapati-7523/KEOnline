@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { Lock } from "lucide-react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess } from "../utils/access";
-import { persistAuthSession, resetPinSession } from "../utils/auth";
+import { getValidToken, persistAuthSession, resetPinSession } from "../utils/auth";
 
 function normalizePin(value) {
   return value.replace(/\D/g, "").slice(0, 6);
@@ -49,11 +49,16 @@ export default function PinLogin() {
   const [isResettingPin, setIsResettingPin] = useState(false);
   const [isPinFocused, setIsPinFocused] = useState(false);
   const pinInputRef = useRef(null);
+  const validToken = getValidToken();
   const redirectPath = location.state?.from
     ? typeof location.state.from === "string"
       ? location.state.from
       : `${location.state.from.pathname || ""}${location.state.from.search || ""}${location.state.from.hash || ""}`
     : "/employee-dashboard";
+
+  if (validToken) {
+    return <Navigate to="/employee-dashboard" replace />;
+  }
 
   const unlockWithPin = async (pinValue) => {
     if (isSubmitting) return;

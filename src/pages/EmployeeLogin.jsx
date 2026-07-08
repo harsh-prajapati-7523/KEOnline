@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Clock3, Lock, QrCode, RefreshCw, ShieldCheck, Smartphone, User } from "lucide-react";
 import QRCode from "qrcode";
-import { useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAuthSession, getValidToken, isPinLoginAvailable, persistAuthSession } from "../utils/auth";
 
@@ -74,6 +74,7 @@ export default function EmployeeLogin() {
   const isDeviceMode = authMode === AUTH_MODES.DEVICE_PAIRING_PIN;
   const pairingToken = pairing?.pairingToken || "";
   const deviceFingerprint = useMemo(() => getDeviceFingerprint(), []);
+  const validToken = getValidToken();
 
   useEffect(() => {
     let isCurrent = true;
@@ -162,6 +163,10 @@ export default function EmployeeLogin() {
       window.clearTimeout(timeoutId);
     };
   }, [deviceFingerprint, navigate, pairing, redirectPath]);
+
+  if (validToken) {
+    return <Navigate to="/employee-dashboard" replace />;
+  }
 
   if (isCheckingPinLogin) {
     return <SessionCheckScreen />;

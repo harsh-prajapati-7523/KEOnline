@@ -9,7 +9,6 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { hasAnyAccess } from "./utils/access";
 import { clearAccessSession, clearAuthSession, getTokenExpiryMs, getValidToken, isPinLoginAvailable, logoutSession, onAuthExpired } from "./utils/auth";
 
-const HomePage = lazy(() => import("./pages/Home"));
 const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
 const EmployeeManagement = lazy(() => import("./pages/EmployeeManagement"));
 const RoleManagement = lazy(() => import("./pages/RoleManagement"));
@@ -391,7 +390,7 @@ function AppRoutes() {
     <div className={isAuthenticated ? "ke-content-with-bottom-nav sm:pb-0" : ""}>
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<Navigate to="/employee-login" replace />} />
           <Route path="/employee-login" element={<EmployeeLogin />} />
           <Route path="/pin-login" element={<PinLogin />} />
           <Route path="/pin-setup" element={

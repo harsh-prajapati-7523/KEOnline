@@ -25,7 +25,7 @@ export default defineConfig({
         short_name: 'RiseTicket',
         description: 'RiseTicket service workflow app for Kumar Electronics.',
         id: '/',
-        start_url: '/',
+        start_url: '/employee-login',
         scope: '/',
         display: 'standalone',
         theme_color: '#172554',

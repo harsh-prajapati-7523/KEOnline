@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
@@ -57,19 +57,34 @@ export default function PinLogin() {
       : `${location.state.from.pathname || ""}${location.state.from.search || ""}${location.state.from.hash || ""}`
     : "/employee-dashboard";
 
+  const returnToEmployeeLogin = useCallback(() => {
+    clearFailedPinAttempts();
+    setFailedAttempts(0);
+    setPin("");
+    clearAccess();
+    navigate("/employee-login", { replace: true });
+  }, [navigate]);
+
   useEffect(() => {
+    if (validToken) return undefined;
+
     let isCurrent = true;
 
     getPinLoginStatus().then((status) => {
+      if (!isCurrent) return;
       if (isCurrent && status.pinLoginAvailable && status.employeeName) {
         setEmployeeName(status.employeeName);
+        return;
+      }
+      if (!status.pinLoginAvailable) {
+        returnToEmployeeLogin();
       }
     });
 
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [returnToEmployeeLogin, validToken]);
 
   if (validToken) {
     return <Navigate to="/employee-dashboard" replace />;
@@ -97,16 +112,17 @@ export default function PinLogin() {
 
       if (response.status === PIN_RESET_STATUS) {
         setError("Too many invalid PIN attempts. Resetting PIN...");
-        clearFailedPinAttempts();
-        setFailedAttempts(0);
-        setPin("");
         await resetPinSession();
-        clearAccess();
-        navigate("/employee-login", { replace: true });
+        returnToEmployeeLogin();
         return;
       }
 
       if (!response.ok) {
+        const status = await getPinLoginStatus();
+        if (!status.pinLoginAvailable) {
+          returnToEmployeeLogin();
+          return;
+        }
         throw new Error("PIN expired or incorrect.");
       }
 
@@ -131,11 +147,8 @@ export default function PinLogin() {
 
       if (nextFailedAttempts >= MAX_PIN_ATTEMPTS) {
         setError("Too many invalid PIN attempts. Resetting PIN...");
-        clearFailedPinAttempts();
-        setFailedAttempts(0);
         await resetPinSession();
-        clearAccess();
-        navigate("/employee-login", { replace: true });
+        returnToEmployeeLogin();
         return;
       }
 
@@ -172,11 +185,8 @@ export default function PinLogin() {
 
     setIsResettingPin(true);
     setError("");
-    clearFailedPinAttempts();
-    setFailedAttempts(0);
     await resetPinSession();
-    clearAccess();
-    navigate("/employee-login", { replace: true });
+    returnToEmployeeLogin();
   };
 
   return (

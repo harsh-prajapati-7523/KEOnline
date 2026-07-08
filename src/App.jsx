@@ -438,7 +438,7 @@ function AppRoutes() {
             </ProtectedRoute>
           }/>
           <Route path="/settings/device-pairing" element={
-            <ProtectedRoute anyAccessKey={["MANAGE_EMPLOYEES", "MANAGE_ROLES"]}>
+            <ProtectedRoute accessKey="APPROVE_DEVICE_PAIRING">
               <DevicePairingRequests />
             </ProtectedRoute>
           }/>

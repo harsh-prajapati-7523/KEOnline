@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowLeft, ChevronRight, KeyRound, LogOut, Settings2, Smartphone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { hasAccess } from "../utils/access";
 import { logoutSession } from "../utils/auth";
 
 function IconBubble({ icon: Icon, tone = "slate" }) {
@@ -39,6 +40,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const employeeName = localStorage.getItem("employeeName") || "Employee";
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const canApproveDevicePairing = hasAccess("APPROVE_DEVICE_PAIRING");
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -79,13 +81,15 @@ export default function Settings() {
               tone="blue"
               onClick={() => navigate("/change-password")}
             />
-            <SettingsRow
-              icon={Smartphone}
-              label="Device Pairing Requests"
-              value="Open"
-              tone="blue"
-              onClick={() => navigate("/settings/device-pairing")}
-            />
+            {canApproveDevicePairing && (
+              <SettingsRow
+                icon={Smartphone}
+                label="Device Pairing Requests"
+                value="Open"
+                tone="blue"
+                onClick={() => navigate("/settings/device-pairing")}
+              />
+            )}
           </section>
 
           <section className="min-w-0 rounded-2xl border border-red-100 bg-white p-4 shadow-sm" aria-label="Logout">

@@ -29,7 +29,7 @@ const accessGroups = [
   },
   {
     title: "Employee / Role Administration",
-    keys: ["VIEW_EMPLOYEE_MANAGEMENT", "MANAGE_EMPLOYEES", "VIEW_ROLE_MANAGEMENT", "MANAGE_ROLES"],
+    keys: ["VIEW_EMPLOYEE_MANAGEMENT", "MANAGE_EMPLOYEES", "VIEW_ROLE_MANAGEMENT", "MANAGE_ROLES", "APPROVE_DEVICE_PAIRING"],
   },
   {
     title: "Configuration",
@@ -66,6 +66,7 @@ const accessLabels = {
   MANAGE_EMPLOYEES: "Manage Employees",
   VIEW_ROLE_MANAGEMENT: "View Role Management",
   MANAGE_ROLES: "Manage Roles",
+  APPROVE_DEVICE_PAIRING: "Approve Device Pairing",
   VIEW_TICKET_CATEGORY_MANAGEMENT: "View Ticket Categories",
   MANAGE_TICKET_CATEGORIES: "Manage Ticket Categories",
   VIEW_TICKET_FIELD_MANAGEMENT: "View Ticket Fields",

@@ -146,8 +146,14 @@ export default function EmployeeLogin() {
         }
 
         if (data.session?.token) {
-          persistAuthSession(data.session);
-          navigate(data.session.pinRequired ? "/pin-setup" : redirectPath, { replace: true, state: { from: redirectPath } });
+          if (data.session.pinRequired) {
+            persistAuthSession(data.session);
+            navigate("/pin-setup", { replace: true, state: { from: redirectPath } });
+            return;
+          }
+
+          clearAuthSession();
+          navigate("/pin-login", { replace: true, state: { from: redirectPath } });
           return;
         }
       } catch {

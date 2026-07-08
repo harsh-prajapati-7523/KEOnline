@@ -390,7 +390,7 @@ function AppRoutes() {
     <div className={isAuthenticated ? "ke-content-with-bottom-nav sm:pb-0" : ""}>
       <Suspense fallback={<RouteLoadingFallback />}>
         <Routes>
-          <Route path="/" element={<Navigate to="/employee-login" replace />} />
+          <Route path="/" element={<EmployeeLogin />} />
           <Route path="/employee-login" element={<EmployeeLogin />} />
           <Route path="/pin-login" element={<PinLogin />} />
           <Route path="/pin-setup" element={

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Camera, CheckCircle2, QrCode, RefreshCw, Save, Smartphone, Trash2, X } from "lucide-react";
+import { ArrowLeft, Camera, CheckCircle2, QrCode, RefreshCw, Save, Smartphone, Trash2, User, X } from "lucide-react";
 import QrScanner from "qr-scanner";
 import { useNavigate } from "react-router-dom";
 
@@ -55,10 +55,9 @@ export default function DevicePairingRequests() {
   const scannerRef = useRef(null);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [trustedDevices, setTrustedDevices] = useState([]);
-  const [employees, setEmployees] = useState([]);
   const [pairingToken, setPairingToken] = useState("");
   const [scannedRequestId, setScannedRequestId] = useState("");
-  const [selectedEmployeeId, setSelectedEmployeeId] = useState("");
+  const [reviewRequest, setReviewRequest] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
@@ -66,31 +65,29 @@ export default function DevicePairingRequests() {
   const [revokingDeviceId, setRevokingDeviceId] = useState(null);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
 
-  const activeEmployees = useMemo(
-    () => employees.filter((employee) => employee.active),
-    [employees]
+  const visiblePendingRequests = useMemo(
+    () => pendingRequests.filter((request) => request.status === "PENDING" && new Date(request.expiresAt).getTime() > currentTime),
+    [currentTime, pendingRequests]
   );
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setMessage("");
     try {
-      const [pendingResponse, trustedResponse, employeesResponse] = await Promise.all([
+      const [pendingResponse, trustedResponse] = await Promise.all([
         fetch("/volt/auth/device-pairing/pending", { headers: authHeaders() }),
         fetch("/volt/auth/device-pairing/trusted-devices", { headers: authHeaders() }),
-        fetch("/volt/employees", { headers: authHeaders() }),
       ]);
       if (!pendingResponse.ok) throw new Error(await readApiError(pendingResponse, "Unable to load pending pairing requests."));
       if (!trustedResponse.ok) throw new Error(await readApiError(trustedResponse, "Unable to load trusted devices."));
-      if (!employeesResponse.ok) throw new Error(await readApiError(employeesResponse, "Unable to load employees."));
+      setCurrentTime(Date.now());
       setPendingRequests(await pendingResponse.json());
       setTrustedDevices(await trustedResponse.json());
-      setEmployees(await employeesResponse.json());
     } catch (error) {
       setPendingRequests([]);
       setTrustedDevices([]);
-      setEmployees([]);
       setMessageType("error");
       setMessage(error.message || "Unable to load device pairing requests.");
     } finally {
@@ -112,15 +109,33 @@ export default function DevicePairingRequests() {
     if (updateState) setIsScanning(false);
   }, []);
 
-  const acceptScannedValue = (rawValue) => {
+  const findPendingRequest = useCallback((requestId, requests = pendingRequests) => (
+    requests.find((request) => request.requestId === requestId && request.status === "PENDING" && new Date(request.expiresAt).getTime() > Date.now()) || null
+  ), [pendingRequests]);
+
+  const refreshPendingRequests = useCallback(async () => {
+    const response = await fetch("/volt/auth/device-pairing/pending", { headers: authHeaders() });
+    if (!response.ok) throw new Error(await readApiError(response, "Unable to load pending pairing requests."));
+    const requests = await response.json();
+    setPendingRequests(requests);
+    return requests;
+  }, []);
+
+  const acceptScannedValue = async (rawValue) => {
     try {
       const parsedToken = parsePairingToken(rawValue);
       setPairingToken(rawValue);
       setScannedRequestId(parsedToken.requestId || "");
+      let request = findPendingRequest(parsedToken.requestId);
+      if (!request) {
+        request = findPendingRequest(parsedToken.requestId, await refreshPendingRequests());
+      }
+      if (!request) throw new Error("Scanned request is expired or no longer pending.");
       setScannerError("");
       stopScanner();
-    } catch {
-      setScannerError("Scanned QR is not a valid pairing token.");
+      setReviewRequest(request);
+    } catch (error) {
+      setScannerError(error.message || "Scanned QR is not a valid pairing token.");
     }
   };
 
@@ -134,6 +149,7 @@ export default function DevicePairingRequests() {
     setScannerError("");
     setPairingToken("");
     setScannedRequestId("");
+    setReviewRequest(null);
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setScannerError("Camera access is not available in this browser.");
@@ -146,7 +162,7 @@ export default function DevicePairingRequests() {
       setIsScanning(true);
       const scanner = new QrScanner(
         video,
-        (result) => acceptScannedValue(typeof result === "string" ? result : result?.data || ""),
+        (result) => void acceptScannedValue(typeof result === "string" ? result : result?.data || ""),
         {
           preferredCamera: "environment",
           returnDetailedScanResult: true,
@@ -168,13 +184,14 @@ export default function DevicePairingRequests() {
     setMessage("");
     try {
       const parsedToken = parsePairingToken(pairingToken);
-      if (!selectedEmployeeId) throw new Error("Select an employee for this device.");
+      const employeeId = reviewRequest?.employeeId;
+      if (!employeeId) throw new Error("This pairing request does not include an employee.");
       const response = await fetch("/volt/auth/device-pairing/approve", {
         method: "PATCH",
         headers: authHeaders(true),
         body: JSON.stringify({
           ...parsedToken,
-          employeeId: selectedEmployeeId,
+          employeeId,
         }),
       });
       if (!response.ok) throw new Error(await readApiError(response, "Unable to approve device pairing."));
@@ -182,7 +199,7 @@ export default function DevicePairingRequests() {
       setMessage("Device pairing approved.");
       setPairingToken("");
       setScannedRequestId("");
-      setSelectedEmployeeId("");
+      setReviewRequest(null);
       await loadData();
     } catch (error) {
       setMessageType("error");
@@ -190,6 +207,13 @@ export default function DevicePairingRequests() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const closeReviewDialog = () => {
+    if (isSaving) return;
+    setPairingToken("");
+    setScannedRequestId("");
+    setReviewRequest(null);
   };
 
   const revokeTrustedDevice = async (device) => {
@@ -248,7 +272,7 @@ export default function DevicePairingRequests() {
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-extrabold text-slate-900">Approve Device</h2>
                 <p className="mt-1 break-words text-sm font-semibold text-slate-600">
-                  {scannedRequestId ? `Scanned request ${scannedRequestId}` : "Scan the technician QR to load the pairing request."}
+                  {scannedRequestId ? `Scanned request ${scannedRequestId}` : "Scan the technician QR to review the pairing request."}
                 </p>
 
                 <div className="mt-4 flex flex-wrap gap-2">
@@ -292,36 +316,9 @@ export default function DevicePairingRequests() {
                 {scannerError && (
                   <p className="mt-3 rounded-xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{scannerError}</p>
                 )}
-                {pairingToken && !scannerError && (
-                  <p className="mt-3 rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">QR scanned successfully.</p>
+                {pairingToken && reviewRequest && !scannerError && (
+                  <p className="mt-3 rounded-xl bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">QR scanned successfully. Review the request details to approve.</p>
                 )}
-
-                <label className="mt-4 block text-sm font-semibold text-slate-900">
-                  Employee
-                  <select
-                    value={selectedEmployeeId}
-                    onChange={(event) => setSelectedEmployeeId(event.target.value)}
-                    disabled={isLoading || activeEmployees.length === 0}
-                    className="mt-2 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-950 disabled:opacity-60"
-                  >
-                    <option value="">{isLoading ? "Loading employees..." : "Select employee"}</option>
-                    {activeEmployees.map((employee) => (
-                      <option key={employee.id} value={employee.employeeId}>
-                        {employee.name} ({employee.employeeId})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={approve}
-                  disabled={isSaving || isLoading || !pairingToken}
-                  className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-blue-900 disabled:opacity-60"
-                >
-                  {isSaving ? <RefreshCw size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
-                  {isSaving ? "Approving..." : "Approve"}
-                </button>
               </div>
             </div>
           </section>
@@ -331,7 +328,7 @@ export default function DevicePairingRequests() {
               <IconBubble icon={RefreshCw} tone="blue" />
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-extrabold text-slate-900">Pending Requests</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-600">{pendingRequests.length} waiting</p>
+                <p className="mt-1 text-sm font-semibold text-slate-600">{visiblePendingRequests.length} waiting</p>
               </div>
               <button type="button" onClick={loadData} disabled={isLoading} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-blue-950 px-3 py-2 text-sm font-extrabold text-blue-950 disabled:opacity-60">
                 <RefreshCw size={16} aria-hidden="true" />
@@ -340,16 +337,19 @@ export default function DevicePairingRequests() {
             </div>
 
             {isLoading && <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">Loading requests...</p>}
-            {!isLoading && pendingRequests.length === 0 && (
+            {!isLoading && visiblePendingRequests.length === 0 && (
               <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">No pending requests.</p>
             )}
-            {!isLoading && pendingRequests.length > 0 && (
+            {!isLoading && visiblePendingRequests.length > 0 && (
               <div className="mt-3.5 space-y-2.5">
-                {pendingRequests.map((request) => (
+                {visiblePendingRequests.map((request) => (
                   <div key={request.requestId} className="rounded-xl border border-blue-100 bg-gray-50 p-3.5">
                     <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <p className="break-words text-sm font-extrabold text-slate-900">{request.deviceLabel || "Unknown device"}</p>
+                        <p className="mt-1 break-words text-sm font-semibold text-slate-600">
+                          {request.employeeName || "Employee"} {request.employeeId ? `(${request.employeeId})` : ""}
+                        </p>
                         <p className="mt-1 break-all font-mono text-xs font-semibold text-slate-500">{request.requestId}</p>
                       </div>
                       <span className="inline-flex w-fit items-center gap-2 rounded-full bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-800">
@@ -363,6 +363,65 @@ export default function DevicePairingRequests() {
               </div>
             )}
           </section>
+
+          {reviewRequest && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4 py-6" role="dialog" aria-modal="true" aria-labelledby="pairing-review-title">
+              <div className="w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <IconBubble icon={User} tone="blue" />
+                    <div className="min-w-0">
+                      <h2 id="pairing-review-title" className="text-lg font-extrabold text-slate-900">Approve Device Pairing</h2>
+                      <p className="mt-1 break-words text-sm font-semibold text-slate-600">Review the employee and device details before approving.</p>
+                    </div>
+                  </div>
+                  <button type="button" onClick={closeReviewDialog} disabled={isSaving} className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 disabled:opacity-60" aria-label="Close approval dialog">
+                    <X size={20} aria-hidden="true" />
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-blue-950">Employee</p>
+                    <p className="mt-1 break-words text-base font-extrabold text-slate-900">{reviewRequest.employeeName || "Unknown employee"}</p>
+                    <p className="mt-1 break-words font-mono text-xs font-semibold text-slate-600">{reviewRequest.employeeId || "No employee ID"}</p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-xs font-extrabold uppercase tracking-wide text-slate-600">Device</p>
+                    <p className="mt-1 break-words text-base font-extrabold text-slate-900">{reviewRequest.deviceLabel || "Unknown device"}</p>
+                    <p className="mt-1 break-all font-mono text-xs font-semibold text-slate-500">{reviewRequest.deviceFingerprint || "No fingerprint"}</p>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Request ID</p>
+                      <p className="mt-1 break-all font-mono text-xs font-semibold text-slate-700">{reviewRequest.requestId}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-200 bg-white p-3">
+                      <p className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Expires</p>
+                      <p className="mt-1 text-sm font-bold text-slate-700">{new Date(reviewRequest.expiresAt).toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                  <button type="button" onClick={closeReviewDialog} disabled={isSaving} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60">
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={approve}
+                    disabled={isSaving || isLoading || !pairingToken || !reviewRequest?.employeeId}
+                    className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-blue-950 px-4 py-2 text-sm font-extrabold text-white transition hover:bg-blue-900 disabled:opacity-60"
+                  >
+                    {isSaving ? <RefreshCw size={18} aria-hidden="true" /> : <Save size={18} aria-hidden="true" />}
+                    {isSaving ? "Approving..." : "Approve"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm" aria-label="Trusted devices">
             <div className="flex min-w-0 items-center gap-3">

@@ -198,6 +198,11 @@ export default function EmployeeLogin() {
   };
 
   const startPairing = async () => {
+    if (!employeeId.trim()) {
+      setError("Enter your employee ID first.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError("");
     try {
@@ -209,6 +214,7 @@ export default function EmployeeLogin() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          employeeId,
           deviceFingerprint,
           deviceLabel: getDeviceLabel(),
         }),

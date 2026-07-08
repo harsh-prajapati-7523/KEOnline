@@ -100,16 +100,20 @@ export async function refreshAccessToken() {
 }
 
 export async function isPinLoginAvailable() {
+  const data = await getPinLoginStatus();
+  return data.pinLoginAvailable === true;
+}
+
+export async function getPinLoginStatus() {
   try {
     const response = await fetch("/volt/auth/pin/status", {
       method: "POST",
       credentials: "include",
     });
-    if (!response.ok) return false;
-    const data = await response.json();
-    return data.pinLoginAvailable === true;
+    if (!response.ok) return { pinLoginAvailable: false, employeeName: "" };
+    return await response.json();
   } catch {
-    return false;
+    return { pinLoginAvailable: false, employeeName: "" };
   }
 }
 

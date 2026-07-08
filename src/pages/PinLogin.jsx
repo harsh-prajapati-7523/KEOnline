@@ -1,9 +1,9 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Lock } from "lucide-react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAccess, fetchCurrentAccess } from "../utils/access";
-import { getValidToken, persistAuthSession, resetPinSession } from "../utils/auth";
+import { getPinLoginStatus, getValidToken, persistAuthSession, resetPinSession } from "../utils/auth";
 
 function normalizePin(value) {
   return value.replace(/\D/g, "").slice(0, 6);
@@ -48,6 +48,7 @@ export default function PinLogin() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResettingPin, setIsResettingPin] = useState(false);
   const [isPinFocused, setIsPinFocused] = useState(false);
+  const [employeeName, setEmployeeName] = useState("");
   const pinInputRef = useRef(null);
   const validToken = getValidToken();
   const redirectPath = location.state?.from
@@ -55,6 +56,20 @@ export default function PinLogin() {
       ? location.state.from
       : `${location.state.from.pathname || ""}${location.state.from.search || ""}${location.state.from.hash || ""}`
     : "/employee-dashboard";
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    getPinLoginStatus().then((status) => {
+      if (isCurrent && status.pinLoginAvailable && status.employeeName) {
+        setEmployeeName(status.employeeName);
+      }
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   if (validToken) {
     return <Navigate to="/employee-dashboard" replace />;
@@ -178,6 +193,12 @@ export default function PinLogin() {
 
         <div className="ke-login-card ke-login-form-area">
           <form onSubmit={handleSubmit} className="ke-login-form">
+            {employeeName && (
+              <p className="text-center text-base font-extrabold text-blue-950">
+                Welcome, {employeeName}
+              </p>
+            )}
+
             <label htmlFor="employee-pin" className="ke-login-label">
               6 Digit PIN
             </label>

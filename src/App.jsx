@@ -160,7 +160,11 @@ function AuthExpiryWatcher() {
     };
 
     void checkSession();
-    intervalId = window.setInterval(checkSession, 10000);
+    intervalId = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void checkSession();
+      }
+    }, 10000);
     window.addEventListener("focus", checkSession);
     document.addEventListener("visibilitychange", checkWhenVisible);
 

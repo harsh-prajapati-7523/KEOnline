@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Clock3, Lock, QrCode, RefreshCw, ShieldCheck, Smartphone, User } from "lucide-react";
-import QRCode from "qrcode";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
 import { clearAuthSession, getValidToken, isPinLoginAvailable, persistAuthSession } from "../utils/auth";
@@ -106,7 +105,11 @@ export default function EmployeeLogin() {
       setQrDataUrl("");
       return undefined;
     }
-    QRCode.toDataURL(pairingToken, { margin: 1, width: 220 })
+    import("qrcode")
+      .then((QRCode) => {
+        const toDataURL = QRCode.toDataURL || QRCode.default?.toDataURL;
+        return toDataURL(pairingToken, { margin: 1, width: 220 });
+      })
       .then((url) => {
         if (active) setQrDataUrl(url);
       })

@@ -710,7 +710,9 @@ export default function TicketDetail() {
 
       await loadTicket();
       await loadAvailableActions();
-      await loadWorkflowHistory(0, true);
+      if (hasLoadedWorkflowHistory || showWorkflowHistory || activeDetailView === "timeline") {
+        await loadWorkflowHistory(0, true);
+      }
       setStatusMessage("Workflow action completed successfully.");
     } catch {
       setStatusMessage("Unable to execute workflow action. Please refresh and try again.");

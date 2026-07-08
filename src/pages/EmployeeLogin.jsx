@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Clock3, Lock, QrCode, RefreshCw, ShieldCheck, Smartphone, User } from "lucide-react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import KEWaveBackground from "../components/KEWaveBackground";
-import { clearAuthSession, getValidToken, isPinLoginAvailable, persistAuthSession } from "../utils/auth";
+import { clearAuthSession, getJwtPayload, getPinLoginStatus, getValidToken, isPinLoginAvailable, persistAuthSession } from "../utils/auth";
 
 const AUTH_MODES = {
   PASSWORD_PIN: "PASSWORD_PIN",
@@ -69,11 +69,42 @@ export default function EmployeeLogin() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCheckingPinLogin, setIsCheckingPinLogin] = useState(() => !getValidToken());
+  const [isCheckingExistingSession, setIsCheckingExistingSession] = useState(() => Boolean(getValidToken()));
 
   const isDeviceMode = authMode === AUTH_MODES.DEVICE_PAIRING_PIN;
   const pairingToken = pairing?.pairingToken || "";
   const deviceFingerprint = useMemo(() => getDeviceFingerprint(), []);
   const validToken = getValidToken();
+
+  useEffect(() => {
+    let isCurrent = true;
+    const token = getValidToken();
+    if (!token) {
+      setIsCheckingExistingSession(false);
+      return undefined;
+    }
+
+    const payload = getJwtPayload(token);
+    if (payload?.tokenUse === "PIN_SETUP") {
+      navigate("/pin-setup", { replace: true, state: { from: redirectPath } });
+      return undefined;
+    }
+
+    setIsCheckingExistingSession(true);
+    getPinLoginStatus().then((status) => {
+      if (!isCurrent) return;
+      if (!status.sessionValid) {
+        clearAuthSession();
+        setIsCheckingExistingSession(false);
+        return;
+      }
+      navigate("/employee-dashboard", { replace: true });
+    });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [navigate, redirectPath]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -174,8 +205,8 @@ export default function EmployeeLogin() {
     };
   }, [deviceFingerprint, navigate, pairing, redirectPath]);
 
-  if (validToken) {
-    return <Navigate to="/employee-dashboard" replace />;
+  if (validToken || isCheckingExistingSession) {
+    return <SessionCheckScreen />;
   }
 
   if (isCheckingPinLogin) {

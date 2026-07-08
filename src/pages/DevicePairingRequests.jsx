@@ -74,6 +74,11 @@ export default function DevicePairingRequests() {
     [currentTime, pendingRequests]
   );
 
+  const visibleTrustedDevices = useMemo(
+    () => trustedDevices.filter((device) => !device.revokedAt),
+    [trustedDevices]
+  );
+
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setMessage("");
@@ -131,6 +136,7 @@ export default function DevicePairingRequests() {
 
     try {
       const parsedToken = parsePairingToken(rawValue);
+      scanHandledRef.current = true;
       setPairingToken(rawValue);
       setScannedRequestId(parsedToken.requestId || "");
       let request = findPendingRequest(parsedToken.requestId);
@@ -138,11 +144,11 @@ export default function DevicePairingRequests() {
         request = findPendingRequest(parsedToken.requestId, await refreshPendingRequests());
       }
       if (!request) throw new Error("Scanned request is expired or no longer pending.");
-      scanHandledRef.current = true;
       setScannerError("");
       stopScanner();
       setReviewRequest(request);
     } catch (error) {
+      scanHandledRef.current = false;
       setScannerError(error.message || "Scanned QR is not a valid pairing token.");
     }
   }, [findPendingRequest, refreshPendingRequests, stopScanner]);
@@ -269,6 +275,12 @@ export default function DevicePairingRequests() {
         headers: authHeaders(),
       });
       if (!response.ok) throw new Error(await readApiError(response, "Unable to revoke trusted device."));
+      const revokedDevice = await response.json();
+      setTrustedDevices((current) => current.filter((trustedDevice) => {
+        if (trustedDevice.id === device.id) return false;
+        if (!revokedDevice?.employeeId || !revokedDevice?.deviceFingerprint) return true;
+        return trustedDevice.employeeId !== revokedDevice.employeeId || trustedDevice.deviceFingerprint !== revokedDevice.deviceFingerprint;
+      }));
       setMessageType("success");
       setMessage("Trusted device revoked.");
       await loadData();
@@ -490,7 +502,7 @@ export default function DevicePairingRequests() {
               <IconBubble icon={Smartphone} tone="blue" />
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-extrabold text-slate-900">Trusted Devices</h2>
-                <p className="mt-1 text-sm font-semibold text-slate-600">{trustedDevices.length} active</p>
+                <p className="mt-1 text-sm font-semibold text-slate-600">{visibleTrustedDevices.length} active</p>
               </div>
               <button type="button" onClick={loadData} disabled={isLoading} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-blue-950 px-3 py-2 text-sm font-extrabold text-blue-950 disabled:opacity-60">
                 <RefreshCw size={16} aria-hidden="true" />
@@ -499,12 +511,12 @@ export default function DevicePairingRequests() {
             </div>
 
             {isLoading && <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">Loading trusted devices...</p>}
-            {!isLoading && trustedDevices.length === 0 && (
+            {!isLoading && visibleTrustedDevices.length === 0 && (
               <p className="mt-4 rounded-xl bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-600">No trusted devices.</p>
             )}
-            {!isLoading && trustedDevices.length > 0 && (
+            {!isLoading && visibleTrustedDevices.length > 0 && (
               <div className="mt-3.5 space-y-2.5">
-                {trustedDevices.map((device) => (
+                {visibleTrustedDevices.map((device) => (
                   <div key={device.id} className="rounded-xl border border-blue-100 bg-gray-50 p-3.5">
                     <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">

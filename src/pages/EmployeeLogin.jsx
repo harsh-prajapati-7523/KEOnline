@@ -145,8 +145,9 @@ export default function EmployeeLogin() {
           return;
         }
 
-        if (data.session?.token) {
+        if (data.session) {
           if (data.session.pinRequired) {
+            if (!data.session.token) throw new Error("Missing setup token");
             persistAuthSession(data.session);
             navigate("/pin-setup", { replace: true, state: { from: redirectPath } });
             return;
@@ -292,9 +293,9 @@ export default function EmployeeLogin() {
       }
 
       const data = await response.json();
-      if (!data.token) throw new Error("Missing token");
 
       if (data.pinRequired) {
+        if (!data.token) throw new Error("Missing setup token");
         persistAuthSession(data);
         navigate("/pin-setup", { replace: true, state: { from: redirectPath } });
         return;

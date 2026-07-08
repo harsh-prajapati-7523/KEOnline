@@ -7,7 +7,7 @@ import PinSetup from "./pages/PinSetup";
 import KEWaveBackground from "./components/KEWaveBackground";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { hasAnyAccess } from "./utils/access";
-import { clearAccessSession, clearAuthSession, getTokenExpiryMs, getValidToken, isPinLoginAvailable, logoutSession, onAuthExpired } from "./utils/auth";
+import { clearAccessSession, clearAuthSession, getPinLoginStatus, getTokenExpiryMs, getValidToken, isPinLoginAvailable, logoutSession, onAuthExpired } from "./utils/auth";
 
 const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
 const EmployeeManagement = lazy(() => import("./pages/EmployeeManagement"));
@@ -92,6 +92,7 @@ function AuthExpiryWatcher() {
   const navigate = useNavigate();
   const location = useLocation();
   const currentRedirectState = useMemo(() => ({ from: location }), [location]);
+  const authPaths = useMemo(() => ["/employee-login", "/pin-login", "/pin-setup"], []);
 
   useEffect(() => {
     const unsubscribe = onAuthExpired(async () => {
@@ -106,7 +107,7 @@ function AuthExpiryWatcher() {
   useEffect(() => {
     const token = getValidToken();
     if (!token) {
-      if (location.pathname !== "/" && location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
+      if (location.pathname !== "/" && !authPaths.includes(location.pathname)) {
         let isCurrent = true;
         isPinLoginAvailable().then((available) => {
           if (isCurrent) {
@@ -126,13 +127,50 @@ function AuthExpiryWatcher() {
     const timeoutMs = Math.max(0, expiryMs - Date.now());
     const timeoutId = window.setTimeout(async () => {
       clearAuthSession();
-      if (location.pathname !== "/employee-login" && location.pathname !== "/pin-login" && location.pathname !== "/pin-setup") {
+      if (!authPaths.includes(location.pathname)) {
         navigate(await isPinLoginAvailable() ? "/pin-login" : "/employee-login", { replace: true, state: currentRedirectState });
       }
     }, timeoutMs);
 
     return () => window.clearTimeout(timeoutId);
-  }, [currentRedirectState, location.pathname, navigate]);
+  }, [authPaths, currentRedirectState, location.pathname, navigate]);
+
+  useEffect(() => {
+    if (!getValidToken() || authPaths.includes(location.pathname)) return undefined;
+
+    let cancelled = false;
+    let intervalId;
+
+    const logoutRevokedSession = () => {
+      clearAuthSession();
+      navigate("/employee-login", { replace: true, state: currentRedirectState });
+    };
+
+    const checkSession = async () => {
+      const status = await getPinLoginStatus();
+      if (!cancelled && status.sessionValid === false) {
+        logoutRevokedSession();
+      }
+    };
+
+    const checkWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        void checkSession();
+      }
+    };
+
+    void checkSession();
+    intervalId = window.setInterval(checkSession, 10000);
+    window.addEventListener("focus", checkSession);
+    document.addEventListener("visibilitychange", checkWhenVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", checkSession);
+      document.removeEventListener("visibilitychange", checkWhenVisible);
+    };
+  }, [authPaths, currentRedirectState, location.pathname, navigate]);
 
   return null;
 }

@@ -110,10 +110,10 @@ export async function getPinLoginStatus() {
       method: "POST",
       credentials: "include",
     });
-    if (!response.ok) return { pinLoginAvailable: false, employeeName: "" };
+    if (!response.ok) return { pinLoginAvailable: false, employeeName: "", sessionValid: false };
     return await response.json();
   } catch {
-    return { pinLoginAvailable: false, employeeName: "" };
+    return { pinLoginAvailable: false, employeeName: "", sessionValid: false };
   }
 }
 

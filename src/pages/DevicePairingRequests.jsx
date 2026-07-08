@@ -53,6 +53,7 @@ export default function DevicePairingRequests() {
   const navigate = useNavigate();
   const videoRef = useRef(null);
   const scannerRef = useRef(null);
+  const scanHandledRef = useRef(false);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [trustedDevices, setTrustedDevices] = useState([]);
   const [pairingToken, setPairingToken] = useState("");
@@ -126,6 +127,8 @@ export default function DevicePairingRequests() {
   }, []);
 
   const acceptScannedValue = useCallback(async (rawValue) => {
+    if (scanHandledRef.current) return;
+
     try {
       const parsedToken = parsePairingToken(rawValue);
       setPairingToken(rawValue);
@@ -135,6 +138,7 @@ export default function DevicePairingRequests() {
         request = findPendingRequest(parsedToken.requestId, await refreshPendingRequests());
       }
       if (!request) throw new Error("Scanned request is expired or no longer pending.");
+      scanHandledRef.current = true;
       setScannerError("");
       stopScanner();
       setReviewRequest(request);
@@ -154,6 +158,7 @@ export default function DevicePairingRequests() {
     setPairingToken("");
     setScannedRequestId("");
     setReviewRequest(null);
+    scanHandledRef.current = false;
     setIsScannerDialogOpen(true);
   };
 
@@ -232,7 +237,9 @@ export default function DevicePairingRequests() {
       setMessage("Device pairing approved.");
       setPairingToken("");
       setScannedRequestId("");
+      setScannerError("");
       setReviewRequest(null);
+      scanHandledRef.current = false;
       await loadData();
     } catch (error) {
       setMessageType("error");

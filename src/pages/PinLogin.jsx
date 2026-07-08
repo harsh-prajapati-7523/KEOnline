@@ -76,7 +76,7 @@ export default function PinLogin() {
         setEmployeeName(status.employeeName);
         return;
       }
-      if (!status.pinLoginAvailable) {
+      if (!status.sessionValid || !status.pinLoginAvailable) {
         returnToEmployeeLogin();
       }
     });
@@ -119,7 +119,7 @@ export default function PinLogin() {
 
       if (!response.ok) {
         const status = await getPinLoginStatus();
-        if (!status.pinLoginAvailable) {
+        if (!status.sessionValid || !status.pinLoginAvailable) {
           returnToEmployeeLogin();
           return;
         }

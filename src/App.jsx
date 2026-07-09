@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Navigate, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { Download, Home, LayoutDashboard, ListChecks, Lock, LogIn, PlusCircle, X } from "lucide-react";
+import { Download, Home, LayoutDashboard, ListChecks, Lock, LogIn, PlusCircle, QrCode, X } from "lucide-react";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import PinLogin from "./pages/PinLogin";
 import PinSetup from "./pages/PinSetup";
@@ -24,6 +24,7 @@ const Settings = lazy(() => import("./pages/Settings"));
 const DevicePairingRequests = lazy(() => import("./pages/DevicePairingRequests"));
 const ChangePassword = lazy(() => import("./pages/ChangePassword"));
 const CreateTicket = lazy(() => import("./pages/CreateTicket"));
+const ScanTicketQr = lazy(() => import("./pages/ScanTicketQr"));
 const MyTickets = lazy(() => import("./pages/MyTickets"));
 const OpenTicket = lazy(() => import("./pages/OpenTicket"));
 
@@ -394,6 +395,12 @@ function AuthenticatedBottomNav() {
           </button>
         )}
         {canViewTickets && (
+          <button type="button" onClick={() => navigate("/tickets/scan")} className={itemClassName(active === "/tickets/scan")} aria-label="Scan Ticket QR">
+            <QrCode size={18} aria-hidden="true" />
+            Scan
+          </button>
+        )}
+        {canViewTickets && (
           <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets/find")} className={itemClassName(active === "/tickets/find" || active === "/tickets")} aria-label="Find Tickets">
             <ListChecks size={17} aria-hidden="true" />
             Find
@@ -537,6 +544,11 @@ function AppRoutes() {
           <Route path="/tickets/new" element={
             <ProtectedRoute accessKey="CREATE_TICKET">
               <CreateTicket />
+            </ProtectedRoute>
+          }/>
+          <Route path="/tickets/scan" element={
+            <ProtectedRoute accessKey="VIEW_TICKETS">
+              <ScanTicketQr />
             </ProtectedRoute>
           }/>
           <Route path="/tickets/my" element={

@@ -8,6 +8,7 @@ import KEWaveBackground from "./components/KEWaveBackground";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { hasAnyAccess } from "./utils/access";
 import { clearAccessSession, clearAuthSession, getPinLoginStatus, getTokenExpiryMs, getValidToken, isPinLoginAvailable, logoutSession, onAuthExpired } from "./utils/auth";
+import { isStandaloneDisplay, promptPwaInstall, subscribePwaInstall } from "./utils/pwaInstall";
 
 const EmployeeDashboard = lazy(() => import("./pages/EmployeeDashboard"));
 const EmployeeManagement = lazy(() => import("./pages/EmployeeManagement"));
@@ -75,10 +76,6 @@ if (window.location.pathname === "/tickets" || window.location.pathname === "/ti
 
 if (/^\/tickets\/\d+/.test(window.location.pathname) || /^\/ticket\/[^/]+/.test(window.location.pathname)) {
   preloadTicketDetail();
-}
-
-function isStandaloneDisplay() {
-  return window.matchMedia?.("(display-mode: standalone)")?.matches || window.navigator.standalone === true;
 }
 
 function RouteLoadingFallback() {
@@ -217,46 +214,30 @@ function InactivityWatcher() {
 
 function InstallAppPrompt() {
   const location = useLocation();
-  const [installPromptEvent, setInstallPromptEvent] = useState(null);
+  const [installState, setInstallState] = useState({ canPrompt: false, isInstalled: isStandaloneDisplay() });
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     if (location.pathname === "/employee-login" || location.pathname === "/pin-login" || location.pathname === "/pin-setup") return undefined;
     if (isStandaloneDisplay()) return undefined;
 
-    const handleBeforeInstallPrompt = (event) => {
-      event.preventDefault();
-      setInstallPromptEvent(event);
-      setIsVisible(true);
-    };
-
-    const handleAppInstalled = () => {
-      setInstallPromptEvent(null);
-      setIsVisible(false);
-    };
-
-    window.addEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-    window.addEventListener("appinstalled", handleAppInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
-      window.removeEventListener("appinstalled", handleAppInstalled);
-    };
+    return subscribePwaInstall((snapshot) => {
+      setInstallState(snapshot);
+      if (snapshot.canPrompt) setIsVisible(true);
+      if (snapshot.isInstalled) setIsVisible(false);
+    });
   }, [location.pathname]);
 
   const handleInstall = async () => {
-    if (!installPromptEvent) return;
+    if (!installState.canPrompt) return;
 
-    installPromptEvent.prompt();
-    const choice = await installPromptEvent.userChoice;
-    setInstallPromptEvent(null);
-
+    const choice = await promptPwaInstall();
     if (choice?.outcome !== "accepted") {
       setIsVisible(false);
     }
   };
 
-  if (location.pathname === "/employee-login" || location.pathname === "/pin-login" || location.pathname === "/pin-setup" || !installPromptEvent || !isVisible) return null;
+  if (location.pathname === "/employee-login" || location.pathname === "/pin-login" || location.pathname === "/pin-setup" || !installState.canPrompt || !isVisible) return null;
 
   return (
     <aside className="fixed inset-x-3 bottom-24 z-50 mx-auto max-w-md rounded-2xl border border-blue-100 bg-white p-3 text-blue-950 shadow-2xl sm:bottom-4 sm:right-4 sm:left-auto sm:mx-0 sm:w-full" aria-label="Install RiseTicket app">

@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { ArrowLeft, ChevronRight, KeyRound, LogOut, Settings2, Smartphone } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, ChevronRight, Download, KeyRound, LogOut, Settings2, Smartphone } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { hasAccess } from "../utils/access";
 import { logoutSession } from "../utils/auth";
+import { isStandaloneDisplay, promptPwaInstall, subscribePwaInstall } from "../utils/pwaInstall";
 
 function IconBubble({ icon: Icon, tone = "slate" }) {
   const toneClassNames = {
@@ -40,7 +41,11 @@ export default function Settings() {
   const navigate = useNavigate();
   const employeeName = localStorage.getItem("employeeName") || "Employee";
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [installState, setInstallState] = useState({ canPrompt: false, isInstalled: isStandaloneDisplay() });
+  const [installMessage, setInstallMessage] = useState("");
   const canApproveDevicePairing = hasAccess("APPROVE_DEVICE_PAIRING");
+
+  useEffect(() => subscribePwaInstall(setInstallState), []);
 
   const handleLogout = async () => {
     if (isLoggingOut) return;
@@ -51,6 +56,23 @@ export default function Settings() {
     setIsLoggingOut(true);
     await logoutSession();
     navigate("/employee-login", { replace: true });
+  };
+
+  const handleInstallApp = async () => {
+    setInstallMessage("");
+
+    const result = await promptPwaInstall();
+    if (result?.outcome === "accepted" || result?.outcome === "installed") {
+      setInstallMessage("RiseTicket is installed on this device.");
+      return;
+    }
+
+    if (result?.outcome === "dismissed") {
+      setInstallMessage("Install was cancelled. You can try again from Settings.");
+      return;
+    }
+
+    setInstallMessage("Install option is not available right now. Use your browser menu and choose Install app or Add to Home screen.");
   };
 
   return (
@@ -81,6 +103,13 @@ export default function Settings() {
               tone="blue"
               onClick={() => navigate("/change-password")}
             />
+            <SettingsRow
+              icon={Download}
+              label="Install App"
+              value={installState.isInstalled ? "Installed" : installState.canPrompt ? "Install" : "Open"}
+              tone="blue"
+              onClick={handleInstallApp}
+            />
             {canApproveDevicePairing && (
               <SettingsRow
                 icon={Smartphone}
@@ -89,6 +118,9 @@ export default function Settings() {
                 tone="blue"
                 onClick={() => navigate("/settings/device-pairing")}
               />
+            )}
+            {installMessage && (
+              <p className="border-t border-blue-100 px-1 pt-3 text-sm font-semibold text-slate-600">{installMessage}</p>
             )}
           </section>
 

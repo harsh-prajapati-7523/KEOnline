@@ -4,6 +4,10 @@ import './index.css'
 import App from './App.jsx'
 import { installAuthFetchInterceptor } from './utils/auth'
 
+function isAuthRoute() {
+  return ['/employee-login', '/pin-login', '/pin-setup'].includes(window.location.pathname)
+}
+
 function scheduleServiceWorkerRegistration() {
   if (!('serviceWorker' in navigator)) return
 
@@ -13,6 +17,7 @@ function scheduleServiceWorkerRegistration() {
       let refreshing = false
       navigator.serviceWorker.addEventListener('controllerchange', () => {
         if (refreshing) return
+        if (isAuthRoute()) return
         refreshing = true
         window.location.reload()
       })

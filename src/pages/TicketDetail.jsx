@@ -337,8 +337,6 @@ export default function TicketDetail() {
   const customerHistoryTicketIdRef = useRef(ticketLookupKey);
   const ticketDetailTicketIdRef = useRef(ticketLookupKey);
   const workflowHistoryTicketIdRef = useRef(ticketLookupKey);
-  const currentRole = localStorage.getItem("role") ?? "";
-  const currentEmployeeId = localStorage.getItem("employeeId") ?? "";
 
   const loadTicket = async () => {
     const requestedTicketKey = ticketLookupKey;
@@ -850,22 +848,15 @@ export default function TicketDetail() {
   const canViewCustomerHistory = hasAccess("VIEW_CUSTOMER_HISTORY");
   const canAssignTicket = hasAccess("ASSIGN_TICKET");
   const canViewCharges = hasAccess("VIEW_CHARGES");
-  const canAddCharge = ticket
-    && hasAccess("ADD_CHARGE")
-    && !["NEW", "CANCELLED"].includes(ticket.status)
-    && (["SUPER_ADMIN", "ADMIN"].includes(currentRole)
-      ? ["PICKED", "IN_PROGRESS", "COMPLETED"].includes(ticket.status)
-      : ["PICKED", "IN_PROGRESS"].includes(ticket.status)
-        && ticket?.pickedByEmployeeId
-        && currentEmployeeId
-        && String(ticket.pickedByEmployeeId) === currentEmployeeId);
-  const canDeleteCharge = hasAccess("DELETE_CHARGE") && ["SUPER_ADMIN", "ADMIN"].includes(currentRole);
+  const canAddCharge = Boolean(ticket && hasAccess("ADD_CHARGE") && !["NEW", "CANCELLED"].includes(ticket.status));
+  const canDeleteCharge = Boolean(ticket && hasAccess("DELETE_CHARGE") && !["NEW", "CANCELLED"].includes(ticket.status));
   const dynamicActions = Array.isArray(availableActions?.dynamicActions) ? availableActions.dynamicActions : [];
   const hasDynamicActions = dynamicActions.length > 0;
   const hasLoadedAvailableActions = Boolean(availableActions) && !availableActionsLoading && !availableActionsError;
   const ticketStatusLabel = ticket ? getTicketStatusLabel(ticket) : "Not available";
   const totalAmount = ticket?.totalCharge ?? chargeTotal;
   const chargesTotalAmount = showCharges ? chargeTotal : totalAmount;
+  const chargeGridColumns = canDeleteCharge ? "grid-cols-[1fr_auto_auto]" : "grid-cols-[1fr_auto]";
   const sanitizedMobileNumber = ticket?.mobileNumber ? String(ticket.mobileNumber).replace(/[^\d+]/g, "") : "";
   const customerSummaryLabel = `${ticket?.customerName || "Not available"}${ticket?.villageOrArea ? ` (${ticket.villageOrArea})` : ""}`;
   const mobileSummaryLabel = ticket?.mobileNumber || "Not available";
@@ -1147,9 +1138,10 @@ export default function TicketDetail() {
     <section className="min-w-0 rounded-2xl border border-blue-100 bg-white p-3.5 shadow-sm">
       <h2 className="text-lg font-extrabold text-blue-950">Charge Breakdown</h2>
       <div className="mt-3 overflow-hidden rounded-xl border border-blue-100">
-        <div className="grid grid-cols-[1fr_auto] bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600">
+        <div className={`grid ${chargeGridColumns} items-center gap-3 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-600`}>
           <span>Description</span>
           <span>Amount (₹)</span>
+          {canDeleteCharge && <span className="sr-only">Actions</span>}
         </div>
         {chargeLoading && <p className="px-3 py-3 text-sm font-semibold text-slate-600">Loading charges...</p>}
         {chargeError && <p className="px-3 py-3 text-sm font-semibold text-red-700">{chargeError}</p>}
@@ -1157,14 +1149,26 @@ export default function TicketDetail() {
           <p className="px-3 py-3 text-sm font-semibold text-slate-600">No charge items found.</p>
         )}
         {!chargeLoading && !chargeError && chargeItems.map((item) => (
-          <div key={item.id} className="grid min-h-11 grid-cols-[1fr_auto] items-center border-t border-blue-100 px-3 py-2 text-sm">
+          <div key={item.id} className={`grid min-h-11 ${chargeGridColumns} items-center gap-3 border-t border-blue-100 px-3 py-2 text-sm`}>
             <span className="min-w-0 break-words text-slate-900">{item.description}</span>
             <span className="font-semibold text-slate-900">{formatCompactCurrency(item.amount)}</span>
+            {canDeleteCharge && (
+              <button
+                type="button"
+                onClick={() => setPendingDeleteChargeId(item.id)}
+                disabled={processingKeys[`delete-charge-${item.id}`]}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-red-200 px-2 text-xs font-bold text-red-700 disabled:opacity-60"
+                aria-label={`Delete charge ${item.description}`}
+              >
+                <Trash2 size={15} aria-hidden="true" />
+              </button>
+            )}
           </div>
         ))}
-        <div className="grid min-h-11 grid-cols-[1fr_auto] items-center border-t border-blue-100 bg-slate-50 px-3 py-2 text-base font-extrabold text-blue-950">
+        <div className={`grid min-h-11 ${chargeGridColumns} items-center gap-3 border-t border-blue-100 bg-slate-50 px-3 py-2 text-base font-extrabold text-blue-950`}>
           <span>Total</span>
           <span>{formatCompactCurrency(chargesTotalAmount)}</span>
+          {canDeleteCharge && <span aria-hidden="true" />}
         </div>
       </div>
     </section>

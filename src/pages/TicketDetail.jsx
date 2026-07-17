@@ -1362,7 +1362,7 @@ export default function TicketDetail() {
     <div className="mt-3.5 min-w-0 space-y-3.5 pb-24 sm:pb-0">
       {renderTicketSummary()}
       {renderProblemSection()}
-      <WarrantySection ticketId={ticketId} />
+      <WarrantySection ticketId={ticketId} onTicketChanged={loadTicket} />
       {statusMessage && (
         <p className={`rounded-xl px-4 py-3 text-sm font-semibold ${statusMessage.startsWith("Unable") || statusMessage.startsWith("Please") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
           {statusMessage}

@@ -23,3 +23,16 @@ export const scheduleWarrantyVisit = (ticketId, claimId, body) => warrantyAction
 export const updateExpectedWarrantyVisit = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "visit", "PATCH", body);
 export const recordWarrantyVisit = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/record-visit", "POST", body);
 export const updateWarrantyFollowUp = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "follow-up", "PUT", body);
+export const markManufacturerRepairDone = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/manufacturer-repair-done", "POST", body);
+export const rejectWarranty = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/reject", "POST", body);
+export const recordWarrantyCustomerDecision = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/customer-decision", "POST", body);
+export const markWarrantyCustomerDidNotProceed = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/customer-did-not-proceed", "POST", body);
+export const markReplacementApproved = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/replacement-approved", "POST", body);
+export const moveWarrantyToReadyDelivery = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/move-to-ready-delivery", "POST", body);
+export const closeWarrantyClaim = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/close", "POST", body);
+export const getWarrantyReplacements = (ticketId, claimId) => warrantyAction(ticketId, claimId, "replacements", "GET");
+export const recordWarrantyReplacement = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "replacements", "POST", body);
+export const updateWarrantyReplacement = (ticketId, claimId, replacementId, body) => warrantyAction(ticketId, claimId, `replacements/${replacementId}`, "PATCH", body);
+export const supersedeWarrantyReplacement = (ticketId, claimId, replacementId, body) => warrantyAction(ticketId, claimId, `replacements/${replacementId}/supersede`, "POST", body);
+export const moveReplacementToReadyDelivery = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/move-replacement-to-ready-delivery", "POST", body);
+export const markReplacementDelivered = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/replacement-delivered", "POST", body);

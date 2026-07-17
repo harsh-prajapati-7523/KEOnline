@@ -5,6 +5,7 @@ import { createWarranty, getAssignableEmployees, getWarranty, getWarrantyEvents,
 import WarrantyActions from "./WarrantyActions";
 import WarrantyResolutionActions from "./WarrantyResolutionActions";
 import WarrantyReplacementActions from "./WarrantyReplacementActions";
+import WarrantyDocuments from "./WarrantyDocuments";
 
 const emptyForm = { billingDate:"",warrantyStartDate:"",warrantyEndDate:"",manufacturerName:"",productSerialNumber:"",modelNumber:"",manufacturerComplaintNumber:"",complaintRegisteredDate:"",expectedVisitDate:"",manufacturerEngineerName:"",manufacturerEngineerMobile:"",manufacturerServiceCenterName:"",warrantyNotes:"",nextFollowUpDate:"",warrantyOwnerEmployeeId:"",state:"DETAILS_REQUIRED" };
 const label = (value) => value ? value.replaceAll("_"," ").toLowerCase().replace(/\b\w/g,(c)=>c.toUpperCase()) : "Not provided";
@@ -16,7 +17,7 @@ function Field({labelText,name,value,onChange,type="text",disabled=false,childre
 }
 
 export default function WarrantySection({ ticketId, onTicketChanged }) {
- const canView=hasAccess("VIEW_WARRANTY"),canManage=hasAccess("MANAGE_WARRANTY"),canAssign=hasAccess("ASSIGN_TICKET"),canResolve=hasAccess("RESOLVE_WARRANTY");
+ const canView=hasAccess("VIEW_WARRANTY"),canManage=hasAccess("MANAGE_WARRANTY"),canAssign=hasAccess("ASSIGN_TICKET"),canResolve=hasAccess("RESOLVE_WARRANTY"),canManageDocuments=hasAccess("MANAGE_WARRANTY_DOCUMENTS");
  const [claim,setClaim]=useState(null),[loading,setLoading]=useState(canView),[error,setError]=useState(""),[editing,setEditing]=useState(false),[saving,setSaving]=useState(false),[form,setForm]=useState(emptyForm),[events,setEvents]=useState([]),[employees,setEmployees]=useState([]);
  const load=useCallback(async()=>{if(!canView)return;setLoading(true);setError("");try{const data=await getWarranty(ticketId);setClaim(data);setForm(formFrom(data));if(data){const history=await getWarrantyEvents(ticketId,data.id);setEvents(history?.events||[]);}}catch(e){setError(e.message||"Unable to load warranty details.");}finally{setLoading(false);}},[canView,ticketId]);
  useEffect(()=>{const timer=window.setTimeout(()=>{load();},0);return()=>window.clearTimeout(timer);},[load]);
@@ -39,6 +40,7 @@ export default function WarrantySection({ ticketId, onTicketChanged }) {
    {claim.active&&canManage&&<WarrantyActions ticketId={ticketId} claim={claim} onError={setError} onUpdated={async(data)=>{setClaim(data);await load();}}/>}
    {claim.active&&canResolve&&<WarrantyResolutionActions ticketId={ticketId} claim={claim} onError={setError} onUpdated={async(data)=>{if(data?.warranty)setClaim(data.warranty);if(data?.ticket&&onTicketChanged)await onTicketChanged();await load();}}/>}
    {(claim.activeReplacement||claim.state==="REPLACEMENT_APPROVED_AWAITING_PRODUCT")&&canResolve&&<WarrantyReplacementActions ticketId={ticketId} claim={claim} onError={setError} onUpdated={async(data)=>{if(data?.warranty)setClaim(data.warranty);else if(data)setClaim(data);if(data?.ticket&&onTicketChanged)await onTicketChanged();await load();}}/>}
+   <WarrantyDocuments ticketId={ticketId} claim={claim} canManage={canManageDocuments} onError={setError} onChanged={load}/>
    {editing&&<div className="mt-4 space-y-4 border-t border-amber-100 pt-4">
     <fieldset className="grid gap-3 sm:grid-cols-3"><legend className="mb-2 text-sm font-extrabold uppercase text-slate-500">Warranty basics</legend><Field labelText="Billing Date" name="billingDate" type="date" value={form.billingDate} onChange={change}/><Field labelText="Start Date" name="warrantyStartDate" type="date" value={form.warrantyStartDate} onChange={change}/><Field labelText="End Date" name="warrantyEndDate" type="date" value={form.warrantyEndDate} onChange={change}/><div className="text-sm"><p className="font-bold text-slate-700">Warranty State</p><p className="mt-1.5 min-h-11 rounded-xl bg-slate-100 px-3 py-3 font-semibold text-slate-700">{label(claim.state)} (action controlled)</p></div><div className="text-sm"><p className="font-bold text-slate-700">Warranty Result</p><p className="mt-1.5 min-h-11 rounded-xl bg-slate-100 px-3 py-3 font-semibold text-slate-700">{label(claim.result)} (read-only)</p></div></fieldset>
     <fieldset className="grid gap-3 sm:grid-cols-3"><legend className="mb-2 text-sm font-extrabold uppercase text-slate-500">Product identification</legend><Field labelText="Manufacturer" name="manufacturerName" value={form.manufacturerName} onChange={change}/><Field labelText="Serial Number" name="productSerialNumber" value={form.productSerialNumber} onChange={change}/><Field labelText="Model Number" name="modelNumber" value={form.modelNumber} onChange={change}/></fieldset>

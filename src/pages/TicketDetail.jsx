@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { hasAccess } from "../utils/access";
+import WarrantySection from "../components/warranty/WarrantySection";
 
 const SuggestionInput = lazy(() => import("../components/SuggestionInput"));
 
@@ -1361,6 +1362,7 @@ export default function TicketDetail() {
     <div className="mt-3.5 min-w-0 space-y-3.5 pb-24 sm:pb-0">
       {renderTicketSummary()}
       {renderProblemSection()}
+      <WarrantySection ticketId={ticketId} />
       {statusMessage && (
         <p className={`rounded-xl px-4 py-3 text-sm font-semibold ${statusMessage.startsWith("Unable") || statusMessage.startsWith("Please") ? "bg-red-50 text-red-700" : "bg-green-50 text-green-700"}`}>
           {statusMessage}

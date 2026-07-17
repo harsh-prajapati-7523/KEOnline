@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ClipboardList,
+  Bell,
   KeyRound,
   GitBranch,
   ListPlus,
@@ -18,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import KEPremiumCardBackground from "../components/KEPremiumCardBackground";
 import { clearAccess, fetchCurrentAccess, hasAnyAccess } from "../utils/access";
 import { getValidToken } from "../utils/auth";
+import { getWarrantyReminderSummary } from "../services/warrantyRemindersApi";
 
 const ROLE_LABELS = {
   SUPER_ADMIN: "Super Admin",
@@ -97,6 +99,7 @@ export default function EmployeeDashboard() {
   const navigate = useNavigate();
   const [, setAccessRefreshKey] = useState(0);
   const [accessMessage, setAccessMessage] = useState("");
+  const [reminderSummary, setReminderSummary] = useState(null);
   const employeeName = localStorage.getItem("employeeName") ?? "";
   const role = localStorage.getItem("role") ?? "";
   const roleLabel = formatRoleLabel(role);
@@ -112,6 +115,7 @@ export default function EmployeeDashboard() {
   const canManageCategoryFieldConfiguration = hasAnyAccess(["VIEW_CATEGORY_FIELD_CONFIGURATION", "MANAGE_CATEGORY_FIELD_CONFIGS"]);
   const canManageDropdownSources = hasAnyAccess(["VIEW_DROPDOWN_SOURCE_MANAGEMENT", "MANAGE_DROPDOWN_SOURCES"]);
   const canGenerateBulkLabels = role === "SUPER_ADMIN";
+  const canViewWarrantyReminders = hasAnyAccess(["VIEW_WARRANTY_REMINDERS"]);
   const hasAdminActions = canManageEmployees || canManageRoles || canManageRoleAccess || canManageWorkflow
     || canManageTicketCategories || canManageTicketFields || canManageCategoryFieldConfiguration || canManageDropdownSources || canGenerateBulkLabels;
 
@@ -136,6 +140,13 @@ export default function EmployeeDashboard() {
       isCurrent = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!canViewWarrantyReminders) return undefined;
+    let current = true;
+    getWarrantyReminderSummary().then((value) => current && setReminderSummary(value)).catch(() => current && setReminderSummary(null));
+    return () => { current = false; };
+  }, [canViewWarrantyReminders]);
 
   return (
     <main id="main-content" className="ke-page-main dashboard-page lg:px-8">
@@ -162,6 +173,15 @@ export default function EmployeeDashboard() {
         </header>
 
         <section className="mt-4 sm:mt-6" aria-label="Dashboard work areas">
+          {canViewWarrantyReminders && (
+            <div className="mb-4 rounded-2xl border border-amber-200 bg-white p-4 shadow-sm sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3"><span className="rounded-xl bg-amber-100 p-2 text-amber-800"><Bell size={20}/></span><div><h2 className="font-extrabold text-blue-950">Warranty reminders</h2><p className="text-xs font-semibold text-gray-600">Today&apos;s internal warranty workload</p></div></div>
+                <div className="flex gap-3 text-center">{[["Open",reminderSummary?.assignedOpenReminders],["Overdue",reminderSummary?.assignedOverdueReminders],["Critical",reminderSummary?.criticalReminders],["Due",reminderSummary?.dueToday]].map(([label,value])=><div key={label}><strong className="block text-lg text-blue-950">{value ?? "—"}</strong><span className="text-[0.7rem] font-bold text-gray-500">{label}</span></div>)}</div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2"><button onClick={()=>navigate("/warranty/reminders")} className="min-h-10 rounded-xl bg-blue-950 px-4 text-sm font-bold text-white">View Reminders</button>{hasAnyAccess(["VIEW_WARRANTY_TRACKER"])&&<button onClick={()=>navigate("/warranty")} className="min-h-10 rounded-xl border border-blue-950 px-4 text-sm font-bold text-blue-950">Open Warranty Tracker</button>}</div>
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {canCreateTicket && (
               <DashboardAction icon={PlusCircle} tone="yellow" onClick={() => navigate("/tickets/new")}>

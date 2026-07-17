@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BrowserRouter, Navigate, Routes, Route, useNavigate, useLocation } from "react-router-dom";
-import { Download, Home, LayoutDashboard, ListChecks, Lock, LogIn, PlusCircle, QrCode, X } from "lucide-react";
+import { BarChart3, Bell, Download, Home, LayoutDashboard, ListChecks, Lock, LogIn, PlusCircle, QrCode, ShieldCheck, X } from "lucide-react";
 import EmployeeLogin from "./pages/EmployeeLogin";
 import PinLogin from "./pages/PinLogin";
 import PinSetup from "./pages/PinSetup";
@@ -28,6 +28,9 @@ const CreateTicket = lazy(() => import("./pages/CreateTicket"));
 const ScanTicketQr = lazy(() => import("./pages/ScanTicketQr"));
 const MyTickets = lazy(() => import("./pages/MyTickets"));
 const OpenTicket = lazy(() => import("./pages/OpenTicket"));
+const WarrantyTracker = lazy(() => import("./pages/WarrantyTracker"));
+const WarrantyReports = lazy(() => import("./pages/WarrantyReports"));
+const WarrantyReminders = lazy(() => import("./pages/WarrantyReminders"));
 
 let ticketListImportPromise;
 function loadTicketList() {
@@ -273,6 +276,9 @@ function Navbar() {
   const isDashboard = active === "/employee-dashboard";
   const isAuthenticated = Boolean(getValidToken());
   const employeeName = localStorage.getItem("employeeName") ?? "";
+  const canViewWarrantyTracker = hasAnyAccess(["VIEW_WARRANTY_TRACKER"]);
+  const canViewWarrantyReports = hasAnyAccess(["VIEW_WARRANTY_REPORTS"]);
+  const canViewWarrantyReminders = hasAnyAccess(["VIEW_WARRANTY_REMINDERS"]);
 
   const logout = async () => {
     await logoutSession();
@@ -321,6 +327,9 @@ function Navbar() {
                 <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets/find")} className={buttonClassName(active.startsWith("/tickets"))} aria-label="Find Tickets">
                   <ListChecks size={18} aria-hidden="true" /> Find Tickets
                 </button>
+                {canViewWarrantyTracker&&<button type="button" onClick={()=>navigate("/warranty")} className={buttonClassName(active==="/warranty")} aria-label="Warranty Tracker"><ShieldCheck size={18}/> Warranty</button>}
+                {canViewWarrantyReports&&<button type="button" onClick={()=>navigate("/warranty/reports")} className={buttonClassName(active==="/warranty/reports")} aria-label="Warranty Reports"><BarChart3 size={18}/> Reports</button>}
+                {canViewWarrantyReminders&&<button type="button" onClick={()=>navigate("/warranty/reminders")} className={buttonClassName(active==="/warranty/reminders")} aria-label="Warranty Reminders"><Bell size={18}/> Reminders</button>}
                 <button type="button" onClick={logout} className="flex min-h-11 min-w-0 items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-semibold transition hover:bg-white/20 sm:px-4 sm:text-base" aria-label="Logout">
                   Logout
                 </button>
@@ -352,6 +361,7 @@ function AuthenticatedBottomNav() {
 
   const canCreateTicket = hasAnyAccess(["CREATE_TICKET"]);
   const canViewTickets = hasAnyAccess(["VIEW_TICKETS"]);
+  const canViewWarrantyTracker = hasAnyAccess(["VIEW_WARRANTY_TRACKER"]);
 
   const lockApp = () => {
     clearAccessSession();
@@ -381,6 +391,7 @@ function AuthenticatedBottomNav() {
             Scan
           </button>
         )}
+        {canViewWarrantyTracker&&<button type="button" onClick={()=>navigate("/warranty")} className={itemClassName(active==="/warranty")} aria-label="Warranty Tracker"><ShieldCheck size={17}/>Warranty</button>}
         {canViewTickets && (
           <button type="button" onPointerEnter={preloadTicketList} onFocus={preloadTicketList} onClick={() => navigate("/tickets/find")} className={itemClassName(active === "/tickets/find" || active === "/tickets")} aria-label="Find Tickets">
             <ListChecks size={17} aria-hidden="true" />
@@ -527,6 +538,9 @@ function AppRoutes() {
               <CreateTicket />
             </ProtectedRoute>
           }/>
+          <Route path="/warranty" element={<ProtectedRoute accessKey="VIEW_WARRANTY_TRACKER"><WarrantyTracker/></ProtectedRoute>}/>
+          <Route path="/warranty/reports" element={<ProtectedRoute accessKey="VIEW_WARRANTY_REPORTS"><WarrantyReports/></ProtectedRoute>}/>
+          <Route path="/warranty/reminders" element={<ProtectedRoute accessKey="VIEW_WARRANTY_REMINDERS"><WarrantyReminders/></ProtectedRoute>}/>
           <Route path="/tickets/scan" element={
             <ProtectedRoute accessKey="VIEW_TICKETS">
               <ScanTicketQr />

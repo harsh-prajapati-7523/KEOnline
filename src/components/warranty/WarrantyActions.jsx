@@ -1,23 +1,426 @@
 import { useState } from "react";
-import { markComplaintRegistrationPending, recordWarrantyVisit, registerWarrantyComplaint, scheduleWarrantyVisit, updateExpectedWarrantyVisit, updateWarrantyFollowUp } from "../../services/warrantyApi";
-const today=()=>new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Kolkata"});
-const initial={attemptDate:today(),contactMethod:"PHONE",notes:"",nextFollowUpDate:"",manufacturerComplaintNumber:"",complaintRegisteredDate:today(),expectedVisitDate:"",engineerName:"",engineerMobile:"",serviceCenterName:"",visitNotes:"",changeReason:"",actualVisitDate:today(),visitOutcome:"INSPECTION_COMPLETED",followUpNotes:"",billDocumentOverrideReason:""};
-const actionLabel={pending:"Mark Complaint Registration Pending",register:"Register Manufacturer Complaint",schedule:"Schedule Manufacturer Visit",updateVisit:"Update Expected Visit",recordVisit:"Record Manufacturer Visit",followUp:"Schedule / Update Follow-up"};
-const optionLabel=value=>value.replaceAll("_"," ").toLowerCase().replace(/\b\w/g,letter=>letter.toUpperCase());
-function Input({label,name,value,onChange,type="text",error,inputMode,required=false}){const id=`${name}-action-error`;return <label className="block text-sm font-bold text-slate-700">{label}<input className={`mt-1 min-h-11 w-full rounded-xl border px-3 text-base ${error?"border-red-500":"border-slate-300"}`} name={name} value={value} onChange={onChange} type={type} inputMode={inputMode} required={required} aria-invalid={Boolean(error)} aria-describedby={error?id:undefined}/>{error&&<span id={id} className="mt-1 block text-sm font-bold text-red-700">{error}</span>}</label>}
-export default function WarrantyActions({ticketId,claim,onUpdated,onError,forcedAction=""}){
- const [action,setAction]=useState(forcedAction),[form,setForm]=useState({...initial,expectedVisitDate:claim.expectedVisitDate||"",nextFollowUpDate:claim.nextFollowUpDate||"",engineerName:claim.manufacturerEngineerName||"",engineerMobile:claim.manufacturerEngineerMobile||"",serviceCenterName:claim.manufacturerServiceCenterName||""}),[saving,setSaving]=useState(false); const change=(e)=>setForm((v)=>({...v,[e.target.name]:e.target.value}));
- const complaintRegistered=Boolean(claim.manufacturerComplaintNumber&&claim.complaintRegisteredDate),visitComplete=claim.state==="VISIT_COMPLETED_AWAITING_RESULT"; const detailsReady=Boolean(claim.manufacturerName&&(claim.productSerialNumber||claim.modelNumber));
- const choices=[];if(detailsReady&&!complaintRegistered){choices.push("pending","register");}if(complaintRegistered&&!visitComplete){if(!claim.expectedVisitDate)choices.push("schedule");else choices.push("updateVisit","recordVisit");choices.push("followUp");}if(claim.state==="COMPLAINT_REGISTRATION_PENDING")choices.push("followUp");
- const submit=async(e)=>{e.preventDefault();if(saving)return;setSaving(true);onError("");try{let data;const version=claim.version;if(action==="pending")data=await markComplaintRegistrationPending(ticketId,claim.id,{attemptDate:form.attemptDate,contactMethod:form.contactMethod,notes:form.notes,nextFollowUpDate:form.nextFollowUpDate,version});if(action==="register")data=await registerWarrantyComplaint(ticketId,claim.id,{manufacturerComplaintNumber:form.manufacturerComplaintNumber,complaintRegisteredDate:form.complaintRegisteredDate,expectedVisitDate:form.expectedVisitDate||null,nextFollowUpDate:form.nextFollowUpDate||null,billDocumentOverrideReason:form.billDocumentOverrideReason||null,version});if(action==="schedule")data=await scheduleWarrantyVisit(ticketId,claim.id,{expectedVisitDate:form.expectedVisitDate,engineerName:form.engineerName||null,engineerMobile:form.engineerMobile||null,serviceCenterName:form.serviceCenterName||null,visitNotes:form.visitNotes||null,nextFollowUpDate:form.nextFollowUpDate||null,version});if(action==="updateVisit")data=await updateExpectedWarrantyVisit(ticketId,claim.id,{expectedVisitDate:form.expectedVisitDate,changeReason:form.changeReason,version});if(action==="recordVisit")data=await recordWarrantyVisit(ticketId,claim.id,{actualVisitDate:form.actualVisitDate,visitOutcome:form.visitOutcome,visitNotes:form.visitNotes,engineerName:form.engineerName||null,engineerMobile:form.engineerMobile||null,serviceCenterName:form.serviceCenterName||null,nextFollowUpDate:form.nextFollowUpDate||null,version});if(action==="followUp")data=await updateWarrantyFollowUp(ticketId,claim.id,{nextFollowUpDate:form.nextFollowUpDate||null,followUpNotes:form.followUpNotes,version});setAction("");setForm(initial);await onUpdated(data);}catch(error){onError(error.status===409?"This warranty case was updated by another user. Refresh and review the latest details before continuing.":error.message);}finally{setSaving(false);}};
- if(visitComplete&&!forcedAction)return <p className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-800">Manufacturer visit completed — result action will be available in the next warranty phase.</p>;
- return <div className={forcedAction?"":"mt-4 border-t border-amber-100 pt-3"}>{!forcedAction&&<><p className="text-sm font-extrabold text-blue-950">Warranty actions</p><div className="mt-2 flex flex-wrap gap-2">{[...new Set(choices)].map((key)=><button key={key} type="button" onClick={()=>{setAction(key);setForm({...initial,expectedVisitDate:claim.expectedVisitDate||"",nextFollowUpDate:claim.nextFollowUpDate||"",engineerName:claim.manufacturerEngineerName||"",engineerMobile:claim.manufacturerEngineerMobile||"",serviceCenterName:claim.manufacturerServiceCenterName||""});}} className="min-h-10 rounded-xl border border-blue-200 px-3 text-sm font-bold text-blue-950">{actionLabel[key]}</button>)}</div></>}
- {action&&<form onSubmit={submit} className="mt-3 grid gap-3 rounded-xl bg-amber-50 p-3 sm:grid-cols-2">
-  {action==="pending"&&<><Input label="Attempt Date" name="attemptDate" type="date" value={form.attemptDate} onChange={change} required/><label className="text-sm font-bold text-slate-700">Contact Method<select name="contactMethod" value={form.contactMethod} onChange={change} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3">{["PHONE","WHATSAPP","EMAIL","SERVICE_CENTER_VISIT","MANUFACTURER_PORTAL","OTHER"].map((v)=><option key={v} value={v}>{optionLabel(v)}</option>)}</select></label><Input label="Attempt Notes" name="notes" value={form.notes} onChange={change} required/><Input label="Next Follow-up" name="nextFollowUpDate" type="date" value={form.nextFollowUpDate} onChange={change} required/></>}
-  {action==="register"&&<><Input label="Complaint Number" name="manufacturerComplaintNumber" value={form.manufacturerComplaintNumber} onChange={change} required/><Input label="Registered Date" name="complaintRegisteredDate" type="date" value={form.complaintRegisteredDate} onChange={change} required/><Input label="Expected Visit (optional)" name="expectedVisitDate" type="date" value={form.expectedVisitDate} onChange={change}/><Input label="Next Follow-up (optional with visit)" name="nextFollowUpDate" type="date" value={form.nextFollowUpDate} onChange={change}/><Input label="Purchase bill override reason (authorized use only)" name="billDocumentOverrideReason" value={form.billDocumentOverrideReason} onChange={change}/></>}
-  {(action==="schedule"||action==="updateVisit")&&<><Input label="Expected Visit Date" name="expectedVisitDate" type="date" value={form.expectedVisitDate} onChange={change} required/>{action==="updateVisit"?<Input label="Change Reason" name="changeReason" value={form.changeReason} onChange={change} required/>:<><Input label="Engineer Name" name="engineerName" value={form.engineerName} onChange={change}/><Input label="Engineer Mobile" name="engineerMobile" value={form.engineerMobile} onChange={change}/><Input label="Service Center" name="serviceCenterName" value={form.serviceCenterName} onChange={change}/><Input label="Visit Notes" name="visitNotes" value={form.visitNotes} onChange={change}/><Input label="Next Follow-up (optional)" name="nextFollowUpDate" type="date" value={form.nextFollowUpDate} onChange={change}/></>}</>}
-  {action==="recordVisit"&&<><Input label="Actual Visit Date" name="actualVisitDate" type="date" value={form.actualVisitDate} onChange={change} required/><label className="text-sm font-bold text-slate-700">Visit Outcome<select name="visitOutcome" value={form.visitOutcome} onChange={change} className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3">{["INSPECTION_COMPLETED","REPAIR_ATTEMPTED","PART_REQUIRED","PRODUCT_TAKEN_TO_SERVICE_CENTER","FOLLOW_UP_REQUIRED","NO_ACTION_TAKEN","ENGINEER_DID_NOT_VISIT","OTHER"].map((v)=><option key={v} value={v}>{optionLabel(v)}</option>)}</select></label><Input label="Visit Notes" name="visitNotes" value={form.visitNotes} onChange={change} required/><Input label="Next Follow-up (optional)" name="nextFollowUpDate" type="date" value={form.nextFollowUpDate} onChange={change}/></>}
-  {action==="followUp"&&<><Input label="Next Follow-up (leave blank to clear)" name="nextFollowUpDate" type="date" value={form.nextFollowUpDate} onChange={change}/><Input label="Follow-up Notes" name="followUpNotes" value={form.followUpNotes} onChange={change} required/></>}
-  <div className={`grid gap-2 sm:col-span-2 ${forcedAction?"grid-cols-1":"grid-cols-2"}`}>{!forcedAction&&<button type="button" onClick={()=>setAction("")} disabled={saving} className="min-h-11 rounded-xl border border-blue-950 font-bold text-blue-950">Cancel</button>}<button disabled={saving} className="ke-primary-action min-h-11 rounded-xl font-bold disabled:opacity-60">{saving?"Saving warranty action…":actionLabel[action]}</button></div>
- </form>}</div>;
+import {
+  markComplaintRegistrationPending,
+  recordWarrantyVisit,
+  registerWarrantyComplaint,
+  scheduleWarrantyVisit,
+  updateExpectedWarrantyVisit,
+  updateWarrantyFollowUp,
+} from "../../services/warrantyApi";
+const today = () =>
+  new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+const initial = {
+  attemptDate: today(),
+  contactMethod: "PHONE",
+  notes: "",
+  nextFollowUpDate: "",
+  manufacturerComplaintNumber: "",
+  expectedVisitDate: "",
+  engineerName: "",
+  engineerMobile: "",
+  serviceCenterName: "",
+  visitNotes: "",
+  changeReason: "",
+  actualVisitDate: today(),
+  visitOutcome: "INSPECTION_COMPLETED",
+  followUpNotes: "",
+};
+const actionLabel = {
+  pending: "Mark Complaint Registration Pending",
+  register: "Register Manufacturer Complaint",
+  schedule: "Schedule Manufacturer Visit",
+  updateVisit: "Update Expected Visit",
+  recordVisit: "Record Manufacturer Visit",
+  followUp: "Schedule / Update Follow-up",
+};
+const optionLabel = (value) =>
+  value
+    .replaceAll("_", " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+function Input({
+  label,
+  name,
+  value,
+  onChange,
+  type = "text",
+  error,
+  inputMode,
+  required = false,
+}) {
+  const id = `${name}-action-error`;
+  return (
+    <label className="block text-sm font-bold text-slate-700">
+      {label}
+      <input
+        className={`mt-1 min-h-11 w-full rounded-xl border px-3 text-base ${error ? "border-red-500" : "border-slate-300"}`}
+        name={name}
+        value={value}
+        onChange={onChange}
+        type={type}
+        inputMode={inputMode}
+        required={required}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? id : undefined}
+      />
+      {error && (
+        <span id={id} className="mt-1 block text-sm font-bold text-red-700">
+          {error}
+        </span>
+      )}
+    </label>
+  );
+}
+export default function WarrantyActions({
+  ticketId,
+  claim,
+  onUpdated,
+  onError,
+  forcedAction = "",
+}) {
+  const [action, setAction] = useState(forcedAction),
+    [form, setForm] = useState({
+      ...initial,
+      expectedVisitDate: claim.expectedVisitDate || "",
+      nextFollowUpDate: claim.nextFollowUpDate || "",
+      engineerName: claim.manufacturerEngineerName || "",
+      engineerMobile: claim.manufacturerEngineerMobile || "",
+      serviceCenterName: claim.manufacturerServiceCenterName || "",
+    }),
+    [saving, setSaving] = useState(false);
+  const change = (e) =>
+    setForm((v) => ({ ...v, [e.target.name]: e.target.value }));
+  const complaintRegistered = Boolean(claim.complaintRegisteredDate),
+    visitComplete = claim.state === "VISIT_COMPLETED_AWAITING_RESULT";
+  const detailsReady = Boolean(
+    claim.manufacturerName && (claim.productSerialNumber || claim.modelNumber),
+  );
+  const choices = [];
+  if (detailsReady && !complaintRegistered) {
+    choices.push("pending", "register");
+  }
+  if (complaintRegistered && !visitComplete) {
+    if (!claim.expectedVisitDate) choices.push("schedule");
+    else choices.push("updateVisit", "recordVisit");
+    choices.push("followUp");
+  }
+  if (claim.state === "COMPLAINT_REGISTRATION_PENDING")
+    choices.push("followUp");
+  const submit = async (e) => {
+    e.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    onError("");
+    try {
+      let data;
+      const version = claim.version;
+      if (action === "pending")
+        data = await markComplaintRegistrationPending(ticketId, claim.id, {
+          attemptDate: form.attemptDate,
+          contactMethod: form.contactMethod,
+          notes: form.notes,
+          nextFollowUpDate: form.nextFollowUpDate,
+          version,
+        });
+      if (action === "register")
+        data = await registerWarrantyComplaint(ticketId, claim.id, {
+          manufacturerComplaintNumber: form.manufacturerComplaintNumber || null,
+          version,
+        });
+      if (action === "schedule")
+        data = await scheduleWarrantyVisit(ticketId, claim.id, {
+          expectedVisitDate: form.expectedVisitDate,
+          engineerName: form.engineerName || null,
+          engineerMobile: form.engineerMobile || null,
+          serviceCenterName: form.serviceCenterName || null,
+          visitNotes: form.visitNotes || null,
+          nextFollowUpDate: form.nextFollowUpDate || null,
+          version,
+        });
+      if (action === "updateVisit")
+        data = await updateExpectedWarrantyVisit(ticketId, claim.id, {
+          expectedVisitDate: form.expectedVisitDate,
+          changeReason: form.changeReason,
+          version,
+        });
+      if (action === "recordVisit")
+        data = await recordWarrantyVisit(ticketId, claim.id, {
+          actualVisitDate: form.actualVisitDate,
+          visitOutcome: form.visitOutcome,
+          visitNotes: form.visitNotes,
+          engineerName: form.engineerName || null,
+          engineerMobile: form.engineerMobile || null,
+          serviceCenterName: form.serviceCenterName || null,
+          nextFollowUpDate: form.nextFollowUpDate || null,
+          version,
+        });
+      if (action === "followUp")
+        data = await updateWarrantyFollowUp(ticketId, claim.id, {
+          nextFollowUpDate: form.nextFollowUpDate || null,
+          followUpNotes: form.followUpNotes,
+          version,
+        });
+      setAction("");
+      setForm(initial);
+      await onUpdated(data);
+    } catch (error) {
+      onError(
+        error.status === 409
+          ? "This warranty case was updated by another user. Refresh and review the latest details before continuing."
+          : error.message,
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+  if (visitComplete && !forcedAction)
+    return (
+      <p className="mt-3 rounded-xl bg-violet-50 px-3 py-2 text-sm font-bold text-violet-800">
+        Manufacturer visit completed — result action will be available in the
+        next warranty phase.
+      </p>
+    );
+  return (
+    <div className={forcedAction ? "" : "mt-4 border-t border-amber-100 pt-3"}>
+      {!forcedAction && (
+        <>
+          <p className="text-sm font-extrabold text-blue-950">
+            Warranty actions
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {[...new Set(choices)].map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => {
+                  setAction(key);
+                  setForm({
+                    ...initial,
+                    expectedVisitDate: claim.expectedVisitDate || "",
+                    nextFollowUpDate: claim.nextFollowUpDate || "",
+                    engineerName: claim.manufacturerEngineerName || "",
+                    engineerMobile: claim.manufacturerEngineerMobile || "",
+                    serviceCenterName:
+                      claim.manufacturerServiceCenterName || "",
+                  });
+                }}
+                className="min-h-10 rounded-xl border border-blue-200 px-3 text-sm font-bold text-blue-950"
+              >
+                {actionLabel[key]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {action && (
+        <form
+          onSubmit={submit}
+          className="mt-3 grid gap-3 rounded-xl bg-amber-50 p-3 sm:grid-cols-2"
+        >
+          {action === "pending" && (
+            <>
+              <Input
+                label="Attempt Date"
+                name="attemptDate"
+                type="date"
+                value={form.attemptDate}
+                onChange={change}
+                required
+              />
+              <label className="text-sm font-bold text-slate-700">
+                Contact Method
+                <select
+                  name="contactMethod"
+                  value={form.contactMethod}
+                  onChange={change}
+                  className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3"
+                >
+                  {[
+                    "PHONE",
+                    "WHATSAPP",
+                    "EMAIL",
+                    "SERVICE_CENTER_VISIT",
+                    "MANUFACTURER_PORTAL",
+                    "OTHER",
+                  ].map((v) => (
+                    <option key={v} value={v}>
+                      {optionLabel(v)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Input
+                label="Attempt Notes"
+                name="notes"
+                value={form.notes}
+                onChange={change}
+                required
+              />
+              <Input
+                label="Next Follow-up"
+                name="nextFollowUpDate"
+                type="date"
+                value={form.nextFollowUpDate}
+                onChange={change}
+                required
+              />
+            </>
+          )}
+          {action === "register" && (
+            <>
+              <Input
+                label="Complaint Number (optional)"
+                name="manufacturerComplaintNumber"
+                value={form.manufacturerComplaintNumber}
+                onChange={change}
+              />
+            </>
+          )}
+          {(action === "schedule" || action === "updateVisit") && (
+            <>
+              <Input
+                label="Expected Visit Date"
+                name="expectedVisitDate"
+                type="date"
+                value={form.expectedVisitDate}
+                onChange={change}
+                required
+              />
+              {action === "updateVisit" ? (
+                <Input
+                  label="Change Reason"
+                  name="changeReason"
+                  value={form.changeReason}
+                  onChange={change}
+                  required
+                />
+              ) : (
+                <>
+                  <Input
+                    label="Engineer Name"
+                    name="engineerName"
+                    value={form.engineerName}
+                    onChange={change}
+                  />
+                  <Input
+                    label="Engineer Mobile"
+                    name="engineerMobile"
+                    value={form.engineerMobile}
+                    onChange={change}
+                  />
+                  <Input
+                    label="Service Center"
+                    name="serviceCenterName"
+                    value={form.serviceCenterName}
+                    onChange={change}
+                  />
+                  <Input
+                    label="Visit Notes"
+                    name="visitNotes"
+                    value={form.visitNotes}
+                    onChange={change}
+                  />
+                  <Input
+                    label="Next Follow-up (optional)"
+                    name="nextFollowUpDate"
+                    type="date"
+                    value={form.nextFollowUpDate}
+                    onChange={change}
+                  />
+                </>
+              )}
+            </>
+          )}
+          {action === "recordVisit" && (
+            <>
+              <Input
+                label="Actual Visit Date"
+                name="actualVisitDate"
+                type="date"
+                value={form.actualVisitDate}
+                onChange={change}
+                required
+              />
+              <label className="text-sm font-bold text-slate-700">
+                Visit Outcome
+                <select
+                  name="visitOutcome"
+                  value={form.visitOutcome}
+                  onChange={change}
+                  className="mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3"
+                >
+                  {[
+                    "INSPECTION_COMPLETED",
+                    "REPAIR_ATTEMPTED",
+                    "PART_REQUIRED",
+                    "PRODUCT_TAKEN_TO_SERVICE_CENTER",
+                    "FOLLOW_UP_REQUIRED",
+                    "NO_ACTION_TAKEN",
+                    "ENGINEER_DID_NOT_VISIT",
+                    "OTHER",
+                  ].map((v) => (
+                    <option key={v} value={v}>
+                      {optionLabel(v)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Input
+                label="Visit Notes"
+                name="visitNotes"
+                value={form.visitNotes}
+                onChange={change}
+                required
+              />
+              <Input
+                label="Next Follow-up (optional)"
+                name="nextFollowUpDate"
+                type="date"
+                value={form.nextFollowUpDate}
+                onChange={change}
+              />
+            </>
+          )}
+          {action === "followUp" && (
+            <>
+              <Input
+                label="Next Follow-up (leave blank to clear)"
+                name="nextFollowUpDate"
+                type="date"
+                value={form.nextFollowUpDate}
+                onChange={change}
+              />
+              <Input
+                label="Follow-up Notes"
+                name="followUpNotes"
+                value={form.followUpNotes}
+                onChange={change}
+                required
+              />
+            </>
+          )}
+          <div
+            className={`grid gap-2 sm:col-span-2 ${forcedAction ? "grid-cols-1" : "grid-cols-2"}`}
+          >
+            {!forcedAction && (
+              <button
+                type="button"
+                onClick={() => setAction("")}
+                disabled={saving}
+                className="min-h-11 rounded-xl border border-blue-950 font-bold text-blue-950"
+              >
+                Cancel
+              </button>
+            )}
+            <button
+              disabled={saving}
+              className="ke-primary-action min-h-11 rounded-xl font-bold disabled:opacity-60"
+            >
+              {saving ? "Saving warranty action…" : actionLabel[action]}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
 }

@@ -263,7 +263,7 @@ export function DetailAccordion({ id, title, open, children }) {
 }
 export function WarrantyDetails({ claim, currentSection }) {
   const hasComplaint =
-    claim.manufacturerComplaintNumber || claim.complaintRegistrationAttemptDate;
+    claim.complaintRegisteredDate || claim.complaintRegistrationAttemptDate;
   const hasVisit =
     claim.expectedVisitDate || claim.actualVisitDate || claim.nextFollowUpDate;
   const hasResolution =

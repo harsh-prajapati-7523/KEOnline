@@ -42,7 +42,7 @@ function actionGroups(claim, permissions, primaryKey) {
         ? "Update or clear follow-up"
         : "Schedule follow-up",
     );
-    if (claim.manufacturerComplaintNumber)
+    if (claim.complaintRegisteredDate)
       add(
         "Scheduling & Follow-up",
         "update-visit",

@@ -25,7 +25,6 @@ export const RESULT_LABELS = {
 };
 
 const registry = {
-  ASSIGN_WARRANTY_OWNER: ["assign-owner", "Assign warranty owner", "Choose the person responsible for moving this claim forward.", "ASSIGN_TICKET"],
   COMPLETE_WARRANTY_DETAILS: ["edit-details", "Complete warranty details", "Add the manufacturer and product identification needed to continue.", "MANAGE_WARRANTY"],
   REGISTER_MANUFACTURER_COMPLAINT: ["register-complaint", "Register manufacturer complaint", "Record the complaint number and the next expected step.", "MANAGE_WARRANTY"],
   FOLLOW_UP_COMPLAINT_REGISTRATION: ["follow-up", "Follow up for complaint number", "Contact the manufacturer and record the next follow-up.", "MANAGE_WARRANTY"],
@@ -62,7 +61,7 @@ export function journeyFor(claim) {
   const stages = [done("Claim Setup", "UPCOMING"), done("Complaint", "UPCOMING"), done("Manufacturer Visit", "UPCOMING"), done("Resolution", "UPCOMING"), done("Delivery", "UPCOMING")];
   const state = claim.state;
   const pending = claim.pendingAction;
-  const setupComplete = Boolean(claim.warrantyOwner && claim.manufacturerName && (claim.productSerialNumber || claim.modelNumber));
+  const setupComplete = Boolean(claim.manufacturerName && (claim.productSerialNumber || claim.modelNumber));
   stages[0].status = setupComplete ? "COMPLETED" : pending?.blocking ? "BLOCKED" : "CURRENT";
   if (!setupComplete) return stages;
   const complaintComplete = Boolean(claim.manufacturerComplaintNumber && claim.complaintRegisteredDate);
@@ -89,11 +88,10 @@ export function detailSectionFor(claim) {
   if (code.includes("VISIT") || code.includes("FOLLOW_UP_MANUFACTURER")) return "visit";
   if (code.includes("REPLACEMENT")) return "replacement";
   if (["RECORD_WARRANTY_RESULT", "RECORD_CUSTOMER_DECISION", "CLOSE_WARRANTY_CLAIM", "MOVE_TO_READY_DELIVERY"].includes(code)) return "resolution";
-  return code === "ASSIGN_WARRANTY_OWNER" || code === "COMPLETE_WARRANTY_DETAILS" ? "basics" : "visit";
+  return code === "COMPLETE_WARRANTY_DETAILS" ? "basics" : "visit";
 }
 
 const reasonCopy = {
-  WARRANTY_OWNER_MISSING: "Assign a warranty owner before continuing.",
   MANUFACTURER_MISSING: "Manufacturer information is required.",
   PRODUCT_IDENTIFICATION_MISSING: "Add a product serial number or model.",
   EXPECTED_VISIT_OVERDUE: "The manufacturer visit is overdue.",

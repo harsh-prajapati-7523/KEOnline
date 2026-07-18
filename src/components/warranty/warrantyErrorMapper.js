@@ -1,6 +1,5 @@
 const known=[
   [/updated by another|stale|version/i,"This warranty record changed while you were editing."],
-  [/owner.*required/i,"Assign a person responsible before continuing."],
   [/complaint.*number.*required/i,"Enter the manufacturer complaint number."],
   [/expected visit.*required/i,"Choose when the manufacturer engineer is expected."],
   [/follow-up.*future|next follow-up.*future/i,"Choose today or a future follow-up date."],

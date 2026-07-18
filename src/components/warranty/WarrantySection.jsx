@@ -1,47 +1,400 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ShieldCheck } from "lucide-react";
 import { hasAccess } from "../../utils/access";
-import { createWarranty, getWarranty, getWarrantyDocumentSummary } from "../../services/warrantyApi";
+import {
+  createWarranty,
+  getWarranty,
+  getWarrantyDocumentSummary,
+} from "../../services/warrantyApi";
 import WarrantyActionHost from "./WarrantyActionHost";
 import WarrantyRecentActivity from "./WarrantyRecentActivity";
-import { buildAlerts, detailSectionFor, pendingPresentation } from "./warrantyPresentation";
-import { WarrantyAlerts, WarrantyDetails, WarrantyDocumentsSummary, WarrantyHeader, WarrantyJourney, WarrantyMoreActions, WarrantyPrimaryActionCard } from "./WarrantyGuidedViews";
+import {
+  buildAlerts,
+  detailSectionFor,
+  pendingPresentation,
+} from "./warrantyPresentation";
+import {
+  WarrantyAlerts,
+  WarrantyDetails,
+  WarrantyDocumentsSummary,
+  WarrantyHeader,
+  WarrantyJourney,
+  WarrantyMoreActions,
+  WarrantyPrimaryActionCard,
+} from "./WarrantyGuidedViews";
 
-function actionGroups(claim, permissions, primaryKey){
- const actions=[];
- const add=(group,key,label,danger=false)=>{if(key!==primaryKey)actions.push({group,key,label,danger});};
- if(claim.active&&permissions.manage){add("Edit Information","edit-details","Edit warranty details");add("Scheduling & Follow-up","complaint-pending","Mark complaint registration pending");add("Scheduling & Follow-up","follow-up",claim.nextFollowUpDate?"Update or clear follow-up":"Schedule follow-up");if(claim.manufacturerComplaintNumber)add("Scheduling & Follow-up","update-visit","Update engineer visit date");}
- if(claim.active&&permissions.assign)add("Ownership","assign-owner","Change person responsible");
- if(permissions.documents)add("Documents","manage-documents","Upload or manage documents");
- if(claim.active&&permissions.resolve&&["VISIT_COMPLETED_AWAITING_RESULT","AWAITING_RESULT"].includes(claim.state)){add("Resolution","record-result","Record warranty outcome");}
- if(claim.active&&permissions.resolve&&claim.activeReplacement){add("Edit Information","edit-replacement","Edit replacement details");add("Administrative","supersede-replacement","Correct replacement record",true);}
- if(claim.active&&permissions.resolve&&claim.result!=="PENDING")add("Administrative","close-claim","Close warranty process",true);
- const order=["Edit Information","Scheduling & Follow-up","Ownership","Documents","Resolution","Administrative"];
- return order.map(label=>({label,danger:label==="Administrative",actions:actions.filter(a=>a.group===label)}));
+function actionGroups(claim, permissions, primaryKey) {
+  const actions = [];
+  const add = (group, key, label, danger = false) => {
+    if (key !== primaryKey) actions.push({ group, key, label, danger });
+  };
+  if (claim.active && permissions.manage) {
+    add("Edit Information", "edit-details", "Edit warranty details");
+    add(
+      "Scheduling & Follow-up",
+      "complaint-pending",
+      "Mark complaint registration pending",
+    );
+    add(
+      "Scheduling & Follow-up",
+      "follow-up",
+      claim.nextFollowUpDate
+        ? "Update or clear follow-up"
+        : "Schedule follow-up",
+    );
+    if (claim.manufacturerComplaintNumber)
+      add(
+        "Scheduling & Follow-up",
+        "update-visit",
+        "Update engineer visit date",
+      );
+  }
+  if (permissions.documents)
+    add("Documents", "manage-documents", "Upload or manage documents");
+  if (
+    claim.active &&
+    permissions.resolve &&
+    ["VISIT_COMPLETED_AWAITING_RESULT", "AWAITING_RESULT"].includes(claim.state)
+  ) {
+    add("Resolution", "record-result", "Record warranty outcome");
+  }
+  if (claim.active && permissions.resolve && claim.activeReplacement) {
+    add("Edit Information", "edit-replacement", "Edit replacement details");
+    add(
+      "Administrative",
+      "supersede-replacement",
+      "Correct replacement record",
+      true,
+    );
+  }
+  if (claim.active && permissions.resolve && claim.result !== "PENDING")
+    add("Administrative", "close-claim", "Close warranty process", true);
+  const order = [
+    "Edit Information",
+    "Scheduling & Follow-up",
+    "Documents",
+    "Resolution",
+    "Administrative",
+  ];
+  return order.map((label) => ({
+    label,
+    danger: label === "Administrative",
+    actions: actions.filter((a) => a.group === label),
+  }));
 }
 
-export default function WarrantySection({ticketId,onTicketChanged}){
- const permissions=useMemo(()=>({view:hasAccess("VIEW_WARRANTY"),manage:hasAccess("MANAGE_WARRANTY"),assign:hasAccess("ASSIGN_TICKET"),resolve:hasAccess("RESOLVE_WARRANTY"),documents:hasAccess("MANAGE_WARRANTY_DOCUMENTS")}),[]);
- const[claim,setClaim]=useState(null),[documentSummary,setDocumentSummary]=useState(null),[loading,setLoading]=useState(permissions.view),[error,setError]=useState(""),[successMessage,setSuccessMessage]=useState(""),[activeActionKey,setActiveActionKey]=useState(""),[actionContext,setActionContext]=useState({}),[activityVersion,setActivityVersion]=useState(0),[starting,setStarting]=useState(false),[confirmStart,setConfirmStart]=useState(false),[trigger,setTrigger]=useState(null);
- const load=useCallback(async()=>{if(!permissions.view)return;setLoading(true);setError("");try{const next=await getWarranty(ticketId);setClaim(next);if(next)setDocumentSummary(await getWarrantyDocumentSummary(ticketId,next.id));else setDocumentSummary(null);}catch(e){setError(e.message||"Unable to load warranty details.");}finally{setLoading(false);}},[permissions.view,ticketId]);
- useEffect(()=>{const timer=window.setTimeout(load,0);return()=>window.clearTimeout(timer);},[load]);
- const canOpen=permission=>!permission||permission==="MANAGE_WARRANTY"&&permissions.manage||permission==="ASSIGN_TICKET"&&permissions.assign||permission==="RESOLVE_WARRANTY"&&permissions.resolve;
- const openAction=(key,context={},source)=>{setActiveActionKey(key);setActionContext(context);setTrigger(source||document.activeElement);};
- const closeAction=useCallback(()=>{setActiveActionKey("");setActionContext({});window.setTimeout(()=>trigger?.focus?.(),0);},[trigger]);
- const successCopy={"edit-details":"Warranty details saved.","assign-owner":"Person responsible updated.","complaint-pending":"Complaint follow-up scheduled.","register-complaint":"Manufacturer complaint registered.","schedule-visit":"Engineer visit scheduled.","update-visit":"Engineer visit date changed.","record-visit":"Engineer visit recorded.","follow-up":"Follow-up updated.","record-result":"Warranty result recorded.","customer-decision":"Customer decision recorded.","record-replacement":"Replacement received.","edit-replacement":"Replacement details saved.","supersede-replacement":"Corrected replacement record created.","move-ready":"Ticket moved to Ready for Delivery.","move-replacement-ready":"Replacement moved to Ready for Delivery.","confirm-replacement-delivered":"Replacement delivery confirmed and warranty closed.","close-claim":"Warranty process closed.","manage-documents":"Warranty documents updated."};
- const success=async(response,actionKey)=>{const ticketChanged=Boolean(response?.ticket);const next=response?.warranty||response;if(next?.id)setClaim(next);setActiveActionKey("");setActionContext({});await load();setActivityVersion(v=>v+1);if(ticketChanged&&onTicketChanged)await onTicketChanged();setSuccessMessage(successCopy[actionKey]||"Warranty updated.");window.setTimeout(()=>setSuccessMessage(""),4000);};
- const start=async()=>{setStarting(true);setError("");try{setClaim(await createWarranty(ticketId,{}));setConfirmStart(false);await load();setActivityVersion(v=>v+1);}catch(e){setError(e.status===409?"An active warranty claim already exists. Reload to see the latest details.":e.message);}finally{setStarting(false);}};
- if(!permissions.view&&!permissions.manage)return null;
- if(loading&&!claim)return <section id="warranty" className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm"><p className="flex items-center gap-2 text-sm font-bold text-slate-600" role="status"><ShieldCheck size={18}/>Loading warranty details…</p></section>;
- if(!claim)return <section id="warranty" className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm"><h2 className="flex items-center gap-2 text-lg font-extrabold text-blue-950"><ShieldCheck size={20}/>Warranty</h2>{error&&<p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">{error}</p>}<p className="mt-3 text-sm font-bold text-slate-700">Warranty has not been started for this ticket.</p><p className="mt-1 text-sm text-slate-600">Use warranty processing when the product may be covered by the manufacturer.</p>{permissions.manage&&!confirmStart&&<button type="button" onClick={()=>setConfirmStart(true)} className="ke-primary-action mt-4 min-h-11 w-full rounded-xl px-4 font-extrabold sm:w-auto">Start Warranty Process</button>}{confirmStart&&<div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3" role="alertdialog" aria-labelledby="start-warranty-title"><h3 id="start-warranty-title" className="font-extrabold text-amber-950">Start warranty processing?</h3><p className="mt-1 text-sm font-semibold text-amber-900">This repair ticket will be tracked as a warranty claim. No separate ticket is created.</p><div className="mt-3 grid grid-cols-2 gap-2"><button type="button" onClick={()=>setConfirmStart(false)} className="min-h-11 rounded-xl border font-bold">Cancel</button><button type="button" onClick={start} disabled={starting} className="ke-primary-action min-h-11 rounded-xl font-bold">{starting?"Starting…":"Confirm"}</button></div></div>}</section>;
- const primary=pendingPresentation(claim.pendingAction);
- const alerts=buildAlerts(claim,documentSummary);
- const groups=actionGroups(claim,permissions,primary.key);
- return <section id="warranty" className="rounded-2xl border border-amber-200 bg-white p-3.5 shadow-sm sm:p-5">
-  <div className="space-y-4"><WarrantyHeader claim={claim}/>{successMessage&&<p className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800" role="status" aria-live="polite">{successMessage}</p>}{error&&<div className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700" role="alert"><p>{error}</p>{/changed while|changed, or/i.test(error)&&<button type="button" onClick={load} className="mt-2 min-h-10 rounded-lg border border-red-300 px-3">Reload Latest</button>}</div>}
-   <div className="grid gap-4 lg:grid-cols-[minmax(0,1.85fr)_minmax(16rem,1fr)]"><div className="space-y-4"><WarrantyPrimaryActionCard claim={claim} canOpen={canOpen} onOpen={openAction}/><WarrantyAlerts alerts={alerts} onOpen={openAction}/><WarrantyJourney claim={claim}/><WarrantyMoreActions groups={groups} onOpen={openAction}/><WarrantyDetails claim={claim} currentSection={detailSectionFor(claim)}/></div><aside className="space-y-4"><WarrantyDocumentsSummary summary={documentSummary} canManage={permissions.documents} active={claim.active} onOpen={openAction}/><WarrantyRecentActivity ticketId={ticketId} claimId={claim.id} refreshToken={activityVersion}/>{!claim.active&&permissions.manage&&<button type="button" onClick={()=>setConfirmStart(true)} className="min-h-11 w-full rounded-xl border border-blue-300 px-4 font-extrabold text-blue-950">Start a new warranty claim</button>}</aside></div>
-  </div>
-  {confirmStart&&!claim.active&&<div className="fixed inset-0 z-[65] flex items-end justify-center bg-slate-950/40 p-3 sm:items-center" role="dialog" aria-modal="true" aria-labelledby="new-warranty-title"><div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl"><h2 id="new-warranty-title" className="text-lg font-extrabold text-blue-950">Start a new warranty claim?</h2><p className="mt-2 text-sm font-semibold text-slate-600">The closed claim remains in history. A new active claim will be created for this ticket.</p><div className="mt-4 grid grid-cols-2 gap-2"><button type="button" onClick={()=>setConfirmStart(false)} className="min-h-11 rounded-xl border font-bold">Cancel</button><button type="button" onClick={start} disabled={starting} className="ke-primary-action min-h-11 rounded-xl font-bold">{starting?"Starting…":"Start new claim"}</button></div></div></div>}
-  <WarrantyActionHost activeActionKey={activeActionKey} context={actionContext} claim={claim} canManageDocuments={permissions.documents} onClose={closeAction} onSuccess={success} onReload={load} onError={setError}/>
- </section>;
+export default function WarrantySection({ ticketId, onTicketChanged }) {
+  const permissions = useMemo(
+    () => ({
+      view: hasAccess("VIEW_WARRANTY"),
+      manage: hasAccess("MANAGE_WARRANTY"),
+      resolve: hasAccess("RESOLVE_WARRANTY"),
+      documents: hasAccess("MANAGE_WARRANTY_DOCUMENTS"),
+    }),
+    [],
+  );
+  const [claim, setClaim] = useState(null),
+    [documentSummary, setDocumentSummary] = useState(null),
+    [loading, setLoading] = useState(permissions.view),
+    [error, setError] = useState(""),
+    [successMessage, setSuccessMessage] = useState(""),
+    [activeActionKey, setActiveActionKey] = useState(""),
+    [actionContext, setActionContext] = useState({}),
+    [activityVersion, setActivityVersion] = useState(0),
+    [starting, setStarting] = useState(false),
+    [confirmStart, setConfirmStart] = useState(false),
+    [trigger, setTrigger] = useState(null);
+  const load = useCallback(async () => {
+    if (!permissions.view) return;
+    setLoading(true);
+    setError("");
+    try {
+      const next = await getWarranty(ticketId);
+      setClaim(next);
+      if (next)
+        setDocumentSummary(await getWarrantyDocumentSummary(ticketId, next.id));
+      else setDocumentSummary(null);
+    } catch (e) {
+      setError(e.message || "Unable to load warranty details.");
+    } finally {
+      setLoading(false);
+    }
+  }, [permissions.view, ticketId]);
+  useEffect(() => {
+    const timer = window.setTimeout(load, 0);
+    return () => window.clearTimeout(timer);
+  }, [load]);
+  const canOpen = (permission) =>
+    !permission ||
+    (permission === "MANAGE_WARRANTY" && permissions.manage) ||
+    (permission === "RESOLVE_WARRANTY" && permissions.resolve);
+  const openAction = (key, context = {}, source) => {
+    setActiveActionKey(key);
+    setActionContext(context);
+    setTrigger(source || document.activeElement);
+  };
+  const closeAction = useCallback(() => {
+    setActiveActionKey("");
+    setActionContext({});
+    window.setTimeout(() => trigger?.focus?.(), 0);
+  }, [trigger]);
+  const successCopy = {
+    "edit-details": "Warranty details saved.",
+    "complaint-pending": "Complaint follow-up scheduled.",
+    "register-complaint": "Manufacturer complaint registered.",
+    "schedule-visit": "Engineer visit scheduled.",
+    "update-visit": "Engineer visit date changed.",
+    "record-visit": "Engineer visit recorded.",
+    "follow-up": "Follow-up updated.",
+    "record-result": "Warranty result recorded.",
+    "customer-decision": "Customer decision recorded.",
+    "record-replacement": "Replacement received.",
+    "edit-replacement": "Replacement details saved.",
+    "supersede-replacement": "Corrected replacement record created.",
+    "move-ready": "Ticket moved to Ready for Delivery.",
+    "move-replacement-ready": "Replacement moved to Ready for Delivery.",
+    "confirm-replacement-delivered":
+      "Replacement delivery confirmed and warranty closed.",
+    "close-claim": "Warranty process closed.",
+    "manage-documents": "Warranty documents updated.",
+  };
+  const success = async (response, actionKey) => {
+    const ticketChanged = Boolean(response?.ticket);
+    const next = response?.warranty || response;
+    if (next?.id) setClaim(next);
+    setActiveActionKey("");
+    setActionContext({});
+    await load();
+    setActivityVersion((v) => v + 1);
+    if (ticketChanged && onTicketChanged) await onTicketChanged();
+    setSuccessMessage(successCopy[actionKey] || "Warranty updated.");
+    window.setTimeout(() => setSuccessMessage(""), 4000);
+  };
+  const start = async () => {
+    setStarting(true);
+    setError("");
+    try {
+      setClaim(await createWarranty(ticketId, {}));
+      setConfirmStart(false);
+      await load();
+      setActivityVersion((v) => v + 1);
+    } catch (e) {
+      setError(
+        e.status === 409
+          ? "An active warranty claim already exists. Reload to see the latest details."
+          : e.message,
+      );
+    } finally {
+      setStarting(false);
+    }
+  };
+  if (!permissions.view && !permissions.manage) return null;
+  if (loading && !claim)
+    return (
+      <section
+        id="warranty"
+        className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm"
+      >
+        <p
+          className="flex items-center gap-2 text-sm font-bold text-slate-600"
+          role="status"
+        >
+          <ShieldCheck size={18} />
+          Loading warranty details…
+        </p>
+      </section>
+    );
+  if (!claim)
+    return (
+      <section
+        id="warranty"
+        className="rounded-2xl border border-amber-200 bg-white p-4 shadow-sm"
+      >
+        <h2 className="flex items-center gap-2 text-lg font-extrabold text-blue-950">
+          <ShieldCheck size={20} />
+          Warranty
+        </h2>
+        {error && (
+          <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700">
+            {error}
+          </p>
+        )}
+        <p className="mt-3 text-sm font-bold text-slate-700">
+          Warranty has not been started for this ticket.
+        </p>
+        <p className="mt-1 text-sm text-slate-600">
+          Use warranty processing when the product may be covered by the
+          manufacturer.
+        </p>
+        {permissions.manage && !confirmStart && (
+          <button
+            type="button"
+            onClick={() => setConfirmStart(true)}
+            className="ke-primary-action mt-4 min-h-11 w-full rounded-xl px-4 font-extrabold sm:w-auto"
+          >
+            Start Warranty Process
+          </button>
+        )}
+        {confirmStart && (
+          <div
+            className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3"
+            role="alertdialog"
+            aria-labelledby="start-warranty-title"
+          >
+            <h3
+              id="start-warranty-title"
+              className="font-extrabold text-amber-950"
+            >
+              Start warranty processing?
+            </h3>
+            <p className="mt-1 text-sm font-semibold text-amber-900">
+              This repair ticket will be tracked as a warranty claim. No
+              separate ticket is created.
+            </p>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmStart(false)}
+                className="min-h-11 rounded-xl border font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={start}
+                disabled={starting}
+                className="ke-primary-action min-h-11 rounded-xl font-bold"
+              >
+                {starting ? "Starting…" : "Confirm"}
+              </button>
+            </div>
+          </div>
+        )}
+      </section>
+    );
+  const primary = pendingPresentation(claim.pendingAction);
+  const alerts = buildAlerts(claim, documentSummary);
+  const groups = actionGroups(claim, permissions, primary.key);
+  return (
+    <section
+      id="warranty"
+      className="rounded-2xl border border-amber-200 bg-white p-3.5 shadow-sm sm:p-5"
+    >
+      <div className="space-y-4">
+        <WarrantyHeader claim={claim} />
+        {successMessage && (
+          <p
+            className="rounded-xl bg-emerald-50 p-3 text-sm font-bold text-emerald-800"
+            role="status"
+            aria-live="polite"
+          >
+            {successMessage}
+          </p>
+        )}
+        {error && (
+          <div
+            className="rounded-xl bg-red-50 p-3 text-sm font-bold text-red-700"
+            role="alert"
+          >
+            <p>{error}</p>
+            {/changed while|changed, or/i.test(error) && (
+              <button
+                type="button"
+                onClick={load}
+                className="mt-2 min-h-10 rounded-lg border border-red-300 px-3"
+              >
+                Reload Latest
+              </button>
+            )}
+          </div>
+        )}
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.85fr)_minmax(16rem,1fr)]">
+          <div className="space-y-4">
+            <WarrantyPrimaryActionCard
+              claim={claim}
+              canOpen={canOpen}
+              onOpen={openAction}
+            />
+            <WarrantyAlerts alerts={alerts} onOpen={openAction} />
+            <WarrantyJourney claim={claim} />
+            <WarrantyMoreActions groups={groups} onOpen={openAction} />
+            <WarrantyDetails
+              claim={claim}
+              currentSection={detailSectionFor(claim)}
+            />
+          </div>
+          <aside className="space-y-4">
+            <WarrantyDocumentsSummary
+              summary={documentSummary}
+              canManage={permissions.documents}
+              active={claim.active}
+              onOpen={openAction}
+            />
+            <WarrantyRecentActivity
+              ticketId={ticketId}
+              claimId={claim.id}
+              refreshToken={activityVersion}
+            />
+            {!claim.active && permissions.manage && (
+              <button
+                type="button"
+                onClick={() => setConfirmStart(true)}
+                className="min-h-11 w-full rounded-xl border border-blue-300 px-4 font-extrabold text-blue-950"
+              >
+                Start a new warranty claim
+              </button>
+            )}
+          </aside>
+        </div>
+      </div>
+      {confirmStart && !claim.active && (
+        <div
+          className="fixed inset-0 z-[65] flex items-end justify-center bg-slate-950/40 p-3 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="new-warranty-title"
+        >
+          <div className="w-full max-w-md rounded-2xl bg-white p-4 shadow-2xl">
+            <h2
+              id="new-warranty-title"
+              className="text-lg font-extrabold text-blue-950"
+            >
+              Start a new warranty claim?
+            </h2>
+            <p className="mt-2 text-sm font-semibold text-slate-600">
+              The closed claim remains in history. A new active claim will be
+              created for this ticket.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmStart(false)}
+                className="min-h-11 rounded-xl border font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={start}
+                disabled={starting}
+                className="ke-primary-action min-h-11 rounded-xl font-bold"
+              >
+                {starting ? "Starting…" : "Start new claim"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <WarrantyActionHost
+        activeActionKey={activeActionKey}
+        context={actionContext}
+        claim={claim}
+        canManageDocuments={permissions.documents}
+        onClose={closeAction}
+        onSuccess={success}
+        onReload={load}
+        onError={setError}
+      />
+    </section>
+  );
 }

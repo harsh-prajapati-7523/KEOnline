@@ -1,13 +1,388 @@
 /* eslint-disable react-hooks/exhaustive-deps */
-import{useCallback,useEffect,useMemo,useState}from"react";import{Link}from"react-router-dom";import{RefreshCw}from"lucide-react";import{getWarrantyReport}from"../services/warrantyReportsApi";const reportSections=["summary","outcomes","manufacturers","resolution-times","follow-up-visits","replacements","owners","documents","trends"],title=(s)=>s.replaceAll("-"," ").replaceAll("_"," ").replace(/\b\w/g,(c)=>c.toUpperCase()),today=()=>new Date().toLocaleDateString("en-CA",{timeZone:"Asia/Kolkata"}),ago=(n)=>{const d=new Date();d.setDate(d.getDate()-n);return d.toLocaleDateString("en-CA",{timeZone:"Asia/Kolkata"});};
-export default function WarrantyReports(){const[filters,setFilters]=useState({from:ago(29),to:today()}),[data,setData]=useState({}),[errors,setErrors]=useState({}),[loading,setLoading]=useState({}),[options,setOptions]=useState({});const key=useMemo(()=>JSON.stringify(filters),[filters]);const loadSection=useCallback(async(section,signal)=>{setLoading((x)=>({...x,[section]:true}));setErrors((x)=>({...x,[section]:""}));try{const r=await getWarrantyReport(section,filters,signal);setData((x)=>({...x,[section]:r}));}catch(e){if(e.name!=="AbortError")setErrors((x)=>({...x,[section]:e.message}));}finally{if(!signal?.aborted)setLoading((x)=>({...x,[section]:false}));}},[key]);useEffect(()=>{const c=new AbortController(),timers=reportSections.map((s,i)=>setTimeout(()=>loadSection(s,c.signal),i*20));getWarrantyReport("filter-options",filters,c.signal).then((r)=>setOptions(r.data||{})).catch(()=>{});return()=>{timers.forEach(clearTimeout);c.abort();};},[loadSection]);const quick=(days)=>setFilters((f)=>({...f,from:ago(days-1),to:today()}));return <main id="main-content" className="mx-auto max-w-7xl p-3 pb-24 sm:p-6"><div className="flex flex-wrap justify-between gap-3"><div><h1 className="text-2xl font-extrabold text-blue-950">Warranty Reports</h1><p className="text-sm font-semibold text-slate-500">{filters.from} to {filters.to} • Asia/Kolkata</p></div><div className="flex gap-2"><Link to="/warranty" className="flex min-h-10 items-center rounded-xl border px-3 font-bold">Warranty Tracker</Link><button onClick={()=>reportSections.forEach((s)=>loadSection(s))} className="flex min-h-10 items-center gap-2 rounded-xl border px-3 font-bold"><RefreshCw size={17}/>Refresh</button></div></div><div className="mt-4 rounded-xl bg-slate-50 p-3"><div className="flex flex-wrap gap-2">{[[1,"Today"],[7,"7 Days"],[30,"30 Days"],[90,"90 Days"]].map(([d,l])=><button key={d} onClick={()=>quick(d)} className="rounded-full border bg-white px-3 py-2 text-sm font-bold">{l}</button>)}</div><div className="mt-3 grid gap-3 sm:grid-cols-5"><Field label="From" type="date" value={filters.from} onChange={(v)=>setFilters((f)=>({...f,from:v}))}/><Field label="To" type="date" value={filters.to} onChange={(v)=>setFilters((f)=>({...f,to:v}))}/><Select label="Manufacturer" value={filters.manufacturer} values={options.manufacturers} onChange={(v)=>setFilters((f)=>({...f,manufacturer:v}))}/><Select label="Owner" value={filters.owner} values={Object.keys(options.owners||{})} onChange={(v)=>setFilters((f)=>({...f,owner:v}))}/><Select label="Result" value={filters.result} values={options.results} onChange={(v)=>setFilters((f)=>({...f,result:v}))}/></div></div>
-<Section name="Operational Summary" loading={loading.summary} error={errors.summary} retry={()=>loadSection("summary")}><Kpis data={data.summary?.data} links={{overdueFollowUps:"/warranty?view=FOLLOW_UP_DUE&overdue=true",overdueVisits:"/warranty?view=VISIT_OVERDUE",documentsPending:"/warranty?view=DOCUMENTS_PENDING",replacementPending:"/warranty?view=REPLACEMENT_PENDING",readyToDeliver:"/warranty?view=READY_TO_DELIVER"}}/></Section>
-<Section name="Outcome Summary" loading={loading.outcomes} error={errors.outcomes} retry={()=>loadSection("outcomes")}><Bars rows={data.outcomes?.data?.outcomes} labelKey="outcome" valueKey="count" suffix={(r)=>`${r.percentage}%`}/></Section>
-<Section name="Manufacturer Analysis" loading={loading.manufacturers} error={errors.manufacturers} retry={()=>loadSection("manufacturers")}><Cards rows={data.manufacturers?.data?.manufacturers} primary="manufacturer" fields={["totalClaims","activeClaims","actionRequired","overdueFollowUps","overdueVisits","resolvedClaims","rejectedClaims","replacementCases","averageResolutionDays","oldestActiveClaimDays"]} link={(r)=>`/warranty?view=ALL_ACTIVE&manufacturer=${encodeURIComponent(r.manufacturer)}`}/></Section>
-<Section name="Resolution-Time Analysis" loading={loading["resolution-times"]} error={errors["resolution-times"]} retry={()=>loadSection("resolution-times")}><Kpis data={data["resolution-times"]?.data?.overall}/><Bars rows={data["resolution-times"]?.data?.buckets} labelKey="label" valueKey="count" suffix={(r)=>`${r.percentage}%`}/></Section>
-<Section name="Follow-up and Visit Performance" loading={loading["follow-up-visits"]} error={errors["follow-up-visits"]} retry={()=>loadSection("follow-up-visits")}><Kpis data={data["follow-up-visits"]?.data}/>{data["follow-up-visits"]?.data?.followUpDelay?.available===false&&<p className="mt-2 text-sm text-slate-600">Follow-up delay unavailable: {data["follow-up-visits"].data.followUpDelay.reason}</p>}</Section>
-<Section name="Replacement Analysis" loading={loading.replacements} error={errors.replacements} retry={()=>loadSection("replacements")}><Kpis data={data.replacements?.data}/></Section>
-<Section name="Warranty Owner Workload" loading={loading.owners} error={errors.owners} retry={()=>loadSection("owners")}><Cards rows={data.owners?.data?.owners} primary="ownerName" fields={["activeClaims","actionRequired","followUpDue","overdueVisits","awaitingResult","replacementPending","readyToDeliver","oldestActiveClaimDays"]} link={(r)=>`/warranty?view=ACTION_REQUIRED&owner=${encodeURIComponent(r.ownerId||"")}`}/></Section>
-<Section name="Document Readiness" loading={loading.documents} error={errors.documents} retry={()=>loadSection("documents")}><Kpis data={data.documents?.data}/></Section>
-<Section name="Warranty Trend" loading={loading.trends} error={errors.trends} retry={()=>loadSection("trends")}><p className="mb-2 text-sm font-bold">Grouping: {data.trends?.data?.grouping}</p><Cards rows={data.trends?.data?.periods} primary="period" fields={["claimsCreated","complaintsRegistered","claimsResolved","replacementsCompleted","warrantyRejections"]}/></Section></main>}
-function Section({name,loading,error,retry,children}){return <details open className="mt-4 rounded-xl border bg-white p-4"><summary className="cursor-pointer text-lg font-extrabold text-blue-950">{name}</summary>{loading&&<div className="mt-3 h-20 animate-pulse rounded-xl bg-slate-100"/>}{error&&<p className="mt-3 rounded-xl bg-red-50 p-3 text-red-800">{error} <button onClick={retry} className="font-bold underline">Retry</button></p>}{!loading&&!error&&<div className="mt-3">{children}</div>}</details>}function Kpis({data,links={}}){if(!data)return <p className="text-sm text-slate-500">No data</p>;return <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">{Object.entries(data).filter(([,v])=>typeof v!=="object").map(([k,v])=><div key={k} className="rounded-xl bg-blue-50 p-3"><p className="text-xs font-bold text-slate-500">{title(k)}</p><p className="text-xl font-extrabold text-blue-950">{v??"—"}</p>{links[k]&&<Link to={links[k]} className="text-xs font-bold underline">Open tracker</Link>}</div>)}</div>}function Bars({rows=[],labelKey,valueKey,suffix}){if(!rows?.length)return <p>No qualifying records</p>;const max=Math.max(1,...rows.map((r)=>r[valueKey]||0));return <div className="space-y-2">{rows.map((r)=><div key={r[labelKey]}><div className="flex justify-between text-sm font-bold"><span>{title(r[labelKey])}</span><span>{r[valueKey]} {suffix?.(r)}</span></div><div className="h-3 rounded bg-slate-100"><div className="h-3 rounded bg-blue-700" style={{width:`${(r[valueKey]||0)*100/max}%`}}/></div></div>)}</div>}function Cards({rows=[],primary,fields,link}){if(!rows?.length)return <p>No qualifying records</p>;return <div className="grid gap-3 lg:grid-cols-2">{rows.map((r,i)=><div key={`${r[primary]}-${i}`} className="rounded-xl bg-slate-50 p-3"><div className="flex justify-between"><b>{r[primary]}</b>{link&&<Link to={link(r)} className="text-sm font-bold underline">Open tracker</Link>}</div><dl className="mt-2 grid grid-cols-2 gap-2 text-sm">{fields.map((f)=><div key={f}><dt className="text-slate-500">{title(f)}</dt><dd className="font-bold">{typeof r[f]==="object"?r[f]?.average??"—":r[f]??"—"}</dd></div>)}</dl></div>)}</div>}function Field({label,type,value,onChange}){return <label className="text-sm font-bold">{label}<input type={type} value={value||""} onChange={(e)=>onChange(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border px-2"/></label>}function Select({label,value="",values=[],onChange}){return <label className="text-sm font-bold">{label}<select value={value} onChange={(e)=>onChange(e.target.value)} className="mt-1 min-h-11 w-full rounded-xl border bg-white px-2"><option value="">All</option>{values?.map((x)=><option key={x} value={x}>{title(x)}</option>)}</select></label>}
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { RefreshCw } from "lucide-react";
+import { getWarrantyReport } from "../services/warrantyReportsApi";
+const reportSections = [
+    "summary",
+    "outcomes",
+    "manufacturers",
+    "resolution-times",
+    "follow-up-visits",
+    "replacements",
+    "documents",
+    "trends",
+  ],
+  title = (s) =>
+    s
+      .replaceAll("-", " ")
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase()),
+  today = () =>
+    new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }),
+  ago = (n) => {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+  };
+export default function WarrantyReports() {
+  const [filters, setFilters] = useState({ from: ago(29), to: today() }),
+    [data, setData] = useState({}),
+    [errors, setErrors] = useState({}),
+    [loading, setLoading] = useState({}),
+    [options, setOptions] = useState({});
+  const key = useMemo(() => JSON.stringify(filters), [filters]);
+  const loadSection = useCallback(
+    async (section, signal) => {
+      setLoading((x) => ({ ...x, [section]: true }));
+      setErrors((x) => ({ ...x, [section]: "" }));
+      try {
+        const r = await getWarrantyReport(section, filters, signal);
+        setData((x) => ({ ...x, [section]: r }));
+      } catch (e) {
+        if (e.name !== "AbortError")
+          setErrors((x) => ({ ...x, [section]: e.message }));
+      } finally {
+        if (!signal?.aborted) setLoading((x) => ({ ...x, [section]: false }));
+      }
+    },
+    [key],
+  );
+  useEffect(() => {
+    const c = new AbortController(),
+      timers = reportSections.map((s, i) =>
+        setTimeout(() => loadSection(s, c.signal), i * 20),
+      );
+    getWarrantyReport("filter-options", filters, c.signal)
+      .then((r) => setOptions(r.data || {}))
+      .catch(() => {});
+    return () => {
+      timers.forEach(clearTimeout);
+      c.abort();
+    };
+  }, [loadSection]);
+  const quick = (days) =>
+    setFilters((f) => ({ ...f, from: ago(days - 1), to: today() }));
+  return (
+    <main id="main-content" className="mx-auto max-w-7xl p-3 pb-24 sm:p-6">
+      <div className="flex flex-wrap justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold text-blue-950">
+            Warranty Reports
+          </h1>
+          <p className="text-sm font-semibold text-slate-500">
+            {filters.from} to {filters.to} • Asia/Kolkata
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            to="/warranty"
+            className="flex min-h-10 items-center rounded-xl border px-3 font-bold"
+          >
+            Warranty Tracker
+          </Link>
+          <button
+            onClick={() => reportSections.forEach((s) => loadSection(s))}
+            className="flex min-h-10 items-center gap-2 rounded-xl border px-3 font-bold"
+          >
+            <RefreshCw size={17} />
+            Refresh
+          </button>
+        </div>
+      </div>
+      <div className="mt-4 rounded-xl bg-slate-50 p-3">
+        <div className="flex flex-wrap gap-2">
+          {[
+            [1, "Today"],
+            [7, "7 Days"],
+            [30, "30 Days"],
+            [90, "90 Days"],
+          ].map(([d, l]) => (
+            <button
+              key={d}
+              onClick={() => quick(d)}
+              className="rounded-full border bg-white px-3 py-2 text-sm font-bold"
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-4">
+          <Field
+            label="From"
+            type="date"
+            value={filters.from}
+            onChange={(v) => setFilters((f) => ({ ...f, from: v }))}
+          />
+          <Field
+            label="To"
+            type="date"
+            value={filters.to}
+            onChange={(v) => setFilters((f) => ({ ...f, to: v }))}
+          />
+          <Select
+            label="Manufacturer"
+            value={filters.manufacturer}
+            values={options.manufacturers}
+            onChange={(v) => setFilters((f) => ({ ...f, manufacturer: v }))}
+          />
+          <Select
+            label="Result"
+            value={filters.result}
+            values={options.results}
+            onChange={(v) => setFilters((f) => ({ ...f, result: v }))}
+          />
+        </div>
+      </div>
+      <Section
+        name="Operational Summary"
+        loading={loading.summary}
+        error={errors.summary}
+        retry={() => loadSection("summary")}
+      >
+        <Kpis
+          data={data.summary?.data}
+          links={{
+            overdueFollowUps: "/warranty?view=FOLLOW_UP_DUE&overdue=true",
+            overdueVisits: "/warranty?view=VISIT_OVERDUE",
+            documentsPending: "/warranty?view=DOCUMENTS_PENDING",
+            replacementPending: "/warranty?view=REPLACEMENT_PENDING",
+            readyToDeliver: "/warranty?view=READY_TO_DELIVER",
+          }}
+        />
+      </Section>
+      <Section
+        name="Outcome Summary"
+        loading={loading.outcomes}
+        error={errors.outcomes}
+        retry={() => loadSection("outcomes")}
+      >
+        <Bars
+          rows={data.outcomes?.data?.outcomes}
+          labelKey="outcome"
+          valueKey="count"
+          suffix={(r) => `${r.percentage}%`}
+        />
+      </Section>
+      <Section
+        name="Manufacturer Analysis"
+        loading={loading.manufacturers}
+        error={errors.manufacturers}
+        retry={() => loadSection("manufacturers")}
+      >
+        <Cards
+          rows={data.manufacturers?.data?.manufacturers}
+          primary="manufacturer"
+          fields={[
+            "totalClaims",
+            "activeClaims",
+            "actionRequired",
+            "overdueFollowUps",
+            "overdueVisits",
+            "resolvedClaims",
+            "rejectedClaims",
+            "replacementCases",
+            "averageResolutionDays",
+            "oldestActiveClaimDays",
+          ]}
+          link={(r) =>
+            `/warranty?view=ALL_ACTIVE&manufacturer=${encodeURIComponent(r.manufacturer)}`
+          }
+        />
+      </Section>
+      <Section
+        name="Resolution-Time Analysis"
+        loading={loading["resolution-times"]}
+        error={errors["resolution-times"]}
+        retry={() => loadSection("resolution-times")}
+      >
+        <Kpis data={data["resolution-times"]?.data?.overall} />
+        <Bars
+          rows={data["resolution-times"]?.data?.buckets}
+          labelKey="label"
+          valueKey="count"
+          suffix={(r) => `${r.percentage}%`}
+        />
+      </Section>
+      <Section
+        name="Follow-up and Visit Performance"
+        loading={loading["follow-up-visits"]}
+        error={errors["follow-up-visits"]}
+        retry={() => loadSection("follow-up-visits")}
+      >
+        <Kpis data={data["follow-up-visits"]?.data} />
+        {data["follow-up-visits"]?.data?.followUpDelay?.available === false && (
+          <p className="mt-2 text-sm text-slate-600">
+            Follow-up delay unavailable:{" "}
+            {data["follow-up-visits"].data.followUpDelay.reason}
+          </p>
+        )}
+      </Section>
+      <Section
+        name="Replacement Analysis"
+        loading={loading.replacements}
+        error={errors.replacements}
+        retry={() => loadSection("replacements")}
+      >
+        <Kpis data={data.replacements?.data} />
+      </Section>
+      <Section
+        name="Document Readiness"
+        loading={loading.documents}
+        error={errors.documents}
+        retry={() => loadSection("documents")}
+      >
+        <Kpis data={data.documents?.data} />
+      </Section>
+      <Section
+        name="Warranty Trend"
+        loading={loading.trends}
+        error={errors.trends}
+        retry={() => loadSection("trends")}
+      >
+        <p className="mb-2 text-sm font-bold">
+          Grouping: {data.trends?.data?.grouping}
+        </p>
+        <Cards
+          rows={data.trends?.data?.periods}
+          primary="period"
+          fields={[
+            "claimsCreated",
+            "complaintsRegistered",
+            "claimsResolved",
+            "replacementsCompleted",
+            "warrantyRejections",
+          ]}
+        />
+      </Section>
+    </main>
+  );
+}
+function Section({ name, loading, error, retry, children }) {
+  return (
+    <details open className="mt-4 rounded-xl border bg-white p-4">
+      <summary className="cursor-pointer text-lg font-extrabold text-blue-950">
+        {name}
+      </summary>
+      {loading && (
+        <div className="mt-3 h-20 animate-pulse rounded-xl bg-slate-100" />
+      )}
+      {error && (
+        <p className="mt-3 rounded-xl bg-red-50 p-3 text-red-800">
+          {error}{" "}
+          <button onClick={retry} className="font-bold underline">
+            Retry
+          </button>
+        </p>
+      )}
+      {!loading && !error && <div className="mt-3">{children}</div>}
+    </details>
+  );
+}
+function Kpis({ data, links = {} }) {
+  if (!data) return <p className="text-sm text-slate-500">No data</p>;
+  return (
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+      {Object.entries(data)
+        .filter(([, v]) => typeof v !== "object")
+        .map(([k, v]) => (
+          <div key={k} className="rounded-xl bg-blue-50 p-3">
+            <p className="text-xs font-bold text-slate-500">{title(k)}</p>
+            <p className="text-xl font-extrabold text-blue-950">{v ?? "—"}</p>
+            {links[k] && (
+              <Link to={links[k]} className="text-xs font-bold underline">
+                Open tracker
+              </Link>
+            )}
+          </div>
+        ))}
+    </div>
+  );
+}
+function Bars({ rows = [], labelKey, valueKey, suffix }) {
+  if (!rows?.length) return <p>No qualifying records</p>;
+  const max = Math.max(1, ...rows.map((r) => r[valueKey] || 0));
+  return (
+    <div className="space-y-2">
+      {rows.map((r) => (
+        <div key={r[labelKey]}>
+          <div className="flex justify-between text-sm font-bold">
+            <span>{title(r[labelKey])}</span>
+            <span>
+              {r[valueKey]} {suffix?.(r)}
+            </span>
+          </div>
+          <div className="h-3 rounded bg-slate-100">
+            <div
+              className="h-3 rounded bg-blue-700"
+              style={{ width: `${((r[valueKey] || 0) * 100) / max}%` }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+function Cards({ rows = [], primary, fields, link }) {
+  if (!rows?.length) return <p>No qualifying records</p>;
+  return (
+    <div className="grid gap-3 lg:grid-cols-2">
+      {rows.map((r, i) => (
+        <div key={`${r[primary]}-${i}`} className="rounded-xl bg-slate-50 p-3">
+          <div className="flex justify-between">
+            <b>{r[primary]}</b>
+            {link && (
+              <Link to={link(r)} className="text-sm font-bold underline">
+                Open tracker
+              </Link>
+            )}
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-2 text-sm">
+            {fields.map((f) => (
+              <div key={f}>
+                <dt className="text-slate-500">{title(f)}</dt>
+                <dd className="font-bold">
+                  {typeof r[f] === "object"
+                    ? (r[f]?.average ?? "—")
+                    : (r[f] ?? "—")}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      ))}
+    </div>
+  );
+}
+function Field({ label, type, value, onChange }) {
+  return (
+    <label className="text-sm font-bold">
+      {label}
+      <input
+        type={type}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 min-h-11 w-full rounded-xl border px-2"
+      />
+    </label>
+  );
+}
+function Select({ label, value = "", values = [], onChange }) {
+  return (
+    <label className="text-sm font-bold">
+      {label}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="mt-1 min-h-11 w-full rounded-xl border bg-white px-2"
+      >
+        <option value="">All</option>
+        {values?.map((x) => (
+          <option key={x} value={x}>
+            {title(x)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}

@@ -14,7 +14,7 @@ async function parse(response) {
 export async function getWarranty(ticketId) { return parse(await fetch(`/volt/tickets/${ticketId}/warranty`, { headers: headers() })); }
 export async function createWarranty(ticketId, body = {}) { return parse(await fetch(`/volt/tickets/${ticketId}/warranty`, { method: "POST", headers: headers(true), body: JSON.stringify(body) })); }
 export async function updateWarranty(ticketId, claimId, body) { return parse(await fetch(`/volt/tickets/${ticketId}/warranty/${claimId}`, { method: "PATCH", headers: headers(true), body: JSON.stringify(body) })); }
-export async function getWarrantyEvents(ticketId, claimId) { return parse(await fetch(`/volt/tickets/${ticketId}/warranty/${claimId}/events?page=0&size=10`, { headers: headers() })); }
+export async function getWarrantyEvents(ticketId, claimId, page = 0, size = 5, signal) { return parse(await fetch(`/volt/tickets/${ticketId}/warranty/${claimId}/events?page=${page}&size=${size}`, { headers: headers(), signal })); }
 export async function getAssignableEmployees() { return parse(await fetch("/volt/tickets/assignable-employees", { headers: headers() })); }
 async function warrantyAction(ticketId, claimId, path, method, body) { return parse(await fetch(`/volt/tickets/${ticketId}/warranty/${claimId}/${path}`, { method, headers: headers(true), body: JSON.stringify(body) })); }
 export const markComplaintRegistrationPending = (ticketId, claimId, body) => warrantyAction(ticketId, claimId, "actions/complaint-registration-pending", "POST", body);

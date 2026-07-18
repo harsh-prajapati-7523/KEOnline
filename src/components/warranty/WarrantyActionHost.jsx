@@ -100,8 +100,6 @@ const replacementModes = {
 };
 const empty = {
   billingDate: "",
-  warrantyStartDate: "",
-  warrantyEndDate: "",
   manufacturerName: "",
   productSerialNumber: "",
   modelNumber: "",
@@ -109,7 +107,6 @@ const empty = {
   complaintRegisteredDate: "",
   expectedVisitDate: "",
   manufacturerEngineerName: "",
-  manufacturerEngineerMobile: "",
   manufacturerServiceCenterName: "",
   warrantyNotes: "",
   nextFollowUpDate: "",
@@ -194,27 +191,13 @@ function DetailsForm({ claim, onSuccess, onError }) {
         <legend className="sr-only">Warranty details</legend>
         <>
           <p className="text-xs font-extrabold uppercase text-slate-500 sm:col-span-2">
-            Warranty dates
+            Billing information
           </p>
           <Field
             label="Billing date"
             name="billingDate"
             type="date"
             value={form.billingDate}
-            onChange={change}
-          />
-          <Field
-            label="Warranty start"
-            name="warrantyStartDate"
-            type="date"
-            value={form.warrantyStartDate}
-            onChange={change}
-          />
-          <Field
-            label="Warranty end"
-            name="warrantyEndDate"
-            type="date"
-            value={form.warrantyEndDate}
             onChange={change}
           />
           <p className="text-xs font-extrabold uppercase text-slate-500 sm:col-span-2">
@@ -240,14 +223,6 @@ function DetailsForm({ claim, onSuccess, onError }) {
             value={form.modelNumber}
             onChange={change}
             error={errors.modelNumber}
-          />
-          <Field
-            label="Engineer mobile"
-            name="manufacturerEngineerMobile"
-            type="tel"
-            inputMode="tel"
-            value={form.manufacturerEngineerMobile}
-            onChange={change}
           />
           <label className="text-sm font-bold text-slate-700 sm:col-span-2">
             Warranty notes
